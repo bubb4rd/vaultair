@@ -24,7 +24,7 @@ jobs:
       rust: ${{ steps.d.outputs.rust }}
       web: ${{ steps.d.outputs.web }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: d
         run: |
           echo "rust=$([ -f Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -37,7 +37,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.rust == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -56,7 +56,7 @@ jobs:
     needs: detect
     if: needs.detect.outputs.rust == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: EmbarkStudios/cargo-deny-action@v2
       - uses: rustsec/audit-check@v2
         with:
@@ -68,8 +68,8 @@ jobs:
     needs: detect
     if: needs.detect.outputs.web == 'true'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: lts/*
           cache: npm
@@ -82,7 +82,7 @@ jobs:
     name: Repo hygiene
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: No vault or backup files committed
         run: |
           found=$(git ls-files '*.vdb' '*.vhdr' '*.vhdr.*' '*.vaultair-backup')
