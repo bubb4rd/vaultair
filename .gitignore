@@ -1,0 +1,36 @@
+# Build output
+/target/
+**/target/
+node_modules/
+dist/
+src-tauri/gen/schemas/
+
+# Vault data: never commit a vault, header, or backup (including test runs)
+*.vdb
+*.vdb-journal
+*.vdb-wal
+*.vdb-shm
+*.vhdr
+*.vhdr.prev
+*.vhdr.tmp
+*.vaultair-backup
+
+# Logs and local env
+*.log
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Claude Code local-only settings
+.claude/settings.local.json
+
+# Junction to .agents/skills/design-taste-frontend (recreate per README "Design tooling")
+.claude/skills/design-taste-frontend

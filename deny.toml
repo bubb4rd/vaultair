@@ -1,0 +1,53 @@
+# cargo-deny policy. Checked in CI once the Cargo workspace exists.
+# See docs/adr/0002-crypto-and-storage.md and the "no network" promise in docs/threat-model.md.
+
+[graph]
+targets = ["x86_64-pc-windows-msvc"]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "MPL-2.0",
+    "OpenSSL",
+    "BSL-1.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# The MVP makes no network connections. Adding any HTTP/socket client crate fails the build.
+deny = [
+    { name = "reqwest" },
+    { name = "hyper" },
+    { name = "ureq" },
+    { name = "isahc" },
+    { name = "curl" },
+    { name = "surf" },
+    { name = "attohttpc" },
+    { name = "tokio-tungstenite" },
+    { name = "tungstenite" },
+    { name = "tauri-plugin-http" },
+    { name = "tauri-plugin-updater" },
+    { name = "tauri-plugin-shell" },
+    { name = "tauri-plugin-fs" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
