@@ -58,16 +58,15 @@ jobs:
         run: git diff --exit-code -- src/ipc/bindings.ts || (echo "::error::src/ipc/bindings.ts is stale. Run cargo test -p vaultair and commit it." && exit 1)
 
   supply-chain:
-    name: Rust supply chain (cargo-deny, cargo-audit)
+    name: Rust supply chain (cargo-deny)
     runs-on: ubuntu-latest
     needs: detect
     if: needs.detect.outputs.rust == 'true'
     steps:
       - uses: actions/checkout@v5
+      # Advisories come from the RustSec database, the same one cargo-audit uses,
+      # so a separate cargo-audit step would only duplicate this check.
       - uses: EmbarkStudios/cargo-deny-action@v2
-      - uses: rustsec/audit-check@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
   web:
     name: Frontend (lint, typecheck, test)
