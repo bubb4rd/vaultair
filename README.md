@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 0 (repo, toolchain, decisions). No application code yet.
+> **Status:** Phase 0 complete (2026-09-23). Next: Phase 1, the Tauri + React + TS shell with the security baseline.
 > Proprietary. All rights reserved.
 
 ## Docs
