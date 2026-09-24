@@ -27,6 +27,7 @@
 | 17 | Multiple vaults | One open at a time, with a recent-vaults switcher. |
 | 18 | CSV export | **Not implemented in the MVP**; tests assert its absence. |
 | 19 | "High-priority" saved view | Favorites + accounts with the Main or Recovery purpose + accounts with high-severity health issues. |
+| 20 | Favorites (2026-09-24) | **A sidebar section, not a page.** Starred accounts are listed directly in the sidebar under "Favorites" (after the Vault group), in the order they were starred; there is no Favorites route. Empty until accounts exist (Phase 7). |
 
 ## Still open
 

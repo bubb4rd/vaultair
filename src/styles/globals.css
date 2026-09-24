@@ -143,12 +143,14 @@
   }
 }
 
-/* Motion dial 3: only short state transitions, and none at all when the OS asks. */
+/* Motion: short state transitions app-wide; onboarding adds step enter animations.
+   None at all when the OS asks (delays too, or staggered content would stay hidden). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

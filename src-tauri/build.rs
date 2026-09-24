@@ -13,6 +13,12 @@ fn main() {
             "vault_lock",
             "vault_status",
             "vault_integrity_check",
+            "vault_create_demo",
+            "vault_location_check",
+            "vault_pick_folder",
+            "recent_vaults_list",
+            "recent_vaults_forget",
+            "strength_estimate",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

@@ -1,8 +1,8 @@
 //! Typed IPC surface. `bindings.ts` is generated from this list.
 
-use tauri_specta::{collect_commands, Builder};
+use tauri_specta::{collect_commands, collect_events, Builder};
 
-use crate::commands;
+use crate::{commands, events};
 
 pub fn builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
@@ -14,7 +14,14 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::vault::vault_lock,
             commands::vault::vault_status,
             commands::vault::vault_integrity_check,
+            commands::vault::vault_create_demo,
+            commands::vault::vault_location_check,
+            commands::vault::vault_pick_folder,
+            commands::recent::recent_vaults_list,
+            commands::recent::recent_vaults_forget,
+            commands::password::strength_estimate,
         ])
+        .events(collect_events![events::VaultLocked])
         // Error codes every command can reject with (see `vaultair_core::AppError`).
         .typ::<vaultair_core::ErrorCode>()
 }

@@ -1,13 +1,23 @@
 import { useState } from "react";
-import { RouterProvider } from "@tanstack/react-router";
+import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { VaultGate } from "./lock-guard";
+import { createQueryClient } from "./queries";
 import { createAppRouter } from "./router";
 
-export function App({ router: injected }: { router?: ReturnType<typeof createAppRouter> }) {
-  const [router] = useState(() => injected ?? createAppRouter());
+interface AppProps {
+  router?: ReturnType<typeof createAppRouter>;
+  queryClient?: QueryClient;
+}
+
+export function App({ router: injectedRouter, queryClient: injectedClient }: AppProps) {
+  const [router] = useState(() => injectedRouter ?? createAppRouter());
+  const [queryClient] = useState(() => injectedClient ?? createQueryClient());
   return (
-    <TooltipProvider delayDuration={400}>
-      <RouterProvider router={router} />
-    </TooltipProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider delayDuration={400}>
+        <VaultGate router={router} />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }

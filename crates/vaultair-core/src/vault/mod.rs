@@ -6,6 +6,7 @@ mod create;
 pub mod error;
 pub mod header;
 pub mod layout;
+pub mod location;
 pub mod lockfile;
 mod open;
 

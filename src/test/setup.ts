@@ -15,6 +15,9 @@ if (!("scrollIntoView" in Element.prototype)) {
   Object.defineProperty(Element.prototype, "scrollIntoView", { value: () => undefined });
 }
 
+// The router restores scroll position on navigation; jsdom does not implement it.
+window.scrollTo = () => undefined;
+
 afterEach(() => {
   cleanup();
   clearMocks();

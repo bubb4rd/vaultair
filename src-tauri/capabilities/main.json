@@ -21,6 +21,12 @@
     "allow-vault-unlock",
     "allow-vault-lock",
     "allow-vault-status",
-    "allow-vault-integrity-check"
+    "allow-vault-integrity-check",
+    "allow-vault-create-demo",
+    "allow-vault-location-check",
+    "allow-vault-pick-folder",
+    "allow-recent-vaults-list",
+    "allow-recent-vaults-forget",
+    "allow-strength-estimate"
   ]
 }

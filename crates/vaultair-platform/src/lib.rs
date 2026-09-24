@@ -1,8 +1,8 @@
 //! OS integration boundary.
 //!
-//! Phase 1 defines the traits only. Windows implementations (clipboard
-//! exclusion formats, WTS session events, display affinity) and test fakes
-//! arrive in Phase 5. This is the only crate where `unsafe` will be allowed,
+//! The traits are implemented in Phase 5 (clipboard exclusion formats, WTS
+//! session events, display affinity, test fakes). The `windows` module already
+//! holds WebView2 hardening and the native folder picker. This is the only crate where `unsafe` will be allowed,
 //! and only inside its `windows` module.
 
 use std::time::Duration;

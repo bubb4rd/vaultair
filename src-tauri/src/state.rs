@@ -1,13 +1,27 @@
 use std::sync::Arc;
 
 use serde::Serialize;
+use vaultair_core::config::{default_app_dir, ConfigStore};
 use vaultair_core::service::session::SessionManager;
+use vaultair_core::vault::location::CloudRoots;
 use vaultair_core::{AppError, ErrorCode};
 
 /// Managed Tauri state.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct AppState {
     pub session: Arc<SessionManager>,
+    pub config: Arc<ConfigStore>,
+    pub cloud_roots: CloudRoots,
+}
+
+impl AppState {
+    pub fn load() -> Self {
+        Self {
+            session: Arc::default(),
+            config: Arc::new(ConfigStore::load(default_app_dir())),
+            cloud_roots: CloudRoots::from_env(),
+        }
+    }
 }
 
 /// What a failed command sends to the UI: `vaultair_core::AppError` as a

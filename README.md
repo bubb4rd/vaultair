@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 3 (vault engine: Argon2id, SQLCipher, key hierarchy; UI-less commands). Next: Phase 4, onboarding and the lock screen.
+> **Status:** Phase 4 (onboarding, lock screen, recent vaults, manual lock). Next: Phase 5, auto-lock, session lock, clipboard service and capture protection.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -16,6 +16,8 @@ A local-first, encrypted Windows workspace for people who manage several gaming 
 | [`docs/vault-format.md`](docs/vault-format.md) | Byte-level vault format, key hierarchy, error classes |
 | [`docs/security-assumptions.md`](docs/security-assumptions.md) | What the crypto relies on, and its known limits |
 | [`docs/local-data-storage.md`](docs/local-data-storage.md) | Every file Vaultair writes |
+| [`docs/privacy-statement-draft.md`](docs/privacy-statement-draft.md) | Privacy promises; source for onboarding and settings copy |
+| [`docs/forgot-master-password.md`](docs/forgot-master-password.md) | Why there is no recovery, and what to do instead |
 | [`docs/threat-model.md`](docs/threat-model.md) | What Vaultair does and does not protect against (draft) |
 | [`docs/adr/`](docs/adr) | Architecture decision records |
 
@@ -66,3 +68,10 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 ## Phase 3 notes
 
 - Unlock at calibrated parameters: **0.89 s** at Argon2id 512 MiB, t=3, p=4 on the dev machine (target ≤ 1.5 s). Re-measure with `cargo test --release -p vaultair-core --test vault_integration -- --ignored unlock_time --nocapture`.
+
+## Phase 4 notes
+
+- Driven end to end in the real webview (2026-09-24): onboarding, create, Ctrl+L lock, wrong password, unlock, force-kill and restart, unlock again, lock from the sidebar. Create (calibration + Argon2 + SQLCipher) took 1.1 s, unlock 0.8 s, in a debug build.
+- To drive the app from a script: set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` before `npm run tauri dev` and attach with Playwright `chromium.connectOverCDP`. Point `LOCALAPPDATA` at a scratch folder so test vaults and `config.json` don't land in your real profile.
+- No `tauri-plugin-dialog` (it pulls in the banned `tauri-plugin-fs`); the folder picker is native, in `vaultair-platform`.
+- Not done in Phase 4: `app_config_get/update` (there is nothing user-configurable before Phase 5; `config.json` currently holds only the recent-vaults list), and routing `vault_locked` errors from data commands to the lock screen (no data commands exist until Phase 7).

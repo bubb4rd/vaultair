@@ -9,7 +9,6 @@ import {
   KeyIcon,
   PulseIcon,
   SquaresFourIcon,
-  StarIcon,
 } from "@phosphor-icons/react";
 
 export interface NavItem {
@@ -24,7 +23,11 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-/** Sidebar destinations (implementation plan, Phase 2). Order is the sidebar order. */
+/**
+ * Sidebar destinations (implementation plan, Phase 2). Order is the sidebar order.
+ * Favorites is not a page: it is a sidebar section listing starred accounts
+ * (`FavoritesGroup`), placed after the "Vault" group.
+ */
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: null,
@@ -62,15 +65,6 @@ export const NAV_GROUPS: NavGroup[] = [
           title: "No identities yet",
           description:
             "An identity groups the accounts, emails and handles that belong to one persona, such as your main or a creator profile.",
-        },
-      },
-      {
-        path: "/favorites",
-        label: "Favorites",
-        icon: StarIcon,
-        empty: {
-          title: "No favorites",
-          description: "Star an account to keep it here for quick access.",
         },
       },
       {
