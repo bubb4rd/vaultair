@@ -1,0 +1,10 @@
+# Nothing may print to stdout/stderr: output could end up in logs or terminals with user data.
+disallowed-macros = [
+    { path = "std::dbg", reason = "debug output can leak vault data" },
+    { path = "std::println", reason = "use tracing, with redaction" },
+    { path = "std::eprintln", reason = "use tracing, with redaction" },
+    { path = "std::print", reason = "use tracing, with redaction" },
+    { path = "std::eprint", reason = "use tracing, with redaction" },
+]
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

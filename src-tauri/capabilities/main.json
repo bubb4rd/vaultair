@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Everything the main window may call. Keep this list minimal; see docs/adr/0001-stack.md.",
+  "windows": ["main"],
+  "local": true,
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-unminimize",
+    "allow-app-info"
+  ]
+}

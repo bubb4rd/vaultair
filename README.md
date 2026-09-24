@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 0 complete (2026-09-23). Next: Phase 1, the Tauri + React + TS shell with the security baseline.
+> **Status:** Phase 1 (hardened Tauri + React shell). Next: Phase 2, the dark app shell and design system.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -11,6 +11,7 @@ A local-first, encrypted Windows workspace for people who manage several gaming 
 |---|---|
 | [`docs/product-spec.md`](docs/product-spec.md) | Original product spec |
 | [`docs/implementation-plan.md`](docs/implementation-plan.md) | Architecture, crypto design, schema, and the phased build order (Phases 0–16) |
+| [`docs/architecture.md`](docs/architecture.md) | Layers, security baseline, manual release checks |
 | [`docs/threat-model.md`](docs/threat-model.md) | What Vaultair does and does not protect against (draft) |
 | [`docs/adr/`](docs/adr) | Architecture decision records |
 
@@ -26,9 +27,20 @@ A local-first, encrypted Windows workspace for people who manage several gaming 
 
 ## Development
 
-Application code arrives in Phase 1. Every phase must leave `npm run tauri dev` launching and all tests passing.
+```powershell
+npm install
+npm run tauri dev              # app with hot reload
+cargo test --workspace         # Rust tests (also regenerates src/ipc/bindings.ts)
+npm test -- --run              # frontend tests
+npm run lint; npm run typecheck
+npm run check:release-config
+cargo deny check               # needs: cargo install cargo-deny --locked
+npx tauri build --no-bundle    # release binary at target\release\vaultair.exe
+```
 
-CI (`.github/workflows/ci.yml`) runs fmt, clippy (`-D warnings`), tests, `cargo-deny` and `cargo-audit` for Rust, plus lint, typecheck and tests for the frontend. Each job skips until its manifest exists. `deny.toml` bans network client crates to keep the no-network promise checkable.
+Every phase must leave `npm run tauri dev` launching and all tests passing. After adding or changing a command, run `cargo test -p vaultair` and commit the regenerated `src/ipc/bindings.ts`; CI fails if it's stale.
+
+CI (`.github/workflows/ci.yml`) runs fmt, clippy (`-D warnings`), tests, the bindings check, `cargo-deny` and `cargo-audit` for Rust, plus lint, typecheck, tests and the release-config check for the frontend. `deny.toml` bans network client crates to keep the no-network promise checkable.
 
 Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.gitignore` and a CI check enforce this.
 

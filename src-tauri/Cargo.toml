@@ -1,0 +1,32 @@
+[package]
+name = "vaultair"
+description = "Vaultair desktop app (Tauri command layer)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "vaultair_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+vaultair-core = { path = "../crates/vaultair-core", features = ["specta"] }
+vaultair-platform = { path = "../crates/vaultair-platform" }
+tauri = { version = "=2.11.6", features = [] }
+tauri-plugin-single-instance = "=2.4.5"
+serde.workspace = true
+serde_json.workspace = true
+specta.workspace = true
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta-typescript = "=0.0.12"
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std", "ansi"] }
+tracing-appender = "0.2.5"
+
+[lints]
+workspace = true

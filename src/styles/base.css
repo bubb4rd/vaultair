@@ -1,0 +1,49 @@
+/* Phase 1 placeholder styles. The real design system (tokens, type, palette) lands in Phase 2. */
+:root {
+  color-scheme: dark;
+  --bg: #0d0f12;
+  --surface: #14171c;
+  --border: #23272e;
+  --text: #e6e8eb;
+  --text-muted: #9aa1ab;
+  --danger: #e5484d;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { user-select: none; overflow: hidden; }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  flex: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.titlebar-title { padding-left: 12px; font-size: 12px; color: var(--text-muted); flex: 1; }
+.titlebar-controls { display: flex; height: 100%; }
+.titlebar-controls button {
+  width: 46px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+}
+.titlebar-controls button:hover { background: var(--border); color: var(--text); }
+.titlebar-controls button:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.titlebar-controls .titlebar-close:hover { background: var(--danger); color: #fff; }
+
+.app-body { flex: 1; display: grid; place-content: center; text-align: center; gap: 4px; }
+.app-body h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.muted { color: var(--text-muted); margin: 0; }
+.small { font-size: 12px; }

@@ -1,0 +1,19 @@
+[package]
+name = "vaultair-platform"
+description = "OS integrations (clipboard, session events, capture protection). The only crate allowed `unsafe`."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+# Must match the versions Tauri (wry) uses, so COM interface types are shared.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.38.2"
+windows = "=0.61.3"
+
+[lints]
+workspace = true
