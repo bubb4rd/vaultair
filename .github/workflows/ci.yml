@@ -17,11 +17,25 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
+  detect:
+    name: Detect workspace
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.d.outputs.rust }}
+      web: ${{ steps.d.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: d
+        run: |
+          echo "rust=$([ -f Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "web=$([ -f package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   rust:
     name: Rust (fmt, clippy, test)
     runs-on: windows-latest
     # Skips cleanly until the Cargo workspace exists (Phase 1).
-    if: ${{ hashFiles('Cargo.toml') != '' }}
+    needs: detect
+    if: needs.detect.outputs.rust == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -39,7 +53,8 @@ jobs:
   supply-chain:
     name: Rust supply chain (cargo-deny, cargo-audit)
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('Cargo.toml') != '' }}
+    needs: detect
+    if: needs.detect.outputs.rust == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -50,7 +65,8 @@ jobs:
   web:
     name: Frontend (lint, typecheck, test)
     runs-on: windows-latest
-    if: ${{ hashFiles('package.json') != '' }}
+    needs: detect
+    if: needs.detect.outputs.web == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
