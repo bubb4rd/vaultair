@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { appInfo, isIpcError, toIpcError } from "./client";
+import { appInfo, isIpcError, toIpcError, vault } from "./client";
 
 describe("IPC error normalisation", () => {
   it("passes well-formed AppErrors through", () => {
@@ -29,5 +29,29 @@ describe("IPC error normalisation", () => {
       throw "raw backend failure text";
     });
     await expect(appInfo()).rejects.toEqual(expect.objectContaining({ code: "internal" }));
+  });
+
+  it("surfaces typed vault errors from Result commands", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "vault_unlock") throw { code: "wrong_password", message: "Incorrect master password." };
+      return null;
+    });
+    await expect(vault.unlock("C:/v", "x")).rejects.toEqual({
+      code: "wrong_password",
+      message: "Incorrect master password.",
+    });
+  });
+
+  it("returns data from Result commands", async () => {
+    const info = {
+      vaultId: "0193",
+      name: "Main",
+      path: "C:/v/Main",
+      kdfSummary: "Argon2id 64 MiB, t=3, p=4",
+      createdAt: "2026-09-23T00:00:00Z",
+      demo: false,
+    };
+    mockIPC((cmd) => (cmd === "vault_unlock" ? info : null));
+    await expect(vault.unlock("C:/v/Main", "x")).resolves.toEqual(info);
   });
 });

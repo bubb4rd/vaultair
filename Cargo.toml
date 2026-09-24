@@ -5,7 +5,7 @@ members = ["crates/vaultair-core", "crates/vaultair-platform", "src-tauri"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.89" # File::try_lock (vault .lock file)
 license = "LicenseRef-Proprietary"
 publish = false
 
@@ -26,6 +26,25 @@ print_stdout = "deny"
 print_stderr = "deny"
 unwrap_used = "warn"
 todo = "deny"
+
+# Argon2 at real parameters (>= 64 MiB) and SQLCipher/OpenSSL are painfully slow
+# unoptimized. Optimizing just these keeps debug builds and tests realistic.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.chacha20]
+opt-level = 3
+[profile.dev.package.poly1305]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.libsqlite3-sys]
+opt-level = 3
+[profile.dev.package.openssl-sys]
+opt-level = 3
+[profile.dev.package.openssl-src]
+opt-level = 3
 
 [profile.release]
 codegen-units = 1

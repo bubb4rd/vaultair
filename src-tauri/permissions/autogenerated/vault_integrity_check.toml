@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-integrity-check"
+description = "Enables the vault_integrity_check command without any pre-configured scope."
+commands.allow = ["vault_integrity_check"]
+
+[[permission]]
+identifier = "deny-vault-integrity-check"
+description = "Denies the vault_integrity_check command without any pre-configured scope."
+commands.deny = ["vault_integrity_check"]

@@ -17,6 +17,13 @@ pub enum ErrorCode {
     InvalidInput,
     NotFound,
     Internal,
+    WrongPassword,
+    WeakPassword,
+    VaultNotFound,
+    VaultExists,
+    VaultInUse,
+    VaultTooNew,
+    VaultCorrupted,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -32,6 +39,21 @@ pub enum AppError {
     /// Anything unexpected. `context` is a static description of where it happened.
     #[error("internal error ({context})")]
     Internal { context: &'static str },
+    /// Wrong master password, or a tampered header (indistinguishable on purpose).
+    #[error("wrong master password")]
+    WrongPassword,
+    #[error("master password does not meet the policy")]
+    WeakPassword,
+    #[error("vault not found")]
+    VaultNotFound,
+    #[error("a vault already exists there")]
+    VaultExists,
+    #[error("vault is open elsewhere")]
+    VaultInUse,
+    #[error("vault needs a newer version")]
+    VaultTooNew,
+    #[error("vault is damaged")]
+    VaultCorrupted,
 }
 
 impl AppError {
@@ -41,6 +63,13 @@ impl AppError {
             Self::InvalidInput { .. } => ErrorCode::InvalidInput,
             Self::NotFound => ErrorCode::NotFound,
             Self::Internal { .. } => ErrorCode::Internal,
+            Self::WrongPassword => ErrorCode::WrongPassword,
+            Self::WeakPassword => ErrorCode::WeakPassword,
+            Self::VaultNotFound => ErrorCode::VaultNotFound,
+            Self::VaultExists => ErrorCode::VaultExists,
+            Self::VaultInUse => ErrorCode::VaultInUse,
+            Self::VaultTooNew => ErrorCode::VaultTooNew,
+            Self::VaultCorrupted => ErrorCode::VaultCorrupted,
         }
     }
 
@@ -51,6 +80,17 @@ impl AppError {
             Self::InvalidInput { .. } => "Some of the details entered aren't valid.",
             Self::NotFound => "That item no longer exists.",
             Self::Internal { .. } => "Something went wrong. Your vault was not changed.",
+            Self::WrongPassword => "Incorrect master password.",
+            Self::WeakPassword => "Choose a longer or less predictable master password.",
+            Self::VaultNotFound => "No vault was found at that location.",
+            Self::VaultExists => {
+                "That folder already contains files. Choose another name or location."
+            }
+            Self::VaultInUse => "This vault is already open in another Vaultair window.",
+            Self::VaultTooNew => {
+                "This vault was made by a newer version of Vaultair. Update to open it."
+            }
+            Self::VaultCorrupted => "This vault appears to be damaged. Restore it from a backup.",
         }
     }
 
@@ -108,6 +148,13 @@ mod tests {
             AppError::VaultLocked,
             AppError::NotFound,
             AppError::Internal { context: "x" },
+            AppError::WrongPassword,
+            AppError::WeakPassword,
+            AppError::VaultNotFound,
+            AppError::VaultExists,
+            AppError::VaultInUse,
+            AppError::VaultTooNew,
+            AppError::VaultCorrupted,
         ] {
             let json = serde_json::to_value(&err).unwrap();
             let keys: Vec<_> = json.as_object().unwrap().keys().cloned().collect();

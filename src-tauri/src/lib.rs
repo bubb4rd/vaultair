@@ -5,6 +5,7 @@
 mod commands;
 mod ipc;
 mod logging;
+mod state;
 mod window;
 
 pub fn run() {
@@ -18,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             window::focus_main(app);
         }))
+        .manage(state::AppState::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);

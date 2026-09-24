@@ -9,6 +9,14 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  Static app metadata. Contains nothing about the user or their vaults. */
 	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
+	/**  Measures this device and suggests Argon2id parameters (~0.85 s unlock). */
+	vaultKdfCalibrate: () => typedError<KdfParams, IpcError_Serialize>(__TAURI_INVOKE("vault_kdf_calibrate")),
+	vaultCreate: (request: CreateVaultRequest) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_create", { request })),
+	vaultUnlock: (path: string, password: string) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_unlock", { path, password })),
+	/**  Returns whether a vault was open. */
+	vaultLock: () => __TAURI_INVOKE<boolean>("vault_lock"),
+	vaultStatus: () => __TAURI_INVOKE<VaultStatus>("vault_status"),
+	vaultIntegrityCheck: () => typedError<IntegrityReport, IpcError_Serialize>(__TAURI_INVOKE("vault_integrity_check")),
 };
 
 /* Types */
@@ -20,6 +28,72 @@ export type AppInfo = {
 
 export type BuildProfile = "debug" | "release";
 
+export type CreateVaultRequest = {
+	name: string,
+	/**  Parent folder. Defaults to `%LOCALAPPDATA%\Vaultair\Vaults`. */
+	location: string | null,
+	kdf: KdfParams,
+	password: string,
+};
+
 /**  Stable, machine-readable error codes. The frontend switches on these. */
-export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal";
+export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted";
+
+export type IntegrityReport = {
+	ok: boolean,
+};
+
+/**
+ *  What a failed command sends to the UI: `vaultair_core::AppError` as a
+ *  plain DTO (`{ code, message, field? }`), with no dynamic data.
+ */
+export type IpcError = IpcError_Serialize | IpcError_Deserialize;
+
+/**
+ *  What a failed command sends to the UI: `vaultair_core::AppError` as a
+ *  plain DTO (`{ code, message, field? }`), with no dynamic data.
+ */
+export type IpcError_Deserialize = {
+	code: ErrorCode,
+	message: string,
+	field?: string | null,
+};
+
+/**
+ *  What a failed command sends to the UI: `vaultair_core::AppError` as a
+ *  plain DTO (`{ code, message, field? }`), with no dynamic data.
+ */
+export type IpcError_Serialize = {
+	code: ErrorCode,
+	message: string,
+	field?: string | null,
+};
+
+export type KdfParams = {
+	mKib: number,
+	t: number,
+	p: number,
+};
+
+/**  Non-secret facts about a vault, safe to show in the UI. */
+export type VaultInfo = {
+	vaultId: string,
+	name: string,
+	path: string,
+	kdfSummary: string,
+	createdAt: string,
+	demo: boolean,
+};
+
+export type VaultStatus = { state: "locked" } | { state: "unlocked"; vault: VaultInfo };
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+    try {
+        return { status: "ok", data: await result };
+    } catch (e) {
+        if (e instanceof Error) throw e;
+        return { status: "error", error: e as any };
+    }
+}
 

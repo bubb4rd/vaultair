@@ -37,3 +37,8 @@ Desktop.ini
 
 # Python bytecode (ui-ux-pro-max scripts)
 __pycache__/
+
+# Golden fixture vaults (test-only password, see crates/vaultair-core/tests) are the one exception.
+!tests-fixtures/**/vault.vdb
+!tests-fixtures/**/vault.vhdr
+tests-fixtures/**/.lock

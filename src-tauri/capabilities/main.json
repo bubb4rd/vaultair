@@ -15,6 +15,12 @@
     "core:window:allow-unminimize",
     "core:window:allow-is-maximized",
     "core:window:allow-internal-toggle-maximize",
-    "allow-app-info"
+    "allow-app-info",
+    "allow-vault-kdf-calibrate",
+    "allow-vault-create",
+    "allow-vault-unlock",
+    "allow-vault-lock",
+    "allow-vault-status",
+    "allow-vault-integrity-check"
   ]
 }

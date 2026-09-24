@@ -9,15 +9,37 @@ publish.workspace = true
 
 [dependencies]
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 specta = { workspace = true, optional = true }
 
-[dev-dependencies]
-serde_json.workspace = true
+# Crypto (RustCrypto). See docs/adr/0002-crypto-and-storage.md.
+argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "zeroize"] }
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
+hkdf = "0.13.0"
+hmac = "0.13.0"
+sha2 = "0.11.0"
+getrandom = "0.4.3"
+zeroize = { version = "1.9.0", features = ["derive"] }
+secrecy = "0.10.3"
+subtle = "2.6.1"
+unicode-normalization = "0.1.25"
+zxcvbn = "3.1.1"
 
-[lints]
-workspace = true
+# Storage
+rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
+base64 = "0.23.1"
+crc32fast = "1.5.2"
+uuid = { version = "1.26.1", features = ["v7"] }
+time = { version = "0.3.55", features = ["formatting", "parsing"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
 
 [features]
 # Derives TS types for IPC-facing enums (used by src-tauri's bindings).
 specta = ["dep:specta"]
+
+[lints]
+workspace = true

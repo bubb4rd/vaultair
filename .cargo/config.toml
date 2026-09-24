@@ -1,0 +1,5 @@
+# openssl-src (vendored by SQLCipher) needs a native Windows Perl. Git for
+# Windows puts its MSYS perl first on PATH in Git Bash, which fails, so point
+# at Strawberry Perl explicitly. Same path on GitHub windows-latest runners.
+[env]
+OPENSSL_SRC_PERL = { value = 'C:/Strawberry/perl/bin/perl.exe', force = false }

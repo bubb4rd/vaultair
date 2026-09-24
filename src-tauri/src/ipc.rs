@@ -6,7 +6,15 @@ use crate::commands;
 
 pub fn builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
-        .commands(collect_commands![commands::app::app_info])
+        .commands(collect_commands![
+            commands::app::app_info,
+            commands::vault::vault_kdf_calibrate,
+            commands::vault::vault_create,
+            commands::vault::vault_unlock,
+            commands::vault::vault_lock,
+            commands::vault::vault_status,
+            commands::vault::vault_integrity_check,
+        ])
         // Error codes every command can reject with (see `vaultair_core::AppError`).
         .typ::<vaultair_core::ErrorCode>()
 }

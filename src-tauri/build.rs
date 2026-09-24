@@ -4,8 +4,16 @@
 fn main() {
     // Every app command must be listed here so it gets an explicit permission,
     // and the capability file has to allow it by name.
-    let mut attrs = tauri_build::Attributes::new()
-        .app_manifest(tauri_build::AppManifest::new().commands(&["app_info"]));
+    let mut attrs =
+        tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
+            "app_info",
+            "vault_kdf_calibrate",
+            "vault_create",
+            "vault_unlock",
+            "vault_lock",
+            "vault_status",
+            "vault_integrity_check",
+        ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test
     // binaries crash with STATUS_ENTRYPOINT_NOT_FOUND (no Common Controls v6).

@@ -92,6 +92,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: No vault or backup files committed
         run: |
-          found=$(git ls-files '*.vdb' '*.vhdr' '*.vhdr.*' '*.vaultair-backup')
+          # tests-fixtures/ holds golden test vaults with a test-only password (see docs/vault-format.md).
+          found=$(git ls-files '*.vdb' '*.vhdr' '*.vhdr.*' '*.vaultair-backup' | grep -v '^tests-fixtures/' || true)
           if [ -n "$found" ]; then echo "Vault files are tracked:"; echo "$found"; exit 1; fi
           echo "ok"
