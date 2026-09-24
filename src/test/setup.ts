@@ -3,6 +3,18 @@ import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { clearMocks } from "@tauri-apps/api/mocks";
 
+// jsdom lacks these browser APIs; cmdk and Radix call them.
+if (!("ResizeObserver" in globalThis)) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+if (!("scrollIntoView" in Element.prototype)) {
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: () => undefined });
+}
+
 afterEach(() => {
   cleanup();
   clearMocks();

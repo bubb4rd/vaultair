@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 1 (hardened Tauri + React shell). Next: Phase 2, the dark app shell and design system.
+> **Status:** Phase 2 (dark app shell and design system). Next: Phase 3, the crypto core and encrypted storage.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -11,6 +11,7 @@ A local-first, encrypted Windows workspace for people who manage several gaming 
 |---|---|
 | [`docs/product-spec.md`](docs/product-spec.md) | Original product spec |
 | [`docs/implementation-plan.md`](docs/implementation-plan.md) | Architecture, crypto design, schema, and the phased build order (Phases 0–16) |
+| [`docs/design-system.md`](docs/design-system.md) | Design read, tokens, contrast, status system, voice |
 | [`docs/architecture.md`](docs/architecture.md) | Layers, security baseline, manual release checks |
 | [`docs/threat-model.md`](docs/threat-model.md) | What Vaultair does and does not protect against (draft) |
 | [`docs/adr/`](docs/adr) | Architecture decision records |

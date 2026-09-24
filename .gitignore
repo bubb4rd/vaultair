@@ -34,3 +34,6 @@ Desktop.ini
 
 # Junction to .agents/skills/design-taste-frontend (recreate per README "Design tooling")
 .claude/skills/design-taste-frontend
+
+# Python bytecode (ui-ux-pro-max scripts)
+__pycache__/

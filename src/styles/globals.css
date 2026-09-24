@@ -1,0 +1,156 @@
+/*
+ * Vaultair design tokens. See docs/design-system.md for the rationale and
+ * contrast measurements. Dark only for the MVP (ADR-0004 / spec D2); every
+ * color is a variable so a light theme can be added without touching components.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces: charcoal, neutral (no blue cast). Lightest = most elevated. */
+  --background: #0e0f11;
+  --sidebar: #131417;
+  --card: #17181c;
+  --popover: #1a1b1f;
+  --muted: #1e2025;        /* hover / raised */
+  --accent: #1e2025;       /* shadcn "accent" = hover surface, NOT the brand accent */
+
+  /* Text tiers (contrast on --background): 16.5 / 7.9 / 5.6 */
+  --foreground: #edeef0;
+  --card-foreground: #edeef0;
+  --popover-foreground: #edeef0;
+  --muted-foreground: #a3a7af;
+  --subtle-foreground: #878c95;
+  --accent-foreground: #edeef0;
+  --sidebar-foreground: #a3a7af;
+
+  /* Primary action: off-white on charcoal (16.5:1). The only filled button. */
+  --primary: #edeef0;
+  --primary-foreground: #0e0f11;
+  --secondary: #1e2025;
+  --secondary-foreground: #edeef0;
+
+  /* Brand accent: one cool blue. Used for focus, selection, links and the
+     "linked / info" status. Never for decoration. 7.7:1 on --background. */
+  --brand: #7aa2ff;
+  --brand-foreground: #0e0f11;
+
+  /* Lines. --border is decorative; --input meets 3:1 for control edges. */
+  --border: #26282d;
+  --border-strong: #33363c;
+  --input: #666a73;
+  --ring: #7aa2ff;
+
+  /* Status (icon + text + color, never color alone). All >= 4.7:1 on
+     their own 12% tint over --card. */
+  --status-secure: #4cc38a;
+  --status-attention: #e5c14a;
+  --status-warning: #f0924a;
+  --status-risk: #f26d6d;
+  --status-dormant: #8d929b;
+  --status-linked: #7aa2ff;
+  --destructive: #f26d6d;
+
+  --radius: 8px;
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --header-height: 48px;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", "Segoe UI Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "Cascadia Mono", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-status-secure: var(--status-secure);
+  --color-status-attention: var(--status-attention);
+  --color-status-warning: var(--status-warning);
+  --color-status-risk: var(--status-risk);
+  --color-status-dormant: var(--status-dormant);
+  --color-status-linked: var(--status-linked);
+
+  /* One radius scale: controls 6px, surfaces 8px, overlays 12px. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/60;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow: hidden;
+    /* Desktop app: text selection only where it's content (opt in with .select-text). */
+    user-select: none;
+    font-feature-settings: "ss01", "cv11";
+  }
+  input,
+  textarea,
+  [contenteditable="true"],
+  .select-text {
+    user-select: text;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 35%, transparent);
+  }
+}
+
+/* Motion dial 3: only short state transitions, and none at all when the OS asks. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
