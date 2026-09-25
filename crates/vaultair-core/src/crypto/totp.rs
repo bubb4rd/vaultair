@@ -116,9 +116,12 @@ pub fn parse_setup(input: &str) -> Result<TotpSetup, AppError> {
     let mut algorithm = TotpAlgorithm::Sha1;
     let mut digits = DEFAULT_DIGITS;
     let mut period = DEFAULT_PERIOD;
-    let secret_text: Zeroizing<String>;
 
-    if input.len() > 15 && input[..15].eq_ignore_ascii_case("otpauth://totp/") {
+    let is_totp_link = input.len() > 15
+        && input
+            .get(..15)
+            .is_some_and(|scheme| scheme.eq_ignore_ascii_case("otpauth://totp/"));
+    let secret_text: Zeroizing<String> = if is_totp_link {
         let query = input.split_once('?').map(|(_, q)| q).ok_or_else(invalid)?;
         let mut secret = None;
         for pair in query.split('&') {
@@ -135,13 +138,13 @@ pub fn parse_setup(input: &str) -> Result<TotpSetup, AppError> {
                 _ => {}
             }
         }
-        secret_text = secret.ok_or_else(invalid)?;
+        secret.ok_or_else(invalid)?
     } else if input.contains("://") {
         // otpauth://hotp and anything else: counter-based codes aren't supported.
         return Err(invalid());
     } else {
-        secret_text = Zeroizing::new(input.to_owned());
-    }
+        Zeroizing::new(input.to_owned())
+    };
 
     if !(6..=8).contains(&digits) || !(10..=300).contains(&period) {
         return Err(invalid());
@@ -266,6 +269,9 @@ mod tests {
         assert!(parse_setup("not base32 !!").is_err());
         assert!(parse_setup("GEZDGNBV").is_err(), "too short");
         assert!(parse_setup("").is_err());
+        // Multi-byte text across byte 15 must be an error, not a slicing panic.
+        assert!(parse_setup("otpauth://totpé/x?secret=GEZDGNBVGY3TQOJQ").is_err());
+        assert!(parse_setup("ключ-настройки-длинный").is_err());
     }
 
     #[test]
