@@ -35,6 +35,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
               <CommandItem
                 key={item.path}
                 value={item.label}
+                keywords={item.keywords ?? []}
                 onSelect={() => {
                   onOpenChange(false);
                   void navigate({ to: item.path });

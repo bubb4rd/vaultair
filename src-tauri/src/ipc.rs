@@ -20,6 +20,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::recent::recent_vaults_list,
             commands::recent::recent_vaults_forget,
             commands::password::strength_estimate,
+            commands::generator::generate_password,
+            commands::generator::generate_passphrase,
             commands::session::session_touch,
             commands::session::session_config_get,
             commands::session::capture_protection_set,

@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 5 (auto-lock, session lock, clipboard service, capture protection). Next: Phase 6, the password generator.
+> **Status:** Phase 6 (password generator). Next: Phase 7, accounts with encrypted secrets.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -85,3 +85,15 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - Toasts (owner request): one app-wide `<Toaster />` for success, error, warning and info, with keycaps, actions and a countdown, and enter/exit/collapse transitions (see `docs/design-system.md`). The lock screen says why the vault locked, which Rust keeps across the webview reload. Try them from Settings > Developer checks > Preview notifications.
 - Real-clipboard test (overwrites your clipboard): `cargo test -p vaultair-platform -- --ignored --test-threads=1 real_clipboard`.
 - Not done in Phase 5: persisting a pending clear across a crash (optional in the plan; a crash before the timeout leaves the value on the clipboard), and editable lock and clipboard settings (Phase 15; the ADR-0004 defaults apply, and capture protection is stored in `config.json`).
+
+## Phase 6 notes
+
+- Generator lives in `vaultair-core::generator`: OS randomness (`getrandom`), an unbiased index sampler (rejects the uneven tail instead of `x % n`), and "every selected type appears" by redrawing the whole password, never by planting characters. Entropy is exact: inclusion–exclusion over the required types for passwords, `words × log2(7776)` (+ `log2(10 × words)` with a number) for passphrases. zxcvbn's 0–4 score is shown alongside.
+- Symbols are ASCII punctuation minus quotes, backtick, backslash, pipe and space (`!#$%&()*+,-./:;<=>?@[]^_{}~`). "Avoid look-alike characters" removes `Il1O0o`; "Leave out characters" takes any extra set. Leaving out every character of a selected type is an `invalid_input` error on `exclude`, shown on the field.
+- Copying uses `clipboard_copy_plain` (auto-clear, kept out of Win+V history). Options are remembered in memory only until Settings arrive in Phase 15; a lock resets them.
+- `GeneratorPopover` (compact, "Use password") is built and tested for the Phase 7 account form; nothing mounts it yet.
+- Uniformity check (slow, ignored by default): `cargo test --release -p vaultair-core characters_are_uniform -- --ignored`. zxcvbn now builds at `opt-level = 3` in dev too, which took the core tests from 43 s to 4 s.
+
+## Third-party content
+
+- Passphrases use the [EFF large wordlist](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) by the Electronic Frontier Foundation, licensed [CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/). It's embedded unmodified at `crates/vaultair-core/src/generator/eff_large_wordlist.txt`.

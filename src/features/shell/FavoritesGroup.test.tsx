@@ -31,7 +31,7 @@ describe("favorites in the sidebar", () => {
     const labels = within(nav)
       .getAllByRole("group")
       .map((g) => g.getAttribute("aria-label"));
-    expect(labels).toEqual(["Overview", "Vault", "Favorites", "Catalog", "Insights"]);
+    expect(labels).toEqual(["Overview", "Vault", "Favorites", "Catalog", "Insights", "Tools"]);
   });
 
   it("lists starred accounts in order", async () => {

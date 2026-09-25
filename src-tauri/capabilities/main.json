@@ -28,6 +28,8 @@
     "allow-recent-vaults-list",
     "allow-recent-vaults-forget",
     "allow-strength-estimate",
+    "allow-generate-password",
+    "allow-generate-passphrase",
     "allow-session-touch",
     "allow-session-config-get",
     "allow-capture-protection-set",

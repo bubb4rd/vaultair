@@ -44,6 +44,8 @@ export const commands = {
 	 *  scored and dropped; it is never stored or logged.
 	 */
 	strengthEstimate: (password: string) => __TAURI_INVOKE<StrengthEstimate>("strength_estimate", { password }),
+	generatePassword: (options: PasswordOptions) => typedError<Generated, IpcError_Serialize>(__TAURI_INVOKE("generate_password", { options })),
+	generatePassphrase: (options: PassphraseOptions) => typedError<Generated, IpcError_Serialize>(__TAURI_INVOKE("generate_passphrase", { options })),
 	/**
 	 *  Records user activity, pushing the idle-lock deadline back. The UI calls
 	 *  it at most every 15 s while the pointer or keyboard is in use. Returns
@@ -117,6 +119,18 @@ export type FolderPurpose =
 /**  Choose an existing vault's folder (the one containing `vault.vhdr`). */
 "existingVault";
 
+/**
+ *  A freshly generated value and how strong it is. The value is wiped from
+ *  memory when this is dropped (after it's serialized to the UI).
+ */
+export type Generated = {
+	value: string,
+	/**  Exact entropy of the generator's output space, in bits. */
+	entropyBits: number | null,
+	/**  zxcvbn score, 0 (trivial) to 4 (very strong). */
+	score: number,
+};
+
 export type IntegrityReport = {
 	ok: boolean,
 };
@@ -172,6 +186,33 @@ export type LocationCheck = {
 export type LockNotice = 
 /**  The lock button or Ctrl+L. */
 { reason: "manual" } | { reason: "idle"; afterSecs: number } | { reason: "sessionLocked" } | { reason: "signedOut" } | { reason: "disconnected" } | { reason: "sleep" } | { reason: "minimized" };
+
+export type PassphraseOptions = {
+	/**  3–12 words. */
+	words: number,
+	/**
+	 *  One ASCII punctuation character or a space. Letters and digits would
+	 *  blur the word boundaries.
+	 */
+	separator: string,
+	/**  Capitalizes the first letter of every word. */
+	capitalize: boolean,
+	/**  Appends one random digit to one randomly chosen word. */
+	includeNumber: boolean,
+};
+
+export type PasswordOptions = {
+	/**  8–128 characters. */
+	length: number,
+	uppercase: boolean,
+	lowercase: boolean,
+	digits: boolean,
+	symbols: boolean,
+	/**  Leaves out `Il1O0o`. */
+	excludeAmbiguous: boolean,
+	/**  Extra characters to leave out. Characters we never use are ignored. */
+	exclude: string,
+};
 
 /**  A recent vault as the lock screen shows it. */
 export type RecentVault = {

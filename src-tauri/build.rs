@@ -19,6 +19,8 @@ fn main() {
             "recent_vaults_list",
             "recent_vaults_forget",
             "strength_estimate",
+            "generate_password",
+            "generate_passphrase",
             "session_touch",
             "session_config_get",
             "capture_protection_set",

@@ -7,6 +7,7 @@ import {
   GraphIcon,
   IdentificationBadgeIcon,
   KeyIcon,
+  PasswordIcon,
   PulseIcon,
   SquaresFourIcon,
 } from "@phosphor-icons/react";
@@ -15,7 +16,10 @@ export interface NavItem {
   path: string;
   label: string;
   icon: Icon;
-  empty: { title: string; description: string };
+  /** Extra words the Ctrl+K palette matches. */
+  keywords?: string[];
+  /** Placeholder copy for pages whose feature hasn't landed. Pages with real content (see `router.tsx`) omit it. */
+  empty?: { title: string; description: string };
 }
 
 export interface NavGroup {
@@ -125,6 +129,17 @@ export const NAV_GROUPS: NavGroup[] = [
           description:
             "Vaultair checks for weak and reused passwords, missing MFA and missing recovery codes. Results appear here with these labels.",
         },
+      },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
+      {
+        path: "/generator",
+        label: "Generator",
+        icon: PasswordIcon,
+        keywords: ["password", "passphrase", "generate"],
       },
     ],
   },

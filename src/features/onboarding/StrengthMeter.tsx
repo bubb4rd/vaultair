@@ -9,6 +9,19 @@ export function strengthLabel(score: number) {
   return LABELS[Math.min(Math.max(score, 0), 4)] ?? "Very weak";
 }
 
+/** The four colored segments for a zxcvbn score; `null` draws them empty. Decorative. */
+export function StrengthSegments({ score, className }: { score: number | null; className?: string }) {
+  const s = Math.min(Math.max(score ?? 0, 0), 4);
+  const filled = score === null ? 0 : Math.max(1, s);
+  return (
+    <div aria-hidden="true" className={cn("grid grid-cols-4 gap-1", className)}>
+      {[1, 2, 3, 4].map((i) => (
+        <span key={i} className={cn("h-1 rounded-full transition-colors", i <= filled ? TONES[s] : "bg-border-strong")} />
+      ))}
+    </div>
+  );
+}
+
 /**
  * Four segments plus a text label: the label carries the meaning, color only
  * reinforces it. The score comes from Rust (zxcvbn), the same check that
@@ -16,19 +29,11 @@ export function strengthLabel(score: number) {
  */
 export function StrengthMeter({ estimate, id }: { estimate: StrengthEstimate | null; id: string }) {
   const score = estimate?.score ?? 0;
-  const filled = estimate ? Math.max(1, score) : 0;
   const advice = estimate?.warning ?? estimate?.suggestions[0] ?? null;
   return (
     <div id={id} className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        <div aria-hidden="true" className="grid flex-1 grid-cols-4 gap-1">
-          {[1, 2, 3, 4].map((i) => (
-            <span
-              key={i}
-              className={cn("h-1 rounded-full transition-colors", i <= filled ? TONES[score] : "bg-border-strong")}
-            />
-          ))}
-        </div>
+        <StrengthSegments score={estimate ? score : null} className="flex-1" />
         <span className="w-24 text-right text-[13px] text-muted-foreground" aria-live="polite">
           {estimate ? strengthLabel(score) : " "}
         </span>
