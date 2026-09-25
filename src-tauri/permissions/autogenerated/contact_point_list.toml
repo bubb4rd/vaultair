@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contact-point-list"
+description = "Enables the contact_point_list command without any pre-configured scope."
+commands.allow = ["contact_point_list"]
+
+[[permission]]
+identifier = "deny-contact-point-list"
+description = "Denies the contact_point_list command without any pre-configured scope."
+commands.deny = ["contact_point_list"]

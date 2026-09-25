@@ -74,6 +74,19 @@ function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () =
         <Meta label="Status">
           <StatusBadge status={status.badge} label={status.label} />
         </Meta>
+        <Meta label="Identity">
+          {account.identityId && account.identityName ? (
+            <Link
+              to="/identities/$identityId"
+              params={{ identityId: account.identityId }}
+              className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {account.identityName}
+            </Link>
+          ) : (
+            <span className="text-subtle-foreground">None</span>
+          )}
+        </Meta>
         <Meta label="Purpose">{account.purposeName}</Meta>
         <Meta label="Tags">
           {account.tags.length === 0 ? (
@@ -324,6 +337,13 @@ function Detail({ account }: { account: AccountDetail }) {
               ) : (
                 <FieldRow label="Password" />
               )}
+              <FieldRow
+                label="Recovery email"
+                actions={account.recoveryEmail && <CopyButton text={account.recoveryEmail} label="Recovery email" />}
+              >
+                {account.recoveryEmail}
+              </FieldRow>
+              <FieldRow label="Recovery phone">{account.recoveryPhone}</FieldRow>
               <UrlRow
                 label="Login page"
                 url={account.loginUrl}

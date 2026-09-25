@@ -50,6 +50,18 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::mfa::mfa_set_backup_codes,
             commands::mfa::mfa_mark_code_used,
             commands::mfa::totp_current_code,
+            commands::identity::identity_list,
+            commands::identity::identity_refs,
+            commands::identity::identity_get,
+            commands::identity::identity_overview,
+            commands::identity::identity_create,
+            commands::identity::identity_update,
+            commands::identity::identity_archive,
+            commands::identity::identity_unarchive,
+            commands::identity::identity_delete,
+            commands::identity::identity_assign_accounts,
+            commands::identity::contact_point_list,
+            commands::identity::dashboard_summary,
         ])
         .events(collect_events![
             events::VaultLocked,

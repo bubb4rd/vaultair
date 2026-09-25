@@ -56,9 +56,12 @@ fn input(title: &str) -> AccountInput {
         account_type: AccountType::Launcher,
         purpose_id: "builtin-main".into(),
         status: AccountStatus::Active,
+        identity_id: None,
         username: None,
         email: None,
         password: SecretUpdate::Unchanged,
+        recovery_email: None,
+        recovery_phone: None,
         website_url: None,
         login_url: None,
         publisher: None,
@@ -857,7 +860,7 @@ fn demo_seed_is_browsable_and_uses_example_domains() {
 
     let active = accounts::list(&v, false).unwrap();
     let archived = accounts::list(&v, true).unwrap();
-    assert_eq!(active.len(), 8);
+    assert_eq!(active.len(), 9);
     assert_eq!(archived.len(), 1);
     assert!(active.iter().all(|a| a.has_password));
     assert_eq!(active.iter().filter(|a| a.favorite).count(), 3);

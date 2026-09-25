@@ -8,9 +8,10 @@ use crate::crypto::{rng, totp};
 use crate::domain::account::{
     AccountInput, AccountStatus, AccountType, CustomFieldInput, CustomFieldType, SecretUpdate,
 };
+use crate::domain::identity::{IdentityColor, IdentityInput};
 use crate::domain::mfa::{MfaInput, MfaMethod};
 use crate::generator::{generate_password, PasswordOptions};
-use crate::service::{accounts, mfa};
+use crate::service::{accounts, identities, mfa};
 use crate::vault::OpenVault;
 use crate::AppError;
 
@@ -62,13 +63,53 @@ fn backup_codes(count: usize) -> Result<String, AppError> {
     Ok(out)
 }
 
+struct DemoIdentity {
+    name: &'static str,
+    description: &'static str,
+    primary_email: &'static str,
+    recovery_email: Option<&'static str>,
+    phone_ref: Option<&'static str>,
+    color: IdentityColor,
+}
+
+const IDENTITIES: [DemoIdentity; 3] = [
+    DemoIdentity {
+        name: "Main",
+        description: "Everyday gaming and the accounts everything else recovers through.",
+        primary_email: "nightowl@example.com",
+        recovery_email: None,
+        phone_ref: Some("Pixel, ends 42"),
+        color: IdentityColor::Blue,
+    },
+    DemoIdentity {
+        name: "Competitive",
+        description: "Ranked and practice accounts.",
+        primary_email: "nightowl.ranked@example.com",
+        recovery_email: Some("nightowl@example.com"),
+        phone_ref: None,
+        color: IdentityColor::Rose,
+    },
+    DemoIdentity {
+        name: "Creator",
+        description: "Public-facing streaming and community accounts.",
+        primary_email: "creator@example.com",
+        recovery_email: Some("nightowl@example.com"),
+        phone_ref: None,
+        color: IdentityColor::Violet,
+    },
+];
+
 struct Sample {
     title: &'static str,
     account_type: AccountType,
     purpose: &'static str,
     status: AccountStatus,
+    /// The name of one of `IDENTITIES`.
+    identity: Option<&'static str>,
     username: Option<&'static str>,
     email: Option<&'static str>,
+    recovery_email: Option<&'static str>,
+    recovery_phone: Option<&'static str>,
     website: Option<&'static str>,
     publisher: Option<&'static str>,
     region: Option<&'static str>,
@@ -88,8 +129,11 @@ const fn sample(title: &'static str, account_type: AccountType, purpose: &'stati
         account_type,
         purpose,
         status: AccountStatus::Active,
+        identity: None,
         username: None,
         email: None,
+        recovery_email: None,
+        recovery_phone: None,
         website: None,
         publisher: None,
         region: None,
@@ -115,6 +159,8 @@ fn samples() -> Vec<Sample> {
             backup_codes: 10,
             favorite: true,
             notes: Some("Main game library. Family sharing is on for the second PC."),
+            identity: Some("Main"),
+            recovery_phone: Some("Pixel, ends 42"),
             ..sample("Game store (main)", AccountType::Launcher, "main")
         },
         Sample {
@@ -127,6 +173,7 @@ fn samples() -> Vec<Sample> {
             mfa: Some(MfaMethod::AuthenticatorApp),
             backup_codes: 8,
             favorite: true,
+            identity: Some("Main"),
             ..sample("Launcher account", AccountType::Launcher, "main")
         },
         Sample {
@@ -138,6 +185,8 @@ fn samples() -> Vec<Sample> {
             player_id: Some("NightOwl#EUW"),
             tags: &["ranked"],
             mfa: Some(MfaMethod::Email),
+            identity: Some("Competitive"),
+            recovery_email: Some("nightowl@example.com"),
             ..sample("Arena ranked (EUW)", AccountType::Game, "ranked")
         },
         Sample {
@@ -149,6 +198,8 @@ fn samples() -> Vec<Sample> {
             tags: &["ranked"],
             strong_password: false,
             notes: Some("Practice account for trying new roles."),
+            identity: Some("Competitive"),
+            recovery_email: Some("nightowl.ranked@example.com"),
             ..sample("Arena alt", AccountType::Game, "alt")
         },
         Sample {
@@ -158,6 +209,8 @@ fn samples() -> Vec<Sample> {
             tags: &["creator"],
             mfa: Some(MfaMethod::Totp),
             backup_codes: 6,
+            identity: Some("Creator"),
+            recovery_email: Some("nightowl@example.com"),
             ..sample("Community chat", AccountType::Social, "creator")
         },
         Sample {
@@ -165,7 +218,16 @@ fn samples() -> Vec<Sample> {
             email: Some("creator@example.com"),
             website: Some("https://stream.example.com"),
             tags: &["creator"],
+            identity: Some("Creator"),
             ..sample("Streaming channel", AccountType::Streaming, "creator")
+        },
+        Sample {
+            email: Some("creator@example.com"),
+            website: Some("https://mail.example.com"),
+            tags: &["creator"],
+            identity: Some("Creator"),
+            notes: Some("The creator accounts reset through this mailbox, and it has no MFA yet."),
+            ..sample("Creator email", AccountType::Email, "creator")
         },
         Sample {
             email: Some("nightowl@example.com"),
@@ -175,6 +237,8 @@ fn samples() -> Vec<Sample> {
             backup_codes: 10,
             favorite: true,
             notes: Some("Recovery email for most game accounts. Keep it the most protected."),
+            identity: Some("Main"),
+            recovery_phone: Some("Pixel, ends 42"),
             ..sample("Primary email", AccountType::Email, "recovery")
         },
         Sample {
@@ -195,8 +259,35 @@ fn samples() -> Vec<Sample> {
     ]
 }
 
-/// Fills a freshly created demo vault with sample accounts.
+/// Fills a freshly created demo vault with sample identities and accounts.
 pub fn seed(vault: &mut OpenVault, clock: &dyn Clock) -> Result<(), AppError> {
+    let mut identity_ids = Vec::new();
+    for i in &IDENTITIES {
+        let created = identities::create(
+            vault,
+            clock,
+            &IdentityInput {
+                name: i.name.into(),
+                description: Some(i.description.into()),
+                primary_email: Some(i.primary_email.into()),
+                recovery_email: i.recovery_email.map(Into::into),
+                phone_ref: i.phone_ref.map(Into::into),
+                notes: None,
+                color: Some(i.color),
+                tags: Vec::new(),
+            },
+        )?;
+        identity_ids.push((i.name, created.id));
+    }
+    let identity_id = |name: Option<&str>| {
+        name.and_then(|n| {
+            identity_ids
+                .iter()
+                .find(|(k, _)| *k == n)
+                .map(|(_, id)| id.clone())
+        })
+    };
+
     let purposes = accounts::purposes(vault)?;
     let purpose_id = |slug: &str| {
         purposes
@@ -234,8 +325,11 @@ pub fn seed(vault: &mut OpenVault, clock: &dyn Clock) -> Result<(), AppError> {
             account_type: s.account_type,
             purpose_id: purpose_id(s.purpose)?,
             status: s.status,
+            identity_id: identity_id(s.identity),
             username: s.username.map(Into::into),
             email: s.email.map(Into::into),
+            recovery_email: s.recovery_email.map(Into::into),
+            recovery_phone: s.recovery_phone.map(Into::into),
             password: if s.strong_password {
                 password(20)?
             } else {

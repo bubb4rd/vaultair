@@ -11,6 +11,23 @@ import {
   type AccountType,
   type AccountUrl,
   type BackupCodeSlot,
+  type ContactKind,
+  type ContactPointView,
+  type ContactRole,
+  type DashboardSummary,
+  type Dependent,
+  type IdentityColor,
+  type IdentityDeletePlan,
+  type IdentityDetail,
+  type IdentityInput,
+  type IdentityOverview,
+  type IdentityRef,
+  type IdentitySummary,
+  type MailboxSecurity,
+  type OverviewAccount,
+  type PlatformGroup,
+  type RecoveryDependency,
+  type SharedEmail,
   type CustomFieldInput,
   type CustomFieldType,
   type CustomFieldView,
@@ -50,6 +67,23 @@ export type {
   AccountType,
   AccountUrl,
   BackupCodeSlot,
+  ContactKind,
+  ContactPointView,
+  ContactRole,
+  DashboardSummary,
+  Dependent,
+  IdentityColor,
+  IdentityDeletePlan,
+  IdentityDetail,
+  IdentityInput,
+  IdentityOverview,
+  IdentityRef,
+  IdentitySummary,
+  MailboxSecurity,
+  OverviewAccount,
+  PlatformGroup,
+  RecoveryDependency,
+  SharedEmail,
   CustomFieldInput,
   CustomFieldType,
   CustomFieldView,
@@ -246,6 +280,36 @@ export const accounts = {
   urlTarget: (id: string, which: AccountUrl): Promise<UrlTarget> => data(() => commands.accountUrlTarget(id, which)),
   /** Rust reads the stored URL itself; nothing here can choose what opens. */
   openUrl: (id: string, which: AccountUrl): Promise<null> => data(() => commands.accountOpenUrl(id, which)),
+};
+
+/** Identities, and the accounts assigned to them. */
+export const identities = {
+  list: (archived: boolean): Promise<IdentitySummary[]> => data(() => commands.identityList(archived)),
+  /** Active identities, for pickers. */
+  refs: (): Promise<IdentityRef[]> => data(() => commands.identityRefs()),
+  get: (id: string): Promise<IdentityDetail> => data(() => commands.identityGet(id)),
+  overview: (id: string): Promise<IdentityOverview> => data(() => commands.identityOverview(id)),
+  create: (input: IdentityInput): Promise<IdentityDetail> => data(() => commands.identityCreate(input)),
+  update: (id: string, input: IdentityInput): Promise<IdentityDetail> =>
+    data(() => commands.identityUpdate(id, input)),
+  archive: (id: string): Promise<IdentityDetail> => data(() => commands.identityArchive(id)),
+  unarchive: (id: string): Promise<IdentityDetail> => data(() => commands.identityUnarchive(id)),
+  /** `confirmName` is what the user typed; Rust checks it against the name. */
+  delete: (id: string, confirmName: string, plan: IdentityDeletePlan): Promise<null> =>
+    data(() => commands.identityDelete(id, confirmName, plan)),
+  /** `identityId` null removes the accounts from their identity. Resolves how many changed. */
+  assignAccounts: (identityId: string | null, accountIds: string[]): Promise<number> =>
+    data(() => commands.identityAssignAccounts(identityId, accountIds)),
+};
+
+/** Emails and phones accounts and identities use (for suggestions). */
+export const contactPoints = {
+  list: (): Promise<ContactPointView[]> => data(() => commands.contactPointList()),
+};
+
+export const dashboard = {
+  /** `identityId` null means the whole vault. */
+  summary: (identityId: string | null): Promise<DashboardSummary> => data(() => commands.dashboardSummary(identityId)),
 };
 
 export const catalog = {

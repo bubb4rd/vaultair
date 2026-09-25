@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 7 (accounts with encrypted secrets). Next: Phase 8, identities and contact points. Phase 17 (passkeys) is scoped below and is not part of Phase 7.
+> **Status:** Phase 8 (identities and contact points). Next: Phase 9, purpose labels. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -98,11 +98,20 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 
 - Not done in Phase 7: the lint rule against putting reveal results in query cache keys (plan §Phase 7 risks). Every reveal (`SecretField`, `AccountForm`, `MfaSection`, the TOTP code) keeps the value in component state today, but nothing enforces it. The rule is `no-restricted-syntax` entries in `eslint.config.js` flagging `secrets.reveal` / `mfa.totpCode` inside `queryKey`/`queryFn`/`mutationKey`, `useQuery`/`useQueries`/`queryOptions`, or `setQueryData`/`fetchQuery`/`prefetchQuery`.
 
+## Phase 8 notes
+
+- Contact points are derived, not edited: an account save upserts its login email, recovery email and recovery phone, and an identity save upserts its primary email, recovery email and phone. `contact_point.value_normalized` uses `normalize_contact` (trim + ASCII lowercase, the same as SQLite's `lower()`), backed by the `UNIQUE (kind, value_normalized)` constraint. Unused contact points are pruned in the same transaction. So the plan's `contact_point_*` commands are just `contact_point_list` (form suggestions). No upsert or delete command exists, because nothing in the UI needs one.
+- V3 adds `contact_point.value_display` and backfills login-email contact points for accounts saved before Phase 8.
+- Recovery dependencies count a login email as a dependency too, since a password reset goes there. The mailbox behind an email is any email-type account signing in with that address. Its MFA decides the "Mailbox has no MFA" flag. With no such account, the flag reads "Mailbox not in vault".
+- Accounts group by platform, falling back to the publisher until Phase 10 catalogs platforms.
+- `dashboard_summary` arrives early, with only the counts accounts and identities can answer (accounts, main/alt, identities, missing MFA, favorites, recent) and an optional identity filter (`useIdentityFilter`, in memory, cleared by the lock reload). Phase 12 adds the health counts.
+- Identity names are unique, case-insensitively. Identity `icon` is not used yet; the avatar is initials on the identity's color.
+
 ## Phase 17: Passkeys and login credentials (scoped)
 
 Not started. This is its own phase, after the MVP (Phases 0–16). Phase 7 owns account records, passwords, and MFA metadata, including the existing `hardware_key` method. This phase owns passkeys. It starts only once an account row exists to attach a credential to.
 
-The product spec lists "Passkey management exploration" on the post-MVP roadmap, and hardware keys plus desktop autofill later still. ADR-0004 keeps Windows Hello vault unlock deferred and forbids autofill and auto-login. This phase is the concrete cut of that exploration. It does not reopen Phase 7.
+The product spec lists "Passkey management exploration" on the post-MVP roadmap, and hardware keys plus desktop autofill later still. ADR-0004 forbids autofill and auto-login. Windows Hello vault unlock is separate: ADR-0005 adds it in Phase 15b. This phase is the concrete cut of that exploration. It does not reopen Phase 7.
 
 A passkey is a FIDO2/WebAuthn credential: a relying-party id, a credential id, and a private key that signs a challenge. Two different jobs use that shape. They ship as two cuts inside this phase.
 

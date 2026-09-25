@@ -57,6 +57,16 @@
   --status-linked: #7aa2ff;
   --destructive: #f26d6d;
 
+  /* Identity accents: a persona's avatar tint, never a status. Each is at
+     least 4.5:1 as text on its own 15% tint over --card, and none reuses a
+     status hue, so an identity's colour can't read as a warning. */
+  --identity-blue: #6c9cf0;
+  --identity-violet: #ad93f5;
+  --identity-teal: #45bdb3;
+  --identity-amber: #d2a85c;
+  --identity-rose: #e883a6;
+  --identity-slate: #9aa3b5;
+
   --radius: 8px;
 
   /* Layout */
@@ -98,6 +108,12 @@
   --color-status-risk: var(--status-risk);
   --color-status-dormant: var(--status-dormant);
   --color-status-linked: var(--status-linked);
+  --color-identity-blue: var(--identity-blue);
+  --color-identity-violet: var(--identity-violet);
+  --color-identity-teal: var(--identity-teal);
+  --color-identity-amber: var(--identity-amber);
+  --color-identity-rose: var(--identity-rose);
+  --color-identity-slate: var(--identity-slate);
 
   /* One radius scale: controls 6px, surfaces 8px, overlays 12px. */
   --radius-sm: 4px;

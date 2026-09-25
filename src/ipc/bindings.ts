@@ -120,6 +120,35 @@ export const commands = {
 	mfaMarkCodeUsed: (id: string, index: number, used: boolean) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("mfa_mark_code_used", { id, index, used })),
 	/**  The current TOTP code and seconds until it changes, for display. */
 	totpCurrentCode: (id: string) => typedError<TotpCodeView, IpcError_Serialize>(__TAURI_INVOKE("totp_current_code", { id })),
+	/**  Active identities, or archived ones (`archived: true`), by name. */
+	identityList: (archived: boolean) => typedError<IdentitySummary[], IpcError_Serialize>(__TAURI_INVOKE("identity_list", { archived })),
+	/**  Active identities for pickers: the account form and the dashboard filter. */
+	identityRefs: () => typedError<IdentityRef[], IpcError_Serialize>(__TAURI_INVOKE("identity_refs")),
+	identityGet: (id: string) => typedError<IdentityDetail, IpcError_Serialize>(__TAURI_INVOKE("identity_get", { id })),
+	/**
+	 *  The identity with its accounts by platform, shared emails, recovery
+	 *  methods and recovery dependencies.
+	 */
+	identityOverview: (id: string) => typedError<IdentityOverview, IpcError_Serialize>(__TAURI_INVOKE("identity_overview", { id })),
+	identityCreate: (input: IdentityInput) => typedError<IdentityDetail, IpcError_Serialize>(__TAURI_INVOKE("identity_create", { input })),
+	identityUpdate: (id: string, input: IdentityInput) => typedError<IdentityDetail, IpcError_Serialize>(__TAURI_INVOKE("identity_update", { id, input })),
+	identityArchive: (id: string) => typedError<IdentityDetail, IpcError_Serialize>(__TAURI_INVOKE("identity_archive", { id })),
+	identityUnarchive: (id: string) => typedError<IdentityDetail, IpcError_Serialize>(__TAURI_INVOKE("identity_unarchive", { id })),
+	/**
+	 *  Permanently deletes an identity. `confirm_name` must be its name, as typed
+	 *  by the user. Its accounts are kept and either move to another identity or
+	 *  are left without one, as `plan` says.
+	 */
+	identityDelete: (id: string, confirmName: string, plan: IdentityDeletePlan) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("identity_delete", { id, confirmName, plan })),
+	/**
+	 *  Assigns accounts to an identity in bulk (`identity_id: null` removes
+	 *  them from theirs). Returns how many changed.
+	 */
+	identityAssignAccounts: (identityId: string | null, accountIds: string[]) => typedError<number, IpcError_Serialize>(__TAURI_INVOKE("identity_assign_accounts", { identityId, accountIds })),
+	/**  Every email and phone accounts and identities use, for suggestions. */
+	contactPointList: () => typedError<ContactPointView[], IpcError_Serialize>(__TAURI_INVOKE("contact_point_list")),
+	/**  The dashboard's numbers, for the whole vault or one identity. */
+	dashboardSummary: (identityId: string | null) => typedError<DashboardSummary, IpcError_Serialize>(__TAURI_INVOKE("dashboard_summary", { identityId })),
 };
 
 /** Events */
@@ -137,8 +166,12 @@ export type AccountDetail = {
 	purposeId: string,
 	purposeName: string,
 	status: AccountStatus,
+	identityId: string | null,
+	identityName: string | null,
 	username: string | null,
 	email: string | null,
+	recoveryEmail: string | null,
+	recoveryPhone: string | null,
 	hasPassword: boolean,
 	passwordStrength: number | null,
 	passwordChangedAt: string | null,
@@ -166,9 +199,16 @@ export type AccountInput = {
 	accountType: AccountType,
 	purposeId: string,
 	status: AccountStatus,
+	/**  The identity it belongs to, if any. */
+	identityId: string | null,
 	username: string | null,
+	/**  The login email. Saving upserts it as a contact point. */
 	email: string | null,
 	password?: SecretUpdate,
+	/**  Where a password reset goes, if not the login email. */
+	recoveryEmail: string | null,
+	/**  A phone reference such as "Pixel, ends 42" (ADR-0004 decision 12). */
+	recoveryPhone: string | null,
 	websiteUrl: string | null,
 	loginUrl: string | null,
 	publisher: string | null,
@@ -197,6 +237,8 @@ export type AccountSummary = {
 	purposeId: string,
 	purposeName: string,
 	status: AccountStatus,
+	identityId: string | null,
+	identityName: string | null,
 	username: string | null,
 	email: string | null,
 	publisher: string | null,
@@ -250,6 +292,27 @@ export type ClipboardCopy = {
 
 export type CloudProvider = "oneDrive" | "dropbox" | "googleDrive" | "iCloud" | "box";
 
+/**
+ *  What a contact point is. Only emails and phones are created in the
+ *  MVP; the others are reserved by the schema for MFA devices.
+ */
+export type ContactKind = "email" | "phone" | "authenticator_app" | "hardware_key" | "other";
+
+export type ContactPointView = {
+	id: string,
+	kind: ContactKind,
+	/**  As first entered (an email is shown lowercased either way). */
+	value: string,
+	label: string | null,
+	/**  The identity that declared it (its primary or recovery email, or phone). */
+	identityId: string | null,
+	/**  Distinct active accounts linked to it in any role, across the vault. */
+	accountCount: number,
+};
+
+/**  How an account uses a contact point. */
+export type ContactRole = "login_email" | "recovery_email" | "recovery_phone" | "authenticator" | "hardware_key" | "other";
+
 export type CreateVaultRequest = {
 	name: string,
 	/**  Parent folder. Defaults to `%LOCALAPPDATA%\Vaultair\Vaults`. */
@@ -284,6 +347,30 @@ export type CustomFieldView = {
 	hasValue: boolean,
 };
 
+/**
+ *  The dashboard's numbers, optionally for one identity. Health counts
+ *  (weak, reused, attention) arrive with Phase 12.
+ */
+export type DashboardSummary = {
+	/**  The identity the numbers are for; `None` means the whole vault. */
+	identityId: string | null,
+	totalAccounts: number,
+	mainAccounts: number,
+	altAccounts: number,
+	/**  Active identities (for one identity: 1). */
+	identities: number,
+	missingMfa: number,
+	favorites: number,
+	/**  The five most recently edited accounts. */
+	recent: AccountSummary[],
+};
+
+/**  An account that depends on a contact point, and how. */
+export type Dependent = {
+	account: OverviewAccount,
+	role: ContactRole,
+};
+
 /**  Stable, machine-readable error codes. The frontend switches on these. */
 export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy";
 
@@ -303,6 +390,85 @@ export type Generated = {
 	entropyBits: number | null,
 	/**  zxcvbn score, 0 (trivial) to 4 (very strong). */
 	score: number,
+};
+
+/**
+ *  An identity's accent. A fixed palette so the UI can map each name to a
+ *  token that reads well on the dark theme; status colours are never used.
+ */
+export type IdentityColor = "blue" | "violet" | "teal" | "amber" | "rose" | "slate";
+
+/**  What happens to an identity's accounts when it's deleted. */
+export type IdentityDeletePlan = 
+/**  The accounts stay, with no identity. */
+{ action: "unassign" } | 
+/**  The accounts move to another identity. */
+{ action: "reassign"; identityId: string };
+
+export type IdentityDetail = {
+	id: string,
+	name: string,
+	description: string | null,
+	primaryEmail: string | null,
+	recoveryEmail: string | null,
+	phoneRef: string | null,
+	notes: string | null,
+	color: IdentityColor | null,
+	tags: string[],
+	archivedAt: string | null,
+	createdAt: string,
+	updatedAt: string,
+};
+
+/**  Everything the identity form edits. Sent whole on create and update. */
+export type IdentityInput = {
+	name: string,
+	description: string | null,
+	primaryEmail: string | null,
+	recoveryEmail: string | null,
+	/**
+	 *  A phone reference such as "Pixel, ends 42" (ADR-0004 decision 12).
+	 *  A full number is allowed but not asked for.
+	 */
+	phoneRef: string | null,
+	notes: string | null,
+	color: IdentityColor | null,
+	tags?: string[],
+};
+
+/**  Everything the identity page shows beyond the identity's own fields. */
+export type IdentityOverview = {
+	identity: IdentityDetail,
+	accountCount: number,
+	groups: PlatformGroup[],
+	/**  Distinct platform (or publisher) names, alphabetically. */
+	platforms: string[],
+	sharedEmails: SharedEmail[],
+	/**  Recovery emails and phones (not login emails) the accounts use. */
+	recoveryMethods: ContactPointView[],
+	dependencies: RecoveryDependency[],
+};
+
+/**  The identity choices an account form or filter offers. */
+export type IdentityRef = {
+	id: string,
+	name: string,
+	color: IdentityColor | null,
+};
+
+/**  A row in the identity list. */
+export type IdentitySummary = {
+	id: string,
+	name: string,
+	description: string | null,
+	primaryEmail: string | null,
+	color: IdentityColor | null,
+	/**  Active (not archived) accounts assigned to it. */
+	accountCount: number,
+	/**  Of those, how many have no enabled MFA method. */
+	accountsWithoutMfa: number,
+	archivedAt: string | null,
+	updatedAt: string,
 };
 
 export type IntegrityReport = {
@@ -361,6 +527,23 @@ export type LockNotice =
 /**  The lock button or Ctrl+L. */
 { reason: "manual" } | { reason: "idle"; afterSecs: number } | { reason: "sessionLocked" } | { reason: "signedOut" } | { reason: "disconnected" } | { reason: "sleep" } | { reason: "minimized" };
 
+/**
+ *  Whether the mailbox behind an email is itself protected. Anyone who gets
+ *  into the mailbox can reset every account that recovers through it.
+ */
+export type MailboxSecurity = 
+/**  Every email account in the vault that signs in with it has MFA on. */
+"mfa_on" | 
+/**  At least one of them has no enabled MFA method. */
+"no_mfa" | 
+/**
+ *  No email-type account in the vault signs in with it, so Vaultair
+ *  can't tell.
+ */
+"not_in_vault" | 
+/**  A phone, not a mailbox. */
+"not_applicable";
+
 /**  An MFA method as the form sends it. `id` is `None` for a new one. */
 export type MfaInput = {
 	id: string | null,
@@ -393,6 +576,16 @@ export type MfaView = {
 	updatedAt: string,
 };
 
+/**  An account as the overview lists it. */
+export type OverviewAccount = {
+	id: string,
+	title: string,
+	accountType: AccountType,
+	status: AccountStatus,
+	purposeName: string,
+	mfaEnabled: boolean,
+};
+
 export type PassphraseOptions = {
 	/**  3–12 words. */
 	words: number,
@@ -420,6 +613,15 @@ export type PasswordOptions = {
 	exclude: string,
 };
 
+/**
+ *  Accounts sharing a platform. `platform` is the platform's name, or the
+ *  publisher until platforms are cataloged (Phase 10); `None` groups the rest.
+ */
+export type PlatformGroup = {
+	platform: string | null,
+	accounts: OverviewAccount[],
+};
+
 export type PurposeView = {
 	id: string,
 	slug: string,
@@ -441,6 +643,21 @@ export type RecentVault = {
 	 *  unplugged). The entry stays until the user removes it.
 	 */
 	available: boolean,
+};
+
+/**
+ *  One recovery route: an email or phone, the accounts that could be reset
+ *  through it, and whether the mailbox itself has MFA.
+ */
+export type RecoveryDependency = {
+	contact: ContactPointView,
+	mailbox: MailboxSecurity,
+	/**
+	 *  The mailbox accounts behind an email (email-type accounts signing in
+	 *  with it), anywhere in the vault.
+	 */
+	mailboxAccounts: OverviewAccount[],
+	dependents: Dependent[],
 };
 
 /**
@@ -491,6 +708,13 @@ export type SessionConfig = {
 	revealHideSecs: number,
 	/**  Hide the window from screenshots, streaming and screen sharing. */
 	captureProtection: boolean,
+};
+
+/**  An email one or more of the identity's accounts sign in or recover with. */
+export type SharedEmail = {
+	contact: ContactPointView,
+	/**  This identity's accounts using it, by title. */
+	accounts: OverviewAccount[],
 };
 
 /**

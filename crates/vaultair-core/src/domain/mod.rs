@@ -2,5 +2,6 @@
 //! validation; the UI mirrors these rules for feedback only.
 
 pub mod account;
+pub mod identity;
 pub mod mfa;
 pub mod validation;

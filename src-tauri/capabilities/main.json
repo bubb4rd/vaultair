@@ -57,6 +57,18 @@
     "allow-mfa-delete",
     "allow-mfa-set-backup-codes",
     "allow-mfa-mark-code-used",
-    "allow-totp-current-code"
+    "allow-totp-current-code",
+    "allow-identity-list",
+    "allow-identity-refs",
+    "allow-identity-get",
+    "allow-identity-overview",
+    "allow-identity-create",
+    "allow-identity-update",
+    "allow-identity-archive",
+    "allow-identity-unarchive",
+    "allow-identity-delete",
+    "allow-identity-assign-accounts",
+    "allow-contact-point-list",
+    "allow-dashboard-summary"
   ]
 }

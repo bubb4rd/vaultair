@@ -6,6 +6,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 use crate::domain::account::{
     AccountDetail, AccountStatus, AccountSummary, AccountType, CustomFieldType, CustomFieldView,
 };
+use crate::domain::identity::ContactRole;
 
 /// The non-secret columns an account form edits, already validated.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +15,7 @@ pub struct AccountFields {
     pub account_type: AccountType,
     pub purpose_id: String,
     pub status: AccountStatus,
+    pub identity_id: Option<String>,
     pub username: Option<String>,
     pub email: Option<String>,
     pub website_url: Option<String>,
@@ -29,8 +31,8 @@ pub fn insert(conn: &Connection, id: &str, f: &AccountFields, now: &str) -> rusq
     conn.execute(
         "INSERT INTO account (id, title, account_type, purpose_id, status, username, email,
             website_url, login_url, publisher, region, player_id, display_name, notes,
-            created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)",
+            created_at, updated_at, identity_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16)",
         params![
             id,
             f.title,
@@ -46,7 +48,8 @@ pub fn insert(conn: &Connection, id: &str, f: &AccountFields, now: &str) -> rusq
             f.player_id,
             f.display_name,
             f.notes,
-            now
+            now,
+            f.identity_id
         ],
     )?;
     Ok(())
@@ -62,7 +65,8 @@ pub fn update_fields(
     let n = conn.execute(
         "UPDATE account SET title = ?2, account_type = ?3, purpose_id = ?4, status = ?5,
             username = ?6, email = ?7, website_url = ?8, login_url = ?9, publisher = ?10,
-            region = ?11, player_id = ?12, display_name = ?13, notes = ?14, updated_at = ?15
+            region = ?11, player_id = ?12, display_name = ?13, notes = ?14, updated_at = ?15,
+            identity_id = ?16
          WHERE id = ?1",
         params![
             id,
@@ -79,7 +83,8 @@ pub fn update_fields(
             f.player_id,
             f.display_name,
             f.notes,
-            now
+            now,
+            f.identity_id
         ],
     )?;
     Ok(n == 1)
@@ -88,7 +93,7 @@ pub fn update_fields(
 pub fn fields(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountFields>> {
     conn.query_row(
         "SELECT title, account_type, purpose_id, status, username, email, website_url,
-                login_url, publisher, region, player_id, display_name, notes
+                login_url, publisher, region, player_id, display_name, notes, identity_id
          FROM account WHERE id = ?1",
         [id],
         |r| {
@@ -106,6 +111,7 @@ pub fn fields(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountFie
                 player_id: r.get(10)?,
                 display_name: r.get(11)?,
                 notes: r.get(12)?,
+                identity_id: r.get(13)?,
             })
         },
     )
@@ -224,12 +230,11 @@ pub fn set_verified(conn: &Connection, id: &str, now: &str) -> rusqlite::Result<
     )? == 1)
 }
 
-/// Copies the identity, platform and game links from one account to another
-/// (the duplicate-as-template flow).
+/// Copies the platform and game links from one account to another (the
+/// duplicate-as-template flow; the identity is one of `AccountFields`).
 pub fn copy_links(conn: &Connection, from: &str, to: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE account SET
-            identity_id = (SELECT identity_id FROM account WHERE id = ?1),
             platform_id = (SELECT platform_id FROM account WHERE id = ?1),
             game_id = (SELECT game_id FROM account WHERE id = ?1)
          WHERE id = ?2",
@@ -257,7 +262,8 @@ fn count(value: i64) -> u32 {
 }
 
 const SUMMARY_SELECT: &str = "
-    SELECT a.id, a.title, a.account_type, a.purpose_id, p.name, a.status, a.username, a.email,
+    SELECT a.id, a.title, a.account_type, a.purpose_id, p.name, a.status, a.identity_id, i.name,
+           a.username, a.email,
            a.publisher, a.password_enc IS NOT NULL, a.password_strength,
            EXISTS(SELECT 1 FROM mfa_method m WHERE m.account_id = a.id AND m.enabled = 1),
            (SELECT COALESCE(SUM(m.backup_codes_remaining), 0) FROM mfa_method m
@@ -266,7 +272,8 @@ const SUMMARY_SELECT: &str = "
            (SELECT group_concat(t.name, char(31)) FROM account_tag x JOIN tag t ON t.id = x.tag_id
              WHERE x.account_id = a.id),
            a.updated_at
-    FROM account a JOIN purpose_label p ON p.id = a.purpose_id";
+    FROM account a JOIN purpose_label p ON p.id = a.purpose_id
+    LEFT JOIN identity i ON i.id = a.identity_id";
 
 fn summary_row(r: &Row<'_>) -> rusqlite::Result<AccountSummary> {
     Ok(AccountSummary {
@@ -276,18 +283,20 @@ fn summary_row(r: &Row<'_>) -> rusqlite::Result<AccountSummary> {
         purpose_id: r.get(3)?,
         purpose_name: r.get(4)?,
         status: r.get(5)?,
-        username: r.get(6)?,
-        email: r.get(7)?,
-        publisher: r.get(8)?,
-        has_password: r.get(9)?,
-        password_strength: r.get(10)?,
-        mfa_enabled: r.get(11)?,
-        backup_codes_remaining: count(r.get(12)?),
-        favorite: r.get(13)?,
-        favorited_at: r.get(14)?,
-        archived_at: r.get(15)?,
-        tags: split_tags(r.get(16)?),
-        updated_at: r.get(17)?,
+        identity_id: r.get(6)?,
+        identity_name: r.get(7)?,
+        username: r.get(8)?,
+        email: r.get(9)?,
+        publisher: r.get(10)?,
+        has_password: r.get(11)?,
+        password_strength: r.get(12)?,
+        mfa_enabled: r.get(13)?,
+        backup_codes_remaining: count(r.get(14)?),
+        favorite: r.get(15)?,
+        favorited_at: r.get(16)?,
+        archived_at: r.get(17)?,
+        tags: split_tags(r.get(18)?),
+        updated_at: r.get(19)?,
     })
 }
 
@@ -300,6 +309,55 @@ pub fn summaries(conn: &Connection, archived: bool) -> rusqlite::Result<Vec<Acco
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([archived], summary_row)?;
     rows.collect()
+}
+
+/// The `limit` most recently edited active accounts, optionally only one
+/// identity's.
+pub fn recent(
+    conn: &Connection,
+    identity_id: Option<&str>,
+    limit: u32,
+) -> rusqlite::Result<Vec<AccountSummary>> {
+    let sql = format!(
+        "{SUMMARY_SELECT} WHERE a.archived_at IS NULL AND (?1 IS NULL OR a.identity_id = ?1)
+         ORDER BY a.updated_at DESC, a.id DESC LIMIT ?2"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![identity_id, limit], summary_row)?;
+    rows.collect()
+}
+
+/// Dashboard counts over active accounts, optionally only one identity's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Counts {
+    pub total: u32,
+    pub main: u32,
+    pub alt: u32,
+    pub missing_mfa: u32,
+    pub favorites: u32,
+}
+
+pub fn counts(conn: &Connection, identity_id: Option<&str>) -> rusqlite::Result<Counts> {
+    conn.query_row(
+        "SELECT COUNT(*),
+                COALESCE(SUM(p.slug = 'main'), 0),
+                COALESCE(SUM(p.slug = 'alt'), 0),
+                COALESCE(SUM(NOT EXISTS(SELECT 1 FROM mfa_method m
+                                         WHERE m.account_id = a.id AND m.enabled = 1)), 0),
+                COALESCE(SUM(a.favorite), 0)
+         FROM account a JOIN purpose_label p ON p.id = a.purpose_id
+         WHERE a.archived_at IS NULL AND (?1 IS NULL OR a.identity_id = ?1)",
+        [identity_id],
+        |r| {
+            Ok(Counts {
+                total: count(r.get(0)?),
+                main: count(r.get(1)?),
+                alt: count(r.get(2)?),
+                missing_mfa: count(r.get(3)?),
+                favorites: count(r.get(4)?),
+            })
+        },
+    )
 }
 
 pub fn summary(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountSummary>> {
@@ -316,8 +374,10 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
                     a.email, a.password_enc IS NOT NULL, a.password_strength, a.password_changed_at,
                     a.website_url, a.login_url, a.publisher, a.region, a.player_id, a.display_name,
                     a.notes, a.sensitive_notes_enc IS NOT NULL, a.favorite, a.archived_at,
-                    a.last_verified_at, a.created_at, a.updated_at
-             FROM account a JOIN purpose_label p ON p.id = a.purpose_id WHERE a.id = ?1",
+                    a.last_verified_at, a.created_at, a.updated_at, a.identity_id, i.name
+             FROM account a JOIN purpose_label p ON p.id = a.purpose_id
+             LEFT JOIN identity i ON i.id = a.identity_id
+             WHERE a.id = ?1",
             [id],
             |r| {
                 Ok(AccountDetail {
@@ -327,8 +387,12 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
                     purpose_id: r.get(3)?,
                     purpose_name: r.get(4)?,
                     status: r.get(5)?,
+                    identity_id: r.get(24)?,
+                    identity_name: r.get(25)?,
                     username: r.get(6)?,
                     email: r.get(7)?,
+                    recovery_email: None,
+                    recovery_phone: None,
                     has_password: r.get(8)?,
                     password_strength: r.get(9)?,
                     password_changed_at: r.get(10)?,
@@ -356,6 +420,8 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
         return Ok(None);
     };
     detail.tags = super::tag::for_account(conn, id)?;
+    detail.recovery_email = super::contact::account_value(conn, id, ContactRole::RecoveryEmail)?;
+    detail.recovery_phone = super::contact::account_value(conn, id, ContactRole::RecoveryPhone)?;
     detail.custom_fields = custom_field_views(conn, id)?;
     Ok(Some(detail))
 }

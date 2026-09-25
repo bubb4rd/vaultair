@@ -8,7 +8,11 @@ import {
 import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
 import { AccountForm } from "@/features/accounts/AccountForm";
 import { AccountsPage } from "@/features/accounts/AccountsPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { GeneratorPanel } from "@/features/generator/GeneratorPanel";
+import { IdentitiesPage } from "@/features/identities/IdentitiesPage";
+import { IdentityDetailPage } from "@/features/identities/IdentityDetailPage";
+import { IdentityForm } from "@/features/identities/IdentityForm";
 import { AppLayout } from "@/features/shell/AppLayout";
 import { RoutePage } from "@/features/shell/RoutePage";
 import { ALL_NAV_ITEMS } from "./nav";
@@ -17,7 +21,9 @@ const rootRoute = createRootRoute({ component: AppLayout });
 
 /** Destinations whose feature has landed. The rest show a placeholder `RoutePage`. */
 const PAGES: Record<string, () => React.JSX.Element> = {
+  "/": DashboardPage,
   "/accounts": () => <AccountsPage />,
+  "/identities": IdentitiesPage,
   "/archived": () => <AccountsPage archived />,
   "/generator": GeneratorPanel,
 };
@@ -56,7 +62,39 @@ const editAccountRoute = createRoute({
   },
 });
 
-const routeTree = rootRoute.addChildren([...pageRoutes, newAccountRoute, accountRoute, editAccountRoute]);
+const newIdentityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/identities/new",
+  component: () => <IdentityForm />,
+});
+
+const identityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/identities/$identityId",
+  component: function IdentityRoute() {
+    const { identityId } = identityRoute.useParams();
+    return <IdentityDetailPage key={identityId} identityId={identityId} />;
+  },
+});
+
+const editIdentityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/identities/$identityId/edit",
+  component: function EditIdentityRoute() {
+    const { identityId } = editIdentityRoute.useParams();
+    return <IdentityForm key={identityId} identityId={identityId} />;
+  },
+});
+
+const routeTree = rootRoute.addChildren([
+  ...pageRoutes,
+  newAccountRoute,
+  accountRoute,
+  editAccountRoute,
+  newIdentityRoute,
+  identityRoute,
+  editIdentityRoute,
+]);
 
 /**
  * Hash history: the webview always loads index.html, so reloads (the lock flow
