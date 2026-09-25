@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-clipboard-copy-plain"
+description = "Enables the clipboard_copy_plain command without any pre-configured scope."
+commands.allow = ["clipboard_copy_plain"]
+
+[[permission]]
+identifier = "deny-clipboard-copy-plain"
+description = "Denies the clipboard_copy_plain command without any pre-configured scope."
+commands.deny = ["clipboard_copy_plain"]

@@ -7,6 +7,37 @@ import { recent, renderApp, TEST_VAULT } from "@/test/render";
 const WRONG = { code: "wrong_password", message: "Incorrect master password." };
 
 describe("lock screen", () => {
+  it.each([
+    [{ reason: "manual" }, "Vault locked", "Ctrl+L"],
+    [{ reason: "idle", afterSecs: 300 }, "Locked after 5 minutes of inactivity", null],
+    [{ reason: "sessionLocked" }, "Locked because Windows was locked", null],
+    [{ reason: "sleep" }, "Locked before your PC went to sleep", null],
+  ])("says why the vault locked (%o)", async (notice, title, shortcut) => {
+    await renderApp("/", {
+      unlocked: false,
+      recents: [recent("Main")],
+      handlers: { session_take_lock_notice: () => notice },
+    });
+    const el = await waitFor(() => {
+      const found = document.querySelector<HTMLElement>('[data-toast-id="lock-notice"]');
+      if (!found) throw new Error("no lock notice yet");
+      return found;
+    });
+    expect(el).toHaveTextContent(title);
+    if (shortcut) expect(within(el).getByLabelText(shortcut)).toBeInTheDocument();
+  });
+
+  it("confirms removing a vault from the list", async () => {
+    const user = userEvent.setup();
+    await renderApp("/", {
+      unlocked: false,
+      recents: [recent("Main"), recent("Alts")],
+      handlers: { recent_vaults_forget: () => [recent("Main")] },
+    });
+    await user.click(await screen.findByRole("button", { name: /remove alts/i }));
+    expect(await screen.findByText("Removed “Alts” from the list")).toBeInTheDocument();
+  });
+
   it("shows the most recent vault and unlocks it", async () => {
     const user = userEvent.setup();
     const { calls } = await renderApp("/", {

@@ -28,6 +28,13 @@ specta-typescript = "=0.0.12"
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std", "ansi"] }
 tracing-appender = "0.2.5"
+# Already Tauri's runtime; used directly for the clipboard and idle-lock timers.
+tokio = { version = "1.53.1", default-features = false, features = ["rt", "time"] }
+
+[dev-dependencies]
+vaultair-platform = { path = "../crates/vaultair-platform", features = ["fake"] }
+tokio = { version = "1.53.1", default-features = false, features = ["macros", "rt", "sync", "test-util", "time"] }
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

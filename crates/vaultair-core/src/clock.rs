@@ -29,3 +29,42 @@ impl Clock for SystemClock {
         Instant::now()
     }
 }
+
+/// A clock that only moves when told to. For tests.
+#[derive(Debug)]
+pub struct ManualClock {
+    start: Instant,
+    offset: std::sync::Mutex<std::time::Duration>,
+}
+
+impl Default for ManualClock {
+    fn default() -> Self {
+        Self {
+            start: Instant::now(),
+            offset: std::sync::Mutex::default(),
+        }
+    }
+}
+
+impl ManualClock {
+    pub fn advance(&self, by: std::time::Duration) {
+        *self
+            .offset
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) += by;
+    }
+}
+
+impl Clock for ManualClock {
+    fn now_utc(&self) -> OffsetDateTime {
+        OffsetDateTime::UNIX_EPOCH + self.monotonic().duration_since(self.start)
+    }
+
+    fn monotonic(&self) -> Instant {
+        self.start
+            + *self
+                .offset
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}

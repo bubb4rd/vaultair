@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
+import { onClipboardClearedByRust } from "@/features/clipboard/copy";
 import { lockVault } from "@/features/lock/lockVault";
+import { onClipboardCleared } from "@/ipc/events";
+import { ActivityTracker } from "./ActivityTracker";
 import { CommandPalette } from "./CommandPalette";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  useEffect(() => onClipboardCleared(onClipboardClearedByRust), []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      // Ctrl only. On Windows `metaKey` is the Windows key, and Win+L, Win+K
+      // and the rest belong to the OS (lock screen, Cast); never claim them.
+      if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       const key = e.key.toLowerCase();
       if (key === "k") {
         e.preventDefault();
@@ -46,6 +53,7 @@ export function AppLayout() {
         <Outlet />
       </main>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <ActivityTracker />
     </div>
   );
 }

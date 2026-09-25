@@ -24,6 +24,7 @@ pub enum ErrorCode {
     VaultInUse,
     VaultTooNew,
     VaultCorrupted,
+    ClipboardBusy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -54,6 +55,9 @@ pub enum AppError {
     VaultTooNew,
     #[error("vault is damaged")]
     VaultCorrupted,
+    /// Another app kept the clipboard open through every retry.
+    #[error("the clipboard is busy")]
+    ClipboardBusy,
 }
 
 impl AppError {
@@ -70,6 +74,7 @@ impl AppError {
             Self::VaultInUse => ErrorCode::VaultInUse,
             Self::VaultTooNew => ErrorCode::VaultTooNew,
             Self::VaultCorrupted => ErrorCode::VaultCorrupted,
+            Self::ClipboardBusy => ErrorCode::ClipboardBusy,
         }
     }
 
@@ -91,6 +96,7 @@ impl AppError {
                 "This vault was made by a newer version of Vaultair. Update to open it."
             }
             Self::VaultCorrupted => "This vault appears to be damaged. Restore it from a backup.",
+            Self::ClipboardBusy => "Another app is using the clipboard. Try again.",
         }
     }
 
@@ -155,6 +161,7 @@ mod tests {
             AppError::VaultInUse,
             AppError::VaultTooNew,
             AppError::VaultCorrupted,
+            AppError::ClipboardBusy,
         ] {
             let json = serde_json::to_value(&err).unwrap();
             let keys: Vec<_> = json.as_object().unwrap().keys().cloned().collect();

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
+import { Toaster } from "@/components/common/Toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { VaultGate } from "./lock-guard";
 import { createQueryClient } from "./queries";
@@ -17,6 +18,7 @@ export function App({ router: injectedRouter, queryClient: injectedClient }: App
     <QueryClientProvider client={queryClient}>
       <TooltipProvider delayDuration={400}>
         <VaultGate router={router} />
+        <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );

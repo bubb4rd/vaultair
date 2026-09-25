@@ -20,8 +20,18 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::recent::recent_vaults_list,
             commands::recent::recent_vaults_forget,
             commands::password::strength_estimate,
+            commands::session::session_touch,
+            commands::session::session_config_get,
+            commands::session::capture_protection_set,
+            commands::session::session_take_lock_notice,
+            commands::clipboard::clipboard_copy_plain,
+            commands::clipboard::clipboard_cancel_clear,
+            commands::clipboard::clipboard_clear_now,
         ])
-        .events(collect_events![events::VaultLocked])
+        .events(collect_events![
+            events::VaultLocked,
+            events::ClipboardCleared
+        ])
         // Error codes every command can reject with (see `vaultair_core::AppError`).
         .typ::<vaultair_core::ErrorCode>()
 }

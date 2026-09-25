@@ -9,6 +9,14 @@ use windows::core::Interface;
 
 use crate::PlatformError;
 
+mod capture;
+mod clipboard;
+mod session;
+
+pub use capture::WindowsCapture;
+pub use clipboard::WindowsClipboard;
+pub use session::WindowsSessionEvents;
+
 fn os(context: &'static str) -> impl FnOnce(windows::core::Error) -> PlatformError {
     move |_| PlatformError::Os { context }
 }

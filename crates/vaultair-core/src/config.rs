@@ -1,9 +1,10 @@
 //! App config: `%LOCALAPPDATA%\Vaultair\config.json`.
 //!
-//! Holds only what the app needs *before* a vault is unlocked. For now that's
-//! the recent-vaults list, which is folder paths plus when each was last
-//! opened. Never vault contents, names from inside a vault, or anything
-//! secret. See docs/local-data-storage.md.
+//! Holds only what the app needs *before* a vault is unlocked: the
+//! recent-vaults list (folder paths plus when each was last opened) and the
+//! screen-capture protection switch, which must apply to the lock screen too.
+//! Never vault contents, names from inside a vault, or anything secret. See
+//! docs/local-data-storage.md.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
@@ -30,6 +31,14 @@ pub struct AppConfig {
     pub version: u32,
     #[serde(default)]
     pub recent_vaults: Vec<RecentVaultEntry>,
+    /// Hide the window from capture. On unless the user turns it off
+    /// (ADR-0004 decision 6), including for configs written before it existed.
+    #[serde(default = "default_true")]
+    pub capture_protection: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for AppConfig {
@@ -37,6 +46,7 @@ impl Default for AppConfig {
         Self {
             version: CONFIG_VERSION,
             recent_vaults: Vec::new(),
+            capture_protection: true,
         }
     }
 }
@@ -132,6 +142,14 @@ impl ConfigStore {
     /// Removes `path` from the list. Never touches the vault itself.
     pub fn forget_recent(&self, path: &str) {
         self.update(|c| c.recent_vaults.retain(|r| !same_path(&r.path, path)));
+    }
+
+    pub fn capture_protection(&self) -> bool {
+        self.guard().capture_protection
+    }
+
+    pub fn set_capture_protection(&self, enabled: bool) {
+        self.update(|c| c.capture_protection = enabled);
     }
 
     pub fn recent_vaults(&self) -> Vec<RecentVault> {
@@ -277,9 +295,30 @@ mod tests {
             json,
             serde_json::json!({
                 "version": 1,
-                "recentVaults": [{ "path": r"C:\V\Main", "lastOpenedAt": "2026-01-01T00:00:00Z" }]
+                "recentVaults": [{ "path": r"C:\V\Main", "lastOpenedAt": "2026-01-01T00:00:00Z" }],
+                "captureProtection": true
             })
         );
+    }
+
+    #[test]
+    fn capture_protection_defaults_on_and_persists() {
+        let (dir, store) = store();
+        assert!(store.capture_protection());
+        store.set_capture_protection(false);
+        let reloaded = ConfigStore::load(Some(dir.path().to_path_buf()));
+        assert!(!reloaded.capture_protection());
+    }
+
+    #[test]
+    fn configs_from_before_capture_protection_default_it_on() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            br#"{"version": 1, "recentVaults": []}"#,
+        )
+        .unwrap();
+        assert!(ConfigStore::load(Some(dir.path().to_path_buf())).capture_protection());
     }
 
     #[test]

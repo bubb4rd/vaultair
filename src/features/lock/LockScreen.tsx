@@ -10,7 +10,9 @@ import { recentVaults, toIpcError, vault, type RecentVault, type VaultInfo } fro
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/features/shell/BrandMark";
 import { DragBar } from "@/features/shell/DragBar";
+import { toast } from "@/features/toast/toast";
 import { lockoutSeconds } from "./backoff";
+import { showLockNotice } from "./lockNotice";
 
 interface LockScreenProps {
   /** A vault folder to preselect, e.g. one just picked from onboarding. */
@@ -42,6 +44,9 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
     },
     [],
   );
+
+  // Say why the vault just locked (button, Ctrl+L, idle, Windows lock, sleep).
+  useEffect(showLockNotice, []);
 
   /** Disables the form for `seconds`, counting down once a second. */
   function startWait(seconds: number) {
@@ -109,7 +114,12 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
 
   async function forget(entry: RecentVault) {
     const list = await recentVaults.forget(entry.path).catch(() => null);
-    if (list) queryClient.setQueryData(queryKeys.recentVaults, list);
+    if (!list) {
+      toast.error("Couldn't update the list", { description: "Try again." });
+      return;
+    }
+    queryClient.setQueryData(queryKeys.recentVaults, list);
+    toast.success(`Removed “${entry.name}” from the list`, { description: "The vault itself wasn't touched." });
   }
 
   const inputId = "unlock-password";

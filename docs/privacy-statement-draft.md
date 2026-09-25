@@ -11,7 +11,7 @@ Vaultair is a program on your PC. It has no account, no server and no internet c
 | What | Where | Encrypted |
 |---|---|---|
 | Your vault: accounts, identities, passwords, codes, notes | A folder you choose. Default: `%LOCALAPPDATA%\Vaultair\Vaults\<name>` | Yes, with a key made from your master password |
-| A list of recently opened vaults (folder paths and when you last opened each) | `%LOCALAPPDATA%\Vaultair\config.json` | No. It holds no vault contents |
+| A list of recently opened vaults (folder paths and when you last opened each), and whether screen-capture protection is on | `%LOCALAPPDATA%\Vaultair\config.json` | No. It holds no vault contents |
 | Diagnostic logs (app started, vault created/unlocked/locked, error categories) | `%LOCALAPPDATA%\Vaultair\logs` (7 days) | No. They never contain passwords, secrets, usernames, emails, vault names or file paths |
 
 The full list, including the WebView2 browser-engine cache, is in `docs/local-data-storage.md`.
@@ -22,6 +22,7 @@ The full list, including the WebView2 browser-engine cache, is in `docs/local-da
 - **No account.** There's nothing to sign up for and nobody to sign in to.
 - **No copy of your master password.** Vaultair never writes it anywhere. It is used to derive a key and then wiped from Vaultair's own memory. See `docs/forgot-master-password.md`.
 - **No browser storage.** The interface never uses web storage, cookies or IndexedDB.
+- **No clipboard history.** What you copy from Vaultair is kept out of Windows clipboard history and cloud clipboard, and cleared automatically.
 
 ## Things outside Vaultair's control
 

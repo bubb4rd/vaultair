@@ -1,6 +1,6 @@
 # Local data storage
 
-> **Status:** Phase 4. Updated in Phase 14 (backups). Every file Vaultair writes is listed here.
+> **Status:** Phase 5. Updated in Phase 14 (backups). Every file Vaultair writes is listed here.
 
 Vaultair never uploads anything. It makes no network connections (enforced at build time by `deny.toml`).
 
@@ -10,9 +10,11 @@ Vaultair never uploads anything. It makes no network connections (enforced at bu
 | `vault.vhdr` | Vault folder | No (authenticated) | KDF parameters, random salt, the wrapped (encrypted) data key, creation time, vault id. **No user data.** |
 | `vault.vdb` | Vault folder | Yes: SQLCipher (AES-256 + HMAC-SHA512 per page), plus a second layer on secret fields | Everything you store: accounts, identities, passwords, codes, notes, search index |
 | `.lock` | Vault folder | n/a (empty) | Nothing; locked while the vault is open |
-| App config | `%LOCALAPPDATA%\Vaultair\config.json` | No | The recent-vaults list: each vault folder path and when it was last opened (at most 10). Nothing from inside a vault. A missing or unreadable file just means an empty list |
+| App config | `%LOCALAPPDATA%\Vaultair\config.json` | No | The recent-vaults list: each vault folder path and when it was last opened (at most 10), and whether screen-capture protection is on. Nothing from inside a vault. A missing or unreadable file just means an empty list and protection on |
 | Logs | `%LOCALAPPDATA%\Vaultair\logs\vaultair.YYYY-MM-DD.log` (7 days kept) | No | App start, vault created/unlocked/locked, error categories. **Never** passwords, secrets, vault names, usernames, emails or file paths |
 | WebView2 data | `%LOCALAPPDATA%\app.vaultair.desktop\EBWebView\` | No | Browser engine cache. Vaultair doesn't use web storage (ESLint bans it), so no vault data is here |
+
+**The clipboard** isn't a file, but copies leave Vaultair. Every copy is marked to stay out of Windows clipboard history and cloud clipboard, and is cleared after 30 seconds, when the vault locks, and when Vaultair closes (unless you chose "Keep in clipboard", or you've copied something else since). See `docs/security-assumptions.md` for the limits.
 
 ## Where not to put a vault
 
@@ -22,4 +24,4 @@ The default location is deliberately **not** Documents, which on many PCs is syn
 
 - Delete a vault by deleting its folder. Without a backup, that data is gone.
 - Logs and WebView2 data can be deleted at any time; they hold no vault data.
-- Deleting `config.json` only empties the recent-vaults list. "Remove from this list" on the lock screen removes one entry and never touches the vault.
+- Deleting `config.json` only empties the recent-vaults list and turns capture protection back on. "Remove from this list" on the lock screen removes one entry and never touches the vault.
