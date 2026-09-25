@@ -10,10 +10,13 @@ import {
   type CreateVaultRequest,
   type ErrorCode,
   type FolderPurpose,
+  type Generated,
   type IntegrityReport,
   type KdfParams,
   type LockNotice,
   type LocationCheck,
+  type PassphraseOptions,
+  type PasswordOptions,
   type RecentVault,
   type SessionConfig,
   type StrengthEstimate,
@@ -28,10 +31,13 @@ export type {
   CreateVaultRequest,
   ErrorCode,
   FolderPurpose,
+  Generated,
   IntegrityReport,
   KdfParams,
   LocationCheck,
   LockNotice,
+  PassphraseOptions,
+  PasswordOptions,
   RecentVault,
   SessionConfig,
   StrengthEstimate,
@@ -150,9 +156,15 @@ export const session = {
  * clears them automatically. Never use `navigator.clipboard` for vault data.
  */
 export const clipboard = {
-  /** Non-secret text the UI already shows (username, email). */
+  /** Text the UI already shows: a username, an email, a freshly generated password. */
   copyPlain: (text: string): Promise<ClipboardCopy> => unwrap(() => commands.clipboardCopyPlain(text)),
   /** "Keep in clipboard": stops the pending clear. */
   cancelClear: (): Promise<boolean> => call(() => commands.clipboardCancelClear()),
   clearNow: (): Promise<boolean> => unwrap(() => commands.clipboardClearNow()),
+};
+
+/** Password and passphrase generator. Rust draws from OS randomness; nothing is stored. */
+export const generator = {
+  password: (options: PasswordOptions): Promise<Generated> => unwrap(() => commands.generatePassword(options)),
+  passphrase: (options: PassphraseOptions): Promise<Generated> => unwrap(() => commands.generatePassphrase(options)),
 };

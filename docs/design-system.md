@@ -128,3 +128,14 @@ Plain and specific. Say what will appear and how it gets there. No hype verbs, n
 ## Known issue
 
 Radix dialogs (the command palette) inject a scroll-lock `<style>` tag, which the CSP (`style-src 'self'`) blocks and reports in the console. It has no visible effect, because the page body never scrolls. The CSP stays strict; revisit only if a dialog ever needs body scroll locking.
+
+## Generator (Phase 6)
+
+**Design read** (design-taste-frontend): an in-app utility page for a desktop security app, trust-first; extends this system with no new look. Dials unchanged (4 / 3 / 5). Taste's scope excludes dense product UI, so it set direction only; the inspo MCP was not used (existing system).
+
+- **Page** (sidebar group "Tools", or Ctrl+K "password"/"passphrase"): one left-aligned column, max 640 px. From the top: Password / Passphrase segmented control; the output panel (card surface, hairline border); the options; one sentence on where the value comes from.
+- **Output panel**: the value in Geist Mono 17 px, wrapping anywhere, with digits and symbols in the brand blue so they're easy to tell apart when typed by hand (the one accent, not a status color). Below a hairline: the strength row (the onboarding meter's four segments, a text label, and entropy as "129 bits" in mono), then "Generate another" (icon button) and Copy (the one filled button). Every option change regenerates at once; only the newest answer is shown. A new value is announced politely with its strength label, never the value itself.
+- **Options**: length and word count are a slider plus a small number field kept in sync (typing out of range never generates). Character types are switches with their sample in mono; the last one left on is disabled with "At least one type of character is needed." as its description. The separator is a segmented control with named items (Hyphen, Space, Period, Underscore, Comma).
+- **Errors**: an impossible exclusion replaces the value with the error (icon + text), marks the field invalid, and disables Copy, so a stale value can't be copied.
+- **Popover** (`GeneratorPopover`, 340 px, overlay radius 12 px): mode, value with a regenerate icon, strength, length or words, then Copy and "Use password". Other options come from the page's last settings.
+- **New primitives**: `Switch` (brand when on), `Slider` (brand range, 2 px focus ring with offset), `Popover`, and `SegmentedGroup` (a Radix radio group styled like the default tabs list, arrow keys move the selection).

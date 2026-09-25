@@ -1,9 +1,10 @@
 //! Clipboard commands. Every copy is kept out of clipboard history and
 //! cleared automatically (see `crate::clipboard`).
 //!
-//! `clipboard_copy_plain` takes text the UI already shows (a username or
-//! email). Secrets never pass through here: Phase 7's
-//! `clipboard_copy_secret` decrypts in Rust and copies directly.
+//! `clipboard_copy_plain` takes text the UI already shows (a username, an
+//! email, or a freshly generated password that isn't saved anywhere yet).
+//! Stored secrets never pass through here: Phase 7's `clipboard_copy_secret`
+//! decrypts in Rust and copies directly.
 
 use serde::Serialize;
 use tauri::State;

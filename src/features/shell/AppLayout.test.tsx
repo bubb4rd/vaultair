@@ -6,11 +6,13 @@ import { renderApp } from "@/test/render";
 import { axeViolations } from "@/test/axe";
 
 describe("app shell", () => {
-  it.each(ALL_NAV_ITEMS.map((i) => [i.path, i] as const))("%s renders its header and empty state", async (path, item) => {
+  it.each(ALL_NAV_ITEMS.map((i) => [i.path, i] as const))("%s renders its header", async (path, item) => {
     await renderApp(path);
     expect(await screen.findByRole("heading", { level: 1, name: item.label })).toBeInTheDocument();
-    const empty = screen.getByTestId("empty-state");
-    expect(within(empty).getByRole("heading", { name: item.empty.title })).toBeInTheDocument();
+    if (item.empty) {
+      const empty = screen.getByTestId("empty-state");
+      expect(within(empty).getByRole("heading", { name: item.empty.title })).toBeInTheDocument();
+    }
   });
 
   it("has no title bar: window controls live in the page header", async () => {

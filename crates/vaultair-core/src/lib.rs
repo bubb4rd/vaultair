@@ -9,6 +9,7 @@ pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod error;
+pub mod generator;
 pub mod redact;
 pub mod service;
 pub mod vault;
