@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "@tanstack/react-router";
+import { lockVault } from "@/features/lock/lockVault";
 import { CommandPalette } from "./CommandPalette";
 import { Sidebar } from "./Sidebar";
 
@@ -8,9 +9,14 @@ export function AppLayout() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k") {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
+      } else if (key === "l") {
+        e.preventDefault();
+        lockVault();
       }
     };
     window.addEventListener("keydown", onKey);

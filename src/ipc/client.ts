@@ -5,15 +5,33 @@
 import {
   commands,
   type AppInfo,
+  type CloudProvider,
   type CreateVaultRequest,
   type ErrorCode,
+  type FolderPurpose,
   type IntegrityReport,
   type KdfParams,
+  type LocationCheck,
+  type RecentVault,
+  type StrengthEstimate,
   type VaultInfo,
   type VaultStatus,
 } from "./bindings";
 
-export type { AppInfo, CreateVaultRequest, ErrorCode, IntegrityReport, KdfParams, VaultInfo, VaultStatus };
+export type {
+  AppInfo,
+  CloudProvider,
+  CreateVaultRequest,
+  ErrorCode,
+  FolderPurpose,
+  IntegrityReport,
+  KdfParams,
+  LocationCheck,
+  RecentVault,
+  StrengthEstimate,
+  VaultInfo,
+  VaultStatus,
+};
 
 /** Shape of `vaultair_core::AppError` once serialized. */
 export interface IpcError {
@@ -91,4 +109,21 @@ export const vault = {
   lock: (): Promise<boolean> => call(() => commands.vaultLock()),
   status: (): Promise<VaultStatus> => call(() => commands.vaultStatus()),
   integrityCheck: (): Promise<IntegrityReport> => unwrap(() => commands.vaultIntegrityCheck()),
+  createDemo: (request: CreateVaultRequest): Promise<VaultInfo> =>
+    unwrap(() => commands.vaultCreateDemo(request)),
+  /** `location` null means the default folder. */
+  checkLocation: (location: string | null, name: string): Promise<LocationCheck> =>
+    unwrap(() => commands.vaultLocationCheck(location, name)),
+  /** Resolves null if the user cancels the dialog. */
+  pickFolder: (purpose: FolderPurpose): Promise<string | null> => unwrap(() => commands.vaultPickFolder(purpose)),
 };
+
+export const recentVaults = {
+  list: (): Promise<RecentVault[]> => call(() => commands.recentVaultsList()),
+  /** Removes the entry only; the vault's files are untouched. Returns the new list. */
+  forget: (path: string): Promise<RecentVault[]> => call(() => commands.recentVaultsForget(path)),
+};
+
+/** Scores a candidate master password in Rust. Nothing is stored. */
+export const strengthEstimate = (password: string): Promise<StrengthEstimate> =>
+  call(() => commands.strengthEstimate(password));

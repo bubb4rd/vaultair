@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod clock;
+pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod error;

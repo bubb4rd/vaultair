@@ -1,8 +1,13 @@
+import { Fragment } from "react";
 import { Link } from "@tanstack/react-router";
-import { MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { LockSimpleIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { NAV_GROUPS, SETTINGS_ITEM, type NavItem } from "@/app/nav";
+import { useOpenVault } from "@/app/queries";
 import { KeyboardHint } from "@/components/common/KeyboardHint";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { lockVault } from "@/features/lock/lockVault";
 import { BrandMark } from "./BrandMark";
+import { FavoritesGroup } from "./FavoritesGroup";
 
 function NavLink({ item }: { item: NavItem }) {
   const Icon = item.icon;
@@ -19,6 +24,40 @@ function NavLink({ item }: { item: NavItem }) {
       />
       <span className="truncate">{item.label}</span>
     </Link>
+  );
+}
+
+function GroupLabel({ children }: { children: string }) {
+  return <div className="px-2.5 pb-1 text-xs font-medium text-subtle-foreground">{children}</div>;
+}
+
+function VaultRow() {
+  const openVault = useOpenVault();
+  return (
+    <div className="flex items-center gap-2 pt-1 pl-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium text-foreground" title={openVault?.path}>
+          {openVault?.name ?? "Vault"}
+        </p>
+        {openVault?.demo && <p className="text-xs text-subtle-foreground">Demo vault</p>}
+      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="Lock vault"
+            aria-keyshortcuts="Control+L"
+            onClick={lockVault}
+            className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <LockSimpleIcon aria-hidden="true" className="size-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="flex items-center gap-2">
+          Lock <KeyboardHint keys={["Ctrl", "L"]} />
+        </TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -47,21 +86,23 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch: () => void }) {
 
       <nav aria-label="Main" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2">
         {NAV_GROUPS.map((group, i) => (
-          <div key={group.label ?? i} role="group" aria-label={group.label ?? "Overview"}>
-            {group.label && (
-              <div className="px-2.5 pb-1 text-xs font-medium text-subtle-foreground">{group.label}</div>
-            )}
-            <div className="flex flex-col gap-0.5">
-              {group.items.map((item) => (
-                <NavLink key={item.path} item={item} />
-              ))}
+          <Fragment key={group.label ?? i}>
+            <div role="group" aria-label={group.label ?? "Overview"}>
+              {group.label && <GroupLabel>{group.label}</GroupLabel>}
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((item) => (
+                  <NavLink key={item.path} item={item} />
+                ))}
+              </div>
             </div>
-          </div>
+            {group.label === "Vault" && <FavoritesGroup />}
+          </Fragment>
         ))}
       </nav>
 
-      <div className="border-t border-border px-3 py-2">
+      <div className="flex flex-col gap-1 border-t border-border px-3 py-2">
         <NavLink item={SETTINGS_ITEM} />
+        <VaultRow />
       </div>
     </aside>
   );

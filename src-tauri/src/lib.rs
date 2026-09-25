@@ -3,6 +3,7 @@
 //! maps DTOs and sanitises errors.
 
 mod commands;
+mod events;
 mod ipc;
 mod logging;
 mod state;
@@ -19,7 +20,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             window::focus_main(app);
         }))
-        .manage(state::AppState::default())
+        .manage(state::AppState::load())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);

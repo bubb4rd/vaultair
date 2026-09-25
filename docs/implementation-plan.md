@@ -537,7 +537,7 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
   - `docs/design-system.md`
 - **Status system:**
   - `StatusBadge` always renders **icon + text + color**: green active/secure (ShieldCheck), yellow needs attention (CircleAlert), orange warning (TriangleAlert), red high risk (ShieldX), gray dormant/archived/unknown (CircleDashed/Archive), blue/purple linked/info (Link2/Info).
-  - Sidebar destinations: Dashboard, All Accounts, Identities, Games, Platforms, Relationship Map, Security Health, Favorites, Archived, Settings. Global search sits at the top and opens a cmdk palette on Ctrl+K.
+  - Sidebar destinations: Dashboard, All Accounts, Identities, Games, Platforms, Relationship Map, Security Health, Archived, Settings. Favorites is a sidebar section listing starred accounts, not a page (ADR-0004 decision 20). Global search sits at the top and opens a cmdk palette on Ctrl+K.
 - **Commands:** none new.
 - **Tests:** RTL tests that every route renders an EmptyState, that StatusBadge exposes an accessible label and never relies on color alone, and vitest-axe on the shell.
 - **Acceptance:** all routes navigable, keyboard-only navigation works, contrast checks pass, and `docs/design-system.md` records the design read, dials, palette, type and status semantics.
@@ -703,7 +703,7 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
 - **Behaviors:**
   - FTS per §3.1, with a filter DSL (versioned JSON) validated in Rust.
   - Table, card and compact views with virtualization; sorting; multi-select; bulk tag and bulk archive; **bulk delete that requires typing "DELETE <n> ACCOUNTS"**.
-  - Saved views, both built-in and user-defined. The Favorites and Archived sidebar entries are saved views.
+  - Saved views, both built-in and user-defined. The Archived sidebar entry is a saved view; the Favorites sidebar section lists starred accounts directly (ADR-0004 decision 20).
 - **Commands:** `search`, `saved_view_*`, `search_rebuild_index`, `account_bulk_*`.
 - **Tests:**
   - **Secret non-indexing canary:** a password or backup code equal to `CANARY7F3A` returns zero hits, and `SELECT * FROM search_index` contains no canary.

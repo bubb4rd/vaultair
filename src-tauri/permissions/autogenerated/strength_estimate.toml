@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-strength-estimate"
+description = "Enables the strength_estimate command without any pre-configured scope."
+commands.allow = ["strength_estimate"]
+
+[[permission]]
+identifier = "deny-strength-estimate"
+description = "Denies the strength_estimate command without any pre-configured scope."
+commands.deny = ["strength_estimate"]

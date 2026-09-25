@@ -1,22 +1,27 @@
-//! Vault lifecycle commands (Phase 3: wired, no UI yet).
+//! Vault lifecycle commands: create, unlock, lock, status, and the pre-unlock
+//! helpers onboarding and the lock screen need (location check, folder picker).
 //!
 //! Passwords arrive from the webview as JSON strings and are moved straight
 //! into `SecretString` (wiped on drop). Copies made by IPC deserialization
 //! and in the JS heap can't be wiped; see docs/security-assumptions.md.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-use tauri::State;
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, State, WebviewWindow};
+use vaultair_core::clock::{Clock, SystemClock};
 use vaultair_core::crypto::kdf::{self, KdfParams};
 use vaultair_core::service::session::VaultStatus;
-use vaultair_core::vault::layout::default_vaults_dir;
+use vaultair_core::vault::layout::{default_vaults_dir, validate_name, HEADER_FILE};
+use vaultair_core::vault::location::CloudProvider;
 use vaultair_core::vault::{CreateOptions, IntegrityReport, VaultError, VaultInfo};
 use vaultair_core::AppError;
 
+use crate::events::lock_and_notify;
 use crate::state::{ipc_err, AppState, IpcResult};
 
-/// Runs slow work (Argon2, SQLCipher) off the async runtime's worker threads.
+/// Runs slow work (Argon2, SQLCipher, modal dialogs) off the async runtime's
+/// worker threads.
 async fn blocking<T: Send + 'static>(
     f: impl FnOnce() -> Result<T, VaultError> + Send + 'static,
 ) -> IpcResult<T> {
@@ -24,6 +29,30 @@ async fn blocking<T: Send + 'static>(
         .await
         .map_err(|_| ipc_err(AppError::Internal { context: "worker" }))?
         .map_err(ipc_err)
+}
+
+/// A folder path from the webview: must be absolute. Rust re-validates every
+/// path it's handed, including ones its own folder picker returned.
+fn absolute_dir(path: &str) -> Result<PathBuf, VaultError> {
+    let p = PathBuf::from(path);
+    if p.is_absolute() {
+        Ok(p)
+    } else {
+        Err(VaultError::InvalidLocation)
+    }
+}
+
+fn parent_or_default(location: Option<String>) -> Result<PathBuf, VaultError> {
+    match location {
+        Some(l) => absolute_dir(&l),
+        None => default_vaults_dir().ok_or(VaultError::InvalidLocation),
+    }
+}
+
+fn record_recent(state: &AppState, info: &VaultInfo) {
+    state
+        .config
+        .record_recent(&info.path, &SystemClock.now_rfc3339());
 }
 
 /// Measures this device and suggests Argon2id parameters (~0.85 s unlock).
@@ -43,12 +72,7 @@ pub struct CreateVaultRequest {
     pub password: String,
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn vault_create(
-    state: State<'_, AppState>,
-    request: CreateVaultRequest,
-) -> IpcResult<VaultInfo> {
+async fn create(state: &AppState, request: CreateVaultRequest, demo: bool) -> IpcResult<VaultInfo> {
     let CreateVaultRequest {
         name,
         location,
@@ -56,23 +80,43 @@ pub async fn vault_create(
         password,
     } = request;
     let password = secrecy::SecretString::from(password);
-    let parent_dir = match location {
-        Some(l) => PathBuf::from(l),
-        None => default_vaults_dir().ok_or_else(|| ipc_err(VaultError::InvalidLocation))?,
-    };
+    let parent_dir = parent_or_default(location).map_err(ipc_err)?;
     let session = state.session.clone();
-    blocking(move || {
+    let info = blocking(move || {
         session.create(
             &CreateOptions {
                 parent_dir,
                 name,
                 kdf,
-                demo: false,
+                demo,
             },
             &password,
         )
     })
-    .await
+    .await?;
+    record_recent(state, &info);
+    tracing::info!(demo, "vault created");
+    Ok(info)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_create(
+    state: State<'_, AppState>,
+    request: CreateVaultRequest,
+) -> IpcResult<VaultInfo> {
+    create(&state, request, false).await
+}
+
+/// Same as `vault_create`, but the vault is flagged as a demo (sample data
+/// arrives in Phase 7+). It's a real encrypted vault with its own password.
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_create_demo(
+    state: State<'_, AppState>,
+    request: CreateVaultRequest,
+) -> IpcResult<VaultInfo> {
+    create(&state, request, true).await
 }
 
 #[tauri::command]
@@ -83,15 +127,18 @@ pub async fn vault_unlock(
     password: String,
 ) -> IpcResult<VaultInfo> {
     let password = secrecy::SecretString::from(password);
+    let dir = absolute_dir(&path).map_err(ipc_err)?;
     let session = state.session.clone();
-    blocking(move || session.unlock(&PathBuf::from(path), &password)).await
+    let info = blocking(move || session.unlock(&dir, &password)).await?;
+    record_recent(&state, &info);
+    Ok(info)
 }
 
-/// Returns whether a vault was open.
+/// Locks and emits `vault://locked`. Returns whether a vault was open.
 #[tauri::command]
 #[specta::specta]
-pub fn vault_lock(state: State<'_, AppState>) -> bool {
-    state.session.lock()
+pub fn vault_lock(app: AppHandle, state: State<'_, AppState>) -> bool {
+    lock_and_notify(&app, &state.session)
 }
 
 #[tauri::command]
@@ -105,4 +152,106 @@ pub fn vault_status(state: State<'_, AppState>) -> VaultStatus {
 pub async fn vault_integrity_check(state: State<'_, AppState>) -> IpcResult<IntegrityReport> {
     let session = state.session.clone();
     blocking(move || session.integrity_check()).await
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LocationCheck {
+    /// The folder the vault folder will be created in.
+    pub parent_dir: String,
+    /// Where the vault itself will live: `parent_dir\<name>`.
+    pub vault_dir: String,
+    /// Set when the folder looks synced to a cloud service (warn, don't block).
+    pub cloud_provider: Option<CloudProvider>,
+    /// A non-empty folder with this name already exists (create would fail).
+    pub already_exists: bool,
+}
+
+/// Where a new vault named `name` would go, and whether that's a good idea.
+/// `location` `None` means the default folder.
+#[tauri::command]
+#[specta::specta]
+pub fn vault_location_check(
+    state: State<'_, AppState>,
+    location: Option<String>,
+    name: String,
+) -> IpcResult<LocationCheck> {
+    if !validate_name(&name) {
+        return Err(ipc_err(VaultError::InvalidName));
+    }
+    let parent = parent_or_default(location).map_err(ipc_err)?;
+    let vault_dir = parent.join(&name);
+    let already_exists = std::fs::read_dir(&vault_dir).is_ok_and(|mut d| d.next().is_some());
+    Ok(LocationCheck {
+        cloud_provider: state.cloud_roots.classify(&vault_dir),
+        parent_dir: parent.display().to_string(),
+        vault_dir: vault_dir.display().to_string(),
+        already_exists,
+    })
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum FolderPurpose {
+    /// Choose where a new vault's folder goes.
+    NewVaultLocation,
+    /// Choose an existing vault's folder (the one containing `vault.vhdr`).
+    ExistingVault,
+}
+
+/// Shows the system folder picker. Returns `None` if cancelled. For
+/// `ExistingVault`, a folder without a vault header is `vault_not_found`.
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_pick_folder(
+    window: WebviewWindow,
+    purpose: FolderPurpose,
+) -> IpcResult<Option<String>> {
+    let owner = owner_handle(&window);
+    let initial = default_vaults_dir();
+    blocking(move || {
+        let title = match purpose {
+            FolderPurpose::NewVaultLocation => "Choose where to keep your vault",
+            FolderPurpose::ExistingVault => "Choose a vault folder",
+        };
+        let Some(dir) = pick_folder(owner, title, initial.as_deref())? else {
+            return Ok(None);
+        };
+        if matches!(purpose, FolderPurpose::ExistingVault) && !dir.join(HEADER_FILE).is_file() {
+            return Err(VaultError::NotFound);
+        }
+        Ok(Some(dir.display().to_string()))
+    })
+    .await
+}
+
+#[cfg(windows)]
+fn owner_handle(window: &WebviewWindow) -> isize {
+    window.hwnd().map_or(0, |h| h.0 as isize)
+}
+
+#[cfg(not(windows))]
+fn owner_handle(_window: &WebviewWindow) -> isize {
+    0
+}
+
+#[cfg(windows)]
+fn pick_folder(
+    owner: isize,
+    title: &str,
+    initial: Option<&Path>,
+) -> Result<Option<PathBuf>, VaultError> {
+    vaultair_platform::windows::pick_folder(owner, title, initial).map_err(|e| {
+        tracing::warn!(error = %e, "folder picker failed");
+        VaultError::Io(std::io::ErrorKind::Other)
+    })
+}
+
+#[cfg(not(windows))]
+fn pick_folder(
+    _owner: isize,
+    _title: &str,
+    _initial: Option<&Path>,
+) -> Result<Option<PathBuf>, VaultError> {
+    Err(VaultError::Io(std::io::ErrorKind::Unsupported))
 }

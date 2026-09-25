@@ -70,3 +70,87 @@ pub fn harden_webview(
     }
     Ok(())
 }
+
+/// Shows the system "choose a folder" dialog, modal to `owner` (a raw HWND).
+/// Returns `None` if the user cancels. Blocks until the dialog closes, so call
+/// it from a worker thread, not the UI thread.
+///
+/// This replaces `tauri-plugin-dialog`, which pulls in `tauri-plugin-fs`
+/// (banned in deny.toml). The webview never gets a file-system API: Rust shows
+/// the dialog and validates the chosen path itself.
+pub fn pick_folder(
+    owner: isize,
+    title: &str,
+    initial: Option<&std::path::Path>,
+) -> Result<Option<std::path::PathBuf>, PlatformError> {
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::Foundation::{ERROR_CANCELLED, HWND};
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER,
+        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+    };
+    use windows::Win32::UI::Shell::{
+        FileOpenDialog, IFileOpenDialog, IShellItem, SHCreateItemFromParsingName,
+        FOS_FORCEFILESYSTEM, FOS_NOCHANGEDIR, FOS_PATHMUSTEXIST, FOS_PICKFOLDERS,
+        SIGDN_FILESYSPATH,
+    };
+
+    /// Balances a successful `CoInitializeEx` on this thread.
+    struct ComGuard;
+    impl Drop for ComGuard {
+        fn drop(&mut self) {
+            // SAFETY: only constructed after CoInitializeEx succeeded on this thread.
+            unsafe { CoUninitialize() };
+        }
+    }
+
+    // SAFETY: standard IFileOpenDialog usage. Every COM object is created, used
+    // and released on this thread, inside a COM apartment this function owns.
+    // `owner` is only passed through as the dialog's parent window.
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
+            .ok()
+            .map_err(os("CoInitializeEx"))?;
+        let _com = ComGuard;
+
+        let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)
+            .map_err(os("FileOpenDialog"))?;
+        let options = dialog.GetOptions().map_err(os("GetOptions"))?;
+        dialog
+            .SetOptions(
+                options
+                    | FOS_PICKFOLDERS
+                    | FOS_FORCEFILESYSTEM
+                    | FOS_PATHMUSTEXIST
+                    | FOS_NOCHANGEDIR,
+            )
+            .map_err(os("SetOptions"))?;
+        dialog
+            .SetTitle(&HSTRING::from(title))
+            .map_err(os("SetTitle"))?;
+        if let Some(dir) = initial.filter(|d| d.is_dir()) {
+            let wide: Vec<u16> = dir.as_os_str().encode_wide().chain([0]).collect();
+            if let Ok(item) =
+                SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(wide.as_ptr()), None)
+            {
+                let _ = dialog.SetFolder(&item);
+            }
+        }
+
+        match dialog.Show(Some(HWND(owner as *mut core::ffi::c_void))) {
+            Ok(()) => {}
+            Err(e) if e.code() == ERROR_CANCELLED.to_hresult() => return Ok(None),
+            Err(_) => return Err(PlatformError::Os { context: "Show" }),
+        }
+
+        let item = dialog.GetResult().map_err(os("GetResult"))?;
+        let raw = item
+            .GetDisplayName(SIGDN_FILESYSPATH)
+            .map_err(os("GetDisplayName"))?;
+        let path = std::ffi::OsString::from_wide(raw.as_wide());
+        CoTaskMemFree(Some(raw.0 as *const core::ffi::c_void));
+        Ok(Some(path.into()))
+    }
+}
