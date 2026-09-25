@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-mark-verified"
+description = "Enables the account_mark_verified command without any pre-configured scope."
+commands.allow = ["account_mark_verified"]
+
+[[permission]]
+identifier = "deny-account-mark-verified"
+description = "Denies the account_mark_verified command without any pre-configured scope."
+commands.deny = ["account_mark_verified"]

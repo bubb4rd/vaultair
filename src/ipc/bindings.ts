@@ -22,8 +22,9 @@ export const commands = {
 	vaultStatus: () => __TAURI_INVOKE<VaultStatus>("vault_status"),
 	vaultIntegrityCheck: () => typedError<IntegrityReport, IpcError_Serialize>(__TAURI_INVOKE("vault_integrity_check")),
 	/**
-	 *  Same as `vault_create`, but the vault is flagged as a demo (sample data
-	 *  arrives in Phase 7+). It's a real encrypted vault with its own password.
+	 *  Same as `vault_create`, but the vault is flagged as a demo and filled with
+	 *  sample accounts (`vaultair_core::demo`). It's a real encrypted vault with
+	 *  its own password.
 	 */
 	vaultCreateDemo: (request: CreateVaultRequest) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_create_demo", { request })),
 	/**
@@ -72,6 +73,53 @@ export const commands = {
 	clipboardCancelClear: () => __TAURI_INVOKE<boolean>("clipboard_cancel_clear"),
 	/**  Clears our value from the clipboard now. Returns whether it cleared. */
 	clipboardClearNow: () => typedError<boolean, IpcError_Serialize>(__TAURI_INVOKE("clipboard_clear_now")),
+	/**  Active accounts, or archived ones (`archived: true`), by title. */
+	accountList: (archived: boolean) => typedError<AccountSummary[], IpcError_Serialize>(__TAURI_INVOKE("account_list", { archived })),
+	accountGet: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_get", { id })),
+	accountCreate: (input: AccountInput) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_create", { input })),
+	/**  Saves the whole form. Secret fields say `unchanged`, `set` or `clear`. */
+	accountUpdate: (id: string, input: AccountInput) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_update", { id, input })),
+	accountArchive: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_archive", { id })),
+	accountUnarchive: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_unarchive", { id })),
+	accountSetFavorite: (id: string, favorite: boolean) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_set_favorite", { id, favorite })),
+	/**  "Mark verified": the user checked the account still works. */
+	accountMarkVerified: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_mark_verified", { id })),
+	/**
+	 *  Permanently deletes an account. `confirm_title` must be its title, as
+	 *  typed by the user; anything else is `invalid_input` on `confirmTitle`.
+	 */
+	accountDelete: (id: string, confirmTitle: string) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("account_delete", { id, confirmTitle })),
+	/**  A new account from this one's platform details, with no credentials. */
+	accountDuplicateAsTemplate: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_duplicate_as_template", { id })),
+	/**  The URL "Open in browser" would open, and its host for the confirm dialog. */
+	accountUrlTarget: (id: string, which: AccountUrl) => typedError<UrlTarget, IpcError_Serialize>(__TAURI_INVOKE("account_url_target", { id, which })),
+	/**
+	 *  Opens the account's stored website or login URL in the default browser.
+	 *  The URL is read from the vault and validated again here; the webview
+	 *  can't pass one in. Nothing is filled in or logged in automatically.
+	 */
+	accountOpenUrl: (id: string, which: AccountUrl) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("account_open_url", { id, which })),
+	/**  Purposes the account form offers. */
+	purposeList: () => typedError<PurposeView[], IpcError_Serialize>(__TAURI_INVOKE("purpose_list")),
+	/**  Every tag in the vault, for suggestions. */
+	tagList: () => typedError<string[], IpcError_Serialize>(__TAURI_INVOKE("tag_list")),
+	secretReveal: (target: SecretRef) => typedError<RevealedSecret, IpcError_Serialize>(__TAURI_INVOKE("secret_reveal", { target })),
+	/**
+	 *  Copies a stored secret (password, TOTP code, backup code, …) without it
+	 *  ever reaching the webview.
+	 */
+	clipboardCopySecret: (target: SecretRef) => typedError<ClipboardCopy, IpcError_Serialize>(__TAURI_INVOKE("clipboard_copy_secret", { target })),
+	/**  Adds an MFA method to an account, or edits one (`input.id`). */
+	mfaUpsert: (accountId: string, input: MfaInput) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("mfa_upsert", { accountId, input })),
+	mfaDelete: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("mfa_delete", { id })),
+	/**
+	 *  Replaces the backup codes with those pasted in `codes`, or removes them
+	 *  (`None`). Parsed and encrypted in Rust; the list is never sent back.
+	 */
+	mfaSetBackupCodes: (id: string, codes: string | null) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("mfa_set_backup_codes", { id, codes })),
+	mfaMarkCodeUsed: (id: string, index: number, used: boolean) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("mfa_mark_code_used", { id, index, used })),
+	/**  The current TOTP code and seconds until it changes, for display. */
+	totpCurrentCode: (id: string) => typedError<TotpCodeView, IpcError_Serialize>(__TAURI_INVOKE("totp_current_code", { id })),
 };
 
 /** Events */
@@ -81,10 +129,110 @@ export const events = {
 };
 
 /* Types */
+/**  Everything the detail page shows. */
+export type AccountDetail = {
+	id: string,
+	title: string,
+	accountType: AccountType,
+	purposeId: string,
+	purposeName: string,
+	status: AccountStatus,
+	username: string | null,
+	email: string | null,
+	hasPassword: boolean,
+	passwordStrength: number | null,
+	passwordChangedAt: string | null,
+	websiteUrl: string | null,
+	loginUrl: string | null,
+	publisher: string | null,
+	region: string | null,
+	playerId: string | null,
+	displayName: string | null,
+	notes: string | null,
+	hasSensitiveNotes: boolean,
+	favorite: boolean,
+	archivedAt: string | null,
+	lastVerifiedAt: string | null,
+	createdAt: string,
+	updatedAt: string,
+	tags: string[],
+	customFields: CustomFieldView[],
+	mfa: MfaView[],
+};
+
+/**  Everything the account form edits. Sent whole on create and update. */
+export type AccountInput = {
+	title: string,
+	accountType: AccountType,
+	purposeId: string,
+	status: AccountStatus,
+	username: string | null,
+	email: string | null,
+	password?: SecretUpdate,
+	websiteUrl: string | null,
+	loginUrl: string | null,
+	publisher: string | null,
+	region: string | null,
+	playerId: string | null,
+	displayName: string | null,
+	/**  Plain notes. Indexed for search. */
+	notes: string | null,
+	/**  Encrypted and never indexed. */
+	sensitiveNotes?: SecretUpdate,
+	tags?: string[],
+	customFields?: CustomFieldInput[],
+};
+
+/**
+ *  Where the account stands. Archiving is separate (`archived_at`), so
+ *  an archived account keeps the status it had.
+ */
+export type AccountStatus = "active" | "dormant" | "locked" | "suspended" | "retired" | "archived" | "unknown";
+
+/**  A row in the account list. */
+export type AccountSummary = {
+	id: string,
+	title: string,
+	accountType: AccountType,
+	purposeId: string,
+	purposeName: string,
+	status: AccountStatus,
+	username: string | null,
+	email: string | null,
+	publisher: string | null,
+	hasPassword: boolean,
+	/**  zxcvbn score 0–4 of the stored password, computed when it was saved. */
+	passwordStrength: number | null,
+	/**  At least one enabled MFA method. */
+	mfaEnabled: boolean,
+	/**  Unused backup codes across enabled MFA methods. */
+	backupCodesRemaining: number,
+	favorite: boolean,
+	favoritedAt: string | null,
+	archivedAt: string | null,
+	tags: string[],
+	updatedAt: string,
+};
+
+/**  What kind of login this is. */
+export type AccountType = "platform" | "launcher" | "game" | "console" | "social" | "streaming" | "email" | "website" | "app" | "other";
+
+/**  Which stored URL "Open in browser" uses. */
+export type AccountUrl = "website" | "login";
+
 export type AppInfo = {
 	name: string,
 	version: string,
 	buildProfile: BuildProfile,
+};
+
+/**
+ *  One backup code's slot: its position and whether it's used. The code
+ *  itself is only revealed or copied on request.
+ */
+export type BackupCodeSlot = {
+	index: number,
+	used: boolean,
 };
 
 export type BuildProfile = "debug" | "release";
@@ -108,6 +256,32 @@ export type CreateVaultRequest = {
 	location: string | null,
 	kdf: KdfParams,
 	password: string,
+};
+
+/**  A custom field as the form sends it. `id` is `None` for a new field. */
+export type CustomFieldInput = {
+	id: string | null,
+	label: string,
+	fieldType: CustomFieldType,
+	/**  The value for every type except `Secret`. */
+	value: string | null,
+	/**  The value for `Secret`. */
+	secret?: SecretUpdate,
+};
+
+/**
+ *  Custom field kinds. `Secret` values are stored as field envelopes and
+ *  behave like the password: hidden, revealed or copied on request.
+ */
+export type CustomFieldType = "text" | "secret" | "url" | "email" | "number" | "date";
+
+export type CustomFieldView = {
+	id: string,
+	label: string,
+	fieldType: CustomFieldType,
+	/**  The value for every type except `Secret`, which is always `None` here. */
+	value: string | null,
+	hasValue: boolean,
 };
 
 /**  Stable, machine-readable error codes. The frontend switches on these. */
@@ -187,6 +361,38 @@ export type LockNotice =
 /**  The lock button or Ctrl+L. */
 { reason: "manual" } | { reason: "idle"; afterSecs: number } | { reason: "sessionLocked" } | { reason: "signedOut" } | { reason: "disconnected" } | { reason: "sleep" } | { reason: "minimized" };
 
+/**  An MFA method as the form sends it. `id` is `None` for a new one. */
+export type MfaInput = {
+	id: string | null,
+	method: MfaMethod,
+	enabled: boolean,
+	/**
+	 *  A base32 setup key or an `otpauth://totp/...` link. Its settings
+	 *  (algorithm, digits, period) come from the link, or the defaults.
+	 */
+	totpSecret?: SecretUpdate,
+	recoveryInstructions?: SecretUpdate,
+	notes: string | null,
+};
+
+/**  How an account's second factor works. */
+export type MfaMethod = "authenticator_app" | "totp" | "hardware_key" | "sms" | "email" | "recovery_codes_only" | "unknown";
+
+export type MfaView = {
+	id: string,
+	method: MfaMethod,
+	enabled: boolean,
+	hasTotp: boolean,
+	totpDigits: number | null,
+	totpPeriod: number | null,
+	backupCodes: BackupCodeSlot[],
+	backupCodesRemaining: number,
+	backupCodesUpdatedAt: string | null,
+	hasRecoveryInstructions: boolean,
+	notes: string | null,
+	updatedAt: string,
+};
+
 export type PassphraseOptions = {
 	/**  3–12 words. */
 	words: number,
@@ -214,6 +420,13 @@ export type PasswordOptions = {
 	exclude: string,
 };
 
+export type PurposeView = {
+	id: string,
+	slug: string,
+	name: string,
+	isBuiltin: boolean,
+};
+
 /**  A recent vault as the lock screen shows it. */
 export type RecentVault = {
 	path: string,
@@ -229,6 +442,36 @@ export type RecentVault = {
 	 */
 	available: boolean,
 };
+
+/**
+ *  A decrypted secret, returned only by `secret_reveal`. Deliberately the
+ *  one serializable wrapper around a secret value; `Debug` hides it.
+ */
+export type RevealedSecret = {
+	value: string,
+};
+
+/**
+ *  Addresses one stored secret for `secret_reveal` and `clipboard_copy_secret`.
+ *  The UI names the cell; Rust decrypts it. `id` is the owning row's id.
+ */
+export type SecretRef = { kind: "accountPassword"; id: string } | { kind: "sensitiveNotes"; id: string } | 
+/**  A custom field of type `Secret`; `id` is the field's id. */
+{ kind: "customField"; id: string } | 
+/**  The TOTP setup key of an MFA method. */
+{ kind: "totpSecret"; id: string } | 
+/**  The current TOTP code of an MFA method. */
+{ kind: "totpCode"; id: string } | { kind: "recoveryInstructions"; id: string } | 
+/**  One backup code, by position. */
+{ kind: "backupCode"; id: string; index: number };
+
+/**
+ *  How an edit changes a secret. The UI never receives stored secrets, so
+ *  "leave it alone" has to be said explicitly.
+ */
+export type SecretUpdate = 
+/**  Keep what's stored (or store nothing, on create). */
+{ op: "unchanged" } | { op: "set"; value: string } | { op: "clear" };
 
 /**
  *  Lock and clipboard behaviour. The defaults are ADR-0004 decision 11.
@@ -262,6 +505,22 @@ export type StrengthEstimate = {
 	/**  zxcvbn's fixed advice strings. They never echo the password. */
 	warning: string | null,
 	suggestions: string[],
+};
+
+/**  The current TOTP code, for display with a countdown. */
+export type TotpCodeView = {
+	code: string,
+	secondsRemaining: number,
+	period: number,
+};
+
+/**
+ *  A stored URL checked again before it's opened, with the host the
+ *  confirm dialog shows.
+ */
+export type UrlTarget = {
+	url: string,
+	host: string,
 };
 
 /**  Non-secret facts about a vault, safe to show in the UI. */

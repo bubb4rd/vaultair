@@ -162,10 +162,12 @@ impl SessionManager {
     }
 
     /// Runs `f` against the unlocked vault and records activity.
-    pub fn with_vault<T>(
+    /// Commands hold the lock for the whole call, so a lock (idle, Win+L)
+    /// waits for an in-flight write to finish rather than cutting it off.
+    pub fn with_vault<T, E: From<VaultError>>(
         &self,
-        f: impl FnOnce(&mut OpenVault) -> Result<T, VaultError>,
-    ) -> Result<T, VaultError> {
+        f: impl FnOnce(&mut OpenVault) -> Result<T, E>,
+    ) -> Result<T, E> {
         let mut guard = self.guard();
         let unlocked = guard.as_mut().ok_or(VaultError::Locked)?;
         unlocked.last_activity = self.clock.monotonic();

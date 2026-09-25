@@ -10,6 +10,7 @@ pub mod kdf;
 pub mod keys;
 pub mod password;
 pub mod rng;
+pub mod totp;
 
 /// Low-level crypto failures. Deliberately coarse: callers map these to
 /// user-facing errors without learning *why* a decryption failed.

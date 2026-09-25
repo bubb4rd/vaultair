@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { Link } from "@tanstack/react-router";
 import { LockSimpleIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { NAV_GROUPS, SETTINGS_ITEM, type NavItem } from "@/app/nav";
-import { useOpenVault } from "@/app/queries";
+import { useAccounts, useOpenVault } from "@/app/queries";
 import { KeyboardHint } from "@/components/common/KeyboardHint";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { lockVault } from "@/features/lock/lockVault";
@@ -14,7 +14,8 @@ function NavLink({ item }: { item: NavItem }) {
   return (
     <Link
       to={item.path}
-      activeOptions={{ exact: true }}
+      // "All Accounts" stays highlighted on an account's own pages.
+      activeOptions={{ exact: item.path === "/" }}
       className="group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring data-[status=active]:bg-muted data-[status=active]:text-foreground"
     >
       <Icon
@@ -61,6 +62,16 @@ function VaultRow() {
   );
 }
 
+/** Starred accounts, in the order they were starred (ADR-0004 decision 20). */
+function Favorites() {
+  const list = useAccounts(false);
+  const items = (list.data ?? [])
+    .filter((a) => a.favorite)
+    .sort((a, b) => (a.favoritedAt ?? "").localeCompare(b.favoritedAt ?? ""))
+    .map((a) => ({ id: a.id, label: a.title, detail: a.purposeName }));
+  return <FavoritesGroup items={items} />;
+}
+
 export function Sidebar({ onOpenSearch }: { onOpenSearch: () => void }) {
   return (
     <aside className="flex h-full w-[var(--sidebar-width)] shrink-0 flex-col border-r border-border bg-sidebar">
@@ -95,7 +106,7 @@ export function Sidebar({ onOpenSearch }: { onOpenSearch: () => void }) {
                 ))}
               </div>
             </div>
-            {group.label === "Vault" && <FavoritesGroup />}
+            {group.label === "Vault" && <Favorites />}
           </Fragment>
         ))}
       </nav>

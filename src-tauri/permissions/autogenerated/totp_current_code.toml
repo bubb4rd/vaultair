@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-totp-current-code"
+description = "Enables the totp_current_code command without any pre-configured scope."
+commands.allow = ["totp_current_code"]
+
+[[permission]]
+identifier = "deny-totp-current-code"
+description = "Denies the totp_current_code command without any pre-configured scope."
+commands.deny = ["totp_current_code"]

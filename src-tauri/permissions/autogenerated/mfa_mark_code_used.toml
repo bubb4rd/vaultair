@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mfa-mark-code-used"
+description = "Enables the mfa_mark_code_used command without any pre-configured scope."
+commands.allow = ["mfa_mark_code_used"]
+
+[[permission]]
+identifier = "deny-mfa-mark-code-used"
+description = "Denies the mfa_mark_code_used command without any pre-configured scope."
+commands.deny = ["mfa_mark_code_used"]

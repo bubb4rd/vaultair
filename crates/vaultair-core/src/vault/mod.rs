@@ -95,6 +95,12 @@ impl OpenVault {
         &mut self.conn
     }
 
+    /// The connection and the keys together, for writes that encrypt fields
+    /// inside a transaction.
+    pub fn conn_and_keys(&mut self) -> (&mut Connection, &VaultKeys) {
+        (&mut self.conn, &self.keys)
+    }
+
     /// Verifies every page's HMAC (SQLCipher) and the SQLite structure.
     pub fn integrity_check(&self) -> Result<IntegrityReport, VaultError> {
         Ok(IntegrityReport {

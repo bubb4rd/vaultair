@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-open-url"
+description = "Enables the account_open_url command without any pre-configured scope."
+commands.allow = ["account_open_url"]
+
+[[permission]]
+identifier = "deny-account-open-url"
+description = "Denies the account_open_url command without any pre-configured scope."
+commands.deny = ["account_open_url"]

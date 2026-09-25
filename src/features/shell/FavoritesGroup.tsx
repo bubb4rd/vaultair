@@ -1,22 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { StarIcon } from "@phosphor-icons/react";
 
-/** Until Phase 7 adds an account detail route, a favorite opens the account list. */
-const ACCOUNTS_PATH: string = "/accounts";
-
 /** A starred account as the sidebar shows it. */
 export interface FavoriteAccount {
   id: string;
   label: string;
-  /** Short context, e.g. the platform ("Steam"). */
+  /** Short context, e.g. the purpose ("Main"). */
   detail?: string;
 }
 
 /**
  * The sidebar's Favorites section: the accounts the user has starred, in the
- * order they starred them. It replaces a separate Favorites page. Accounts
- * arrive in Phase 7, which passes `items` from the account list and points
- * each row at the account's detail view; until then it explains how to add one.
+ * order they starred them. It replaces a separate Favorites page. Each row
+ * opens the account; with none starred it explains how to add one.
  */
 export function FavoritesGroup({ items = [] }: { items?: FavoriteAccount[] }) {
   return (
@@ -35,7 +31,8 @@ export function FavoritesGroup({ items = [] }: { items?: FavoriteAccount[] }) {
           {items.map((account) => (
             <li key={account.id}>
               <Link
-                to={ACCOUNTS_PATH}
+                to="/accounts/$accountId"
+                params={{ accountId: account.id }}
                 className="group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring"
               >
                 <StarIcon aria-hidden="true" weight="fill" className="size-4 shrink-0 text-status-attention" />

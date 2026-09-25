@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-url-target"
+description = "Enables the account_url_target command without any pre-configured scope."
+commands.allow = ["account_url_target"]
+
+[[permission]]
+identifier = "deny-account-url-target"
+description = "Denies the account_url_target command without any pre-configured scope."
+commands.deny = ["account_url_target"]

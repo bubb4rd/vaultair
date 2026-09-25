@@ -1,5 +1,6 @@
-//! Encrypted storage (SQLCipher). Repositories arrive with the features that
-//! need them (Phase 7 onward).
+//! Encrypted storage (SQLCipher): connection setup, migrations and the
+//! per-table repositories.
 
 pub mod connection;
 pub mod migrate;
+pub mod repo;

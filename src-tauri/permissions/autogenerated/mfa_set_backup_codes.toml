@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mfa-set-backup-codes"
+description = "Enables the mfa_set_backup_codes command without any pre-configured scope."
+commands.allow = ["mfa_set_backup_codes"]
+
+[[permission]]
+identifier = "deny-mfa-set-backup-codes"
+description = "Denies the mfa_set_backup_codes command without any pre-configured scope."
+commands.deny = ["mfa_set_backup_codes"]

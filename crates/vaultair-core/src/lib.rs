@@ -8,6 +8,8 @@ pub mod clock;
 pub mod config;
 pub mod crypto;
 pub mod db;
+pub mod demo;
+pub mod domain;
 pub mod error;
 pub mod generator;
 pub mod redact;

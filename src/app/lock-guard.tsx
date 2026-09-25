@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { RouterProvider } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import type { VaultInfo, VaultStatus } from "@/ipc/client";
+import { onVaultLockedError, type VaultInfo, type VaultStatus } from "@/ipc/client";
 import { onVaultLocked } from "@/ipc/events";
 import { reloadWebview } from "@/lib/webview";
 import { LockScreen } from "@/features/lock/LockScreen";
@@ -24,14 +24,20 @@ export function VaultGate({ router }: { router: ReturnType<typeof createAppRoute
   const recents = useRecentVaults();
   const [requested, setRequested] = useState<Requested>({ kind: "auto" });
 
-  useEffect(
-    () =>
-      onVaultLocked(() => {
-        queryClient.clear();
-        reloadWebview();
-      }),
-    [queryClient],
-  );
+  useEffect(() => {
+    const leave = () => {
+      queryClient.clear();
+      reloadWebview();
+    };
+    // The event covers every lock; the error covers a data command that
+    // raced one (it found the vault locked before the event arrived).
+    const offEvent = onVaultLocked(leave);
+    const offError = onVaultLockedError(leave);
+    return () => {
+      offEvent();
+      offError();
+    };
+  }, [queryClient]);
 
   if (status.isPending || recents.isPending) {
     return <div className="h-full bg-background" />;

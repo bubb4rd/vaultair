@@ -36,6 +36,27 @@
     "allow-session-take-lock-notice",
     "allow-clipboard-copy-plain",
     "allow-clipboard-cancel-clear",
-    "allow-clipboard-clear-now"
+    "allow-clipboard-clear-now",
+    "allow-account-list",
+    "allow-account-get",
+    "allow-account-create",
+    "allow-account-update",
+    "allow-account-archive",
+    "allow-account-unarchive",
+    "allow-account-set-favorite",
+    "allow-account-mark-verified",
+    "allow-account-delete",
+    "allow-account-duplicate-as-template",
+    "allow-account-url-target",
+    "allow-account-open-url",
+    "allow-purpose-list",
+    "allow-tag-list",
+    "allow-secret-reveal",
+    "allow-clipboard-copy-secret",
+    "allow-mfa-upsert",
+    "allow-mfa-delete",
+    "allow-mfa-set-backup-codes",
+    "allow-mfa-mark-code-used",
+    "allow-totp-current-code"
   ]
 }
