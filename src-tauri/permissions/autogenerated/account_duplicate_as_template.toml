@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-duplicate-as-template"
+description = "Enables the account_duplicate_as_template command without any pre-configured scope."
+commands.allow = ["account_duplicate_as_template"]
+
+[[permission]]
+identifier = "deny-account-duplicate-as-template"
+description = "Denies the account_duplicate_as_template command without any pre-configured scope."
+commands.deny = ["account_duplicate_as_template"]

@@ -79,6 +79,73 @@ pub fn harden_webview(
     Ok(())
 }
 
+/// Opens an `http(s)://` URL in the user's default browser.
+///
+/// The caller (vaultair-core) has already validated the URL; this re-checks
+/// the scheme and the character set as a last line of defence, because
+/// `ShellExecuteW` will happily run anything it's given a handler for
+/// (`file:`, `ms-settings:`, executables). Blocks briefly; call it off the
+/// UI thread.
+pub fn open_url(url: &str) -> Result<(), PlatformError> {
+    use windows::core::{w, HSTRING};
+    use windows::Win32::System::Com::{
+        CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+    };
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    struct ComGuard;
+    impl Drop for ComGuard {
+        fn drop(&mut self) {
+            // SAFETY: only constructed after CoInitializeEx succeeded on this thread.
+            unsafe { CoUninitialize() };
+        }
+    }
+
+    if !is_openable_url(url) {
+        return Err(PlatformError::Os {
+            context: "url rejected",
+        });
+    }
+
+    // SAFETY: ShellExecuteW with the "open" verb and a validated URL; no
+    // parameters or working directory are passed. COM is initialized on this
+    // thread first, as the ShellExecute documentation asks.
+    unsafe {
+        let _com = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE)
+            .ok()
+            .ok()
+            .map(|()| ComGuard);
+        let result = ShellExecuteW(
+            None,
+            w!("open"),
+            &HSTRING::from(url),
+            None,
+            None,
+            SW_SHOWNORMAL,
+        );
+        // Values above 32 mean success (a legacy HINSTANCE convention).
+        if result.0 as isize > 32 {
+            Ok(())
+        } else {
+            Err(PlatformError::Os {
+                context: "ShellExecuteW",
+            })
+        }
+    }
+}
+
+/// `http://` or `https://`, then only printable ASCII that can't break out
+/// of a command line or look like a path.
+fn is_openable_url(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    (lower.starts_with("https://") || lower.starts_with("http://"))
+        && url.chars().all(|c| {
+            c.is_ascii_graphic()
+                && !matches!(c, '"' | '<' | '>' | '\\' | '^' | '`' | '{' | '|' | '}')
+        })
+}
+
 /// Shows the system "choose a folder" dialog, modal to `owner` (a raw HWND).
 /// Returns `None` if the user cancels. Blocks until the dialog closes, so call
 /// it from a worker thread, not the UI thread.
@@ -160,5 +227,28 @@ pub fn pick_folder(
         let path = std::ffi::OsString::from_wide(raw.as_wide());
         CoTaskMemFree(Some(raw.0 as *const core::ffi::c_void));
         Ok(Some(path.into()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_openable_url;
+
+    #[test]
+    fn only_plain_web_urls_are_opened() {
+        assert!(is_openable_url("https://example.com/login?next=/home#top"));
+        assert!(is_openable_url("HTTP://example.com"));
+        for bad in [
+            "javascript:alert(1)",
+            "file:///C:/Windows/System32/calc.exe",
+            "ms-settings:privacy",
+            r"C:\Windows\System32\calc.exe",
+            "https://example.com/\" --new-window file:///c:",
+            "https://example.com/ space",
+            "https://exämple.com",
+            "",
+        ] {
+            assert!(!is_openable_url(bad), "{bad}");
+        }
     }
 }

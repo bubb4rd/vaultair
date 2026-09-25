@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 6 (password generator). Next: Phase 7, accounts with encrypted secrets.
+> **Status:** Phase 7 (accounts with encrypted secrets). Next: Phase 8, identities and contact points. Phase 17 (passkeys) is scoped below and is not part of Phase 7.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -93,6 +93,70 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - Copying uses `clipboard_copy_plain` (auto-clear, kept out of Win+V history). Options are remembered in memory only until Settings arrive in Phase 15; a lock resets them.
 - `GeneratorPopover` (compact, "Use password") is built and tested for the Phase 7 account form; nothing mounts it yet.
 - Uniformity check (slow, ignored by default): `cargo test --release -p vaultair-core characters_are_uniform -- --ignored`. zxcvbn now builds at `opt-level = 3` in dev too, which took the core tests from 43 s to 4 s.
+
+## Phase 7 notes
+
+- Not done in Phase 7: the lint rule against putting reveal results in query cache keys (plan §Phase 7 risks). Every reveal (`SecretField`, `AccountForm`, `MfaSection`, the TOTP code) keeps the value in component state today, but nothing enforces it. The rule is `no-restricted-syntax` entries in `eslint.config.js` flagging `secrets.reveal` / `mfa.totpCode` inside `queryKey`/`queryFn`/`mutationKey`, `useQuery`/`useQueries`/`queryOptions`, or `setQueryData`/`fetchQuery`/`prefetchQuery`.
+
+## Phase 17: Passkeys and login credentials (scoped)
+
+Not started. This is its own phase, after the MVP (Phases 0–16). Phase 7 owns account records, passwords, and MFA metadata, including the existing `hardware_key` method. This phase owns passkeys. It starts only once an account row exists to attach a credential to.
+
+The product spec lists "Passkey management exploration" on the post-MVP roadmap, and hardware keys plus desktop autofill later still. ADR-0004 keeps Windows Hello vault unlock deferred and forbids autofill and auto-login. This phase is the concrete cut of that exploration. It does not reopen Phase 7.
+
+A passkey is a FIDO2/WebAuthn credential: a relying-party id, a credential id, and a private key that signs a challenge. Two different jobs use that shape. They ship as two cuts inside this phase.
+
+**Cut A — account login credentials.** Vaultair stores passkeys for the user's own sites and apps, and can create or assert one when Windows asks, while the vault is unlocked and the user approves that site. This is the login support.
+
+**Cut B — vault unlock.** A second header key slot, `kind: "windows-hello"`, wraps the same DEK. Windows Hello (PIN or biometric) unwraps it. The master password still creates the vault, still restores a backup, and still changes the password. Hello never replaces it. The slot is wiped on password change and on DEK rotation, and a reboot requires the master password again (the quick-unlock rules already in the implementation plan, §5).
+
+### How a site login works
+
+Windows 11 can hand WebAuthn create/get to a third-party passkey manager. The APIs are the WebAuthn Plugin APIs (`IPluginAuthenticator`, `WebAuthNPluginAddAuthenticator`, `WebAuthNPluginAuthenticatorAddCredentials`, `WebAuthNPluginPerformUserVerification`). Microsoft's passkey-manager sample targets Windows 11 24H2 build 26100.6725+ and 25H2 build 26200.6725+. The public rollout of third-party managers was the November 2025 update. Docs: [WebAuthn APIs](https://learn.microsoft.com/en-us/windows/security/identity-protection/hello-for-business/webauthn-apis), [Passkey Manager sample](https://learn.microsoft.com/en-us/samples/microsoft/windows-classic-samples/passkeymanager/).
+
+Vaultair registers as that plugin from `vaultair-platform` (Win32 only). Windows keeps credential *metadata* so a browser or app can offer "Vaultair" at a passkey prompt. The private key stays in the SQLCipher file, inside a field envelope, same as a password. On create or get:
+
+1. The vault must be unlocked. A locked vault cancels the operation.
+2. Windows Hello performs user verification (`WebAuthNPluginPerformUserVerification`). Vaultair does not invent its own biometric prompt.
+3. Vaultair shows the relying party and the account title and waits for a confirm. A mismatch between the requested rp id and the stored credential is a refusal.
+4. Rust signs the challenge and returns the assertion. The private key is not copied, revealed, logged, or indexed.
+
+On builds that lack the plugin APIs, Cut A still stores a passkey the user created on a supported machine, and the account screen shows it. That machine cannot complete a site login until the OS is new enough. Detect the build; do not pretend the plugin loaded.
+
+Existing passkeys cannot be imported. Platform and hardware authenticators do not export the private key. A YubiKey or a Windows Hello passkey made outside Vaultair stays an MFA note (`hardware_key` from Phase 7): label, where it lives, which account. Vaultair only holds passkeys it created through the plugin.
+
+Most game launchers do not speak WebAuthn. Steam, Battle.net, and console accounts stay username, password, and TOTP. Passkeys attach to accounts that publish a relying-party id (Microsoft accounts, Discord, email, and other websites). The account screen says so when the platform has no passkey login.
+
+### Data
+
+New table `account_passkey`, cascaded with the account:
+
+- `id`, `account_id`, `rp_id`, `credential_id`, `user_handle`
+- `private_key_enc` — field envelope. Never indexed, never in a DTO, never in a log.
+- `sign_count`, `created_at`, `last_used_at`, display label
+- AAGUID fixed to Vaultair's plugin authenticator
+
+List DTOs return rp id, label, created, and last used. There is no reveal command. The sign counter is stored and checked; a counter that moves backwards warns and does not silently accept the clone.
+
+Cut B is a header change. Today's reader requires exactly one `password` slot and `deny_unknown_fields`, so a second slot makes current builds fail to open the file. Cut B bumps `format_version`, writes a pre-migration backup first, and older builds report `VaultTooNew`. Cut A is rows in the encrypted database and does not bump the header, so it can land first.
+
+### Out of this phase
+
+- Phase 7 account CRUD, password fields, and TOTP. The Cloud Agent's scope.
+- A browser extension, password autofill, and filling credentials into a game client.
+- Sign-in with no one at the keyboard. Every assertion is user-present.
+- Any network call. `deny.toml` stays as it is. The browser talks to the site; Vaultair only signs.
+- Syncing passkeys to a phone, and creating or restoring a vault with Hello alone.
+- Acting as a roaming authenticator or speaking CTAP to a security key.
+
+### Acceptance
+
+- On a supported Windows 11 build, a test site can create a passkey into an unlocked vault and sign in again after a lock and unlock, with Hello and an in-app confirm both required.
+- The private key is absent from list DTOs, tracing, and the search index (same canary rule as passwords).
+- rp id mismatch, locked vault, and Hello cancel each fail closed.
+- A format v1 vault still opens. A v2 header with a Hello slot round-trips, and a pre-Cut-B build rejects it as too new.
+- Removing the plugin registration leaves the vault usable with the master password.
+- `npm run tauri dev` launches and the suite passes on a machine without the plugin APIs.
 
 ## Third-party content
 

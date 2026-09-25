@@ -115,7 +115,6 @@ describe("generator page", () => {
         generate_password: (args) => {
           const { exclude } = args.options as { exclude: string };
           if (exclude.includes("0123456789")) {
-            // eslint-disable-next-line @typescript-eslint/only-throw-error
             throw { code: "invalid_input", message: "Check the highlighted field.", field: "exclude" };
           }
           return { value: "Kq7#vR2!mZ9$wT4@pLxY", entropyBits: 129.4, score: 4 };

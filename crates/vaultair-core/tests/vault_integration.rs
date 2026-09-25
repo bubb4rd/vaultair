@@ -50,11 +50,14 @@ fn now() -> &'static str {
 fn insert_canary_account(v: &mut OpenVault) {
     let field_key = *v.keys().field_key();
     let conn = v.conn_mut();
-    conn.execute(
-        "INSERT INTO purpose_label (id, slug, name, is_builtin, created_at, updated_at) VALUES ('p1','main','Main',1,?1,?1)",
-        params![now()],
-    )
-    .unwrap();
+    // Built-in purposes are seeded by the V2 migration.
+    let purpose: String = conn
+        .query_row(
+            "SELECT id FROM purpose_label WHERE slug = 'main'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
     let blob = envelope::seal(
         &field_key,
         FieldRef {
@@ -67,8 +70,8 @@ fn insert_canary_account(v: &mut OpenVault) {
     .unwrap();
     conn.execute(
         "INSERT INTO account (id, title, account_type, purpose_id, username, password_enc, created_at, updated_at)
-         VALUES ('a1', 'Main account', 'game', 'p1', ?1, ?2, ?3, ?3)",
-        params![USER_CANARY, blob, now()],
+         VALUES ('a1', 'Main account', 'game', ?4, ?1, ?2, ?3, ?3)",
+        params![USER_CANARY, blob, now(), purpose],
     )
     .unwrap();
 }
@@ -449,7 +452,10 @@ fn schema_is_migrated_and_future_schemas_are_refused() {
         .conn()
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 1);
+    assert_eq!(
+        version,
+        i64::from(vaultair_core::db::migrate::latest_version())
+    );
     v.conn().pragma_update(None, "user_version", 99).unwrap();
     drop(v);
     assert_eq!(
@@ -608,6 +614,17 @@ fn golden_fixture_v1_still_opens() {
     )
     .unwrap();
     assert_eq!(secret.as_slice(), SECRET_CANARY.as_bytes());
+
+    // Migrated to the latest schema: the v1 account is readable through the
+    // account service, and the built-in purposes were added around the
+    // fixture's own "main" (which keeps its id).
+    let listed = vaultair_core::service::accounts::list(&v, false).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].purpose_id, "p1");
+    assert!(listed[0].has_password);
+    let purposes = vaultair_core::service::accounts::purposes(&v).unwrap();
+    assert_eq!(purposes.len(), 10);
+    assert_eq!(purposes.iter().filter(|p| p.slug == "main").count(), 1);
 }
 
 /// Acceptance: unlock at calibrated parameters takes <= 1.5 s. Timing-based,

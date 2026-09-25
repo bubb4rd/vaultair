@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mfa-upsert"
+description = "Enables the mfa_upsert command without any pre-configured scope."
+commands.allow = ["mfa_upsert"]
+
+[[permission]]
+identifier = "deny-mfa-upsert"
+description = "Denies the mfa_upsert command without any pre-configured scope."
+commands.deny = ["mfa_upsert"]

@@ -9,7 +9,10 @@ use rusqlite::Connection;
 
 use crate::vault::error::VaultError;
 
-const MIGRATIONS: &[&str] = &[include_str!("migrations/V1__init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/V1__init.sql"),
+    include_str!("migrations/V2__accounts.sql"),
+];
 
 pub fn latest_version() -> u32 {
     // A handful of migrations; fits a u32.

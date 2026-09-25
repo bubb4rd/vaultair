@@ -3,8 +3,8 @@
 //!
 //! `clipboard_copy_plain` takes text the UI already shows (a username, an
 //! email, or a freshly generated password that isn't saved anywhere yet).
-//! Stored secrets never pass through here: Phase 7's `clipboard_copy_secret`
-//! decrypts in Rust and copies directly.
+//! Stored secrets never pass through here: `clipboard_copy_secret` (in
+//! `commands::secret`) decrypts in Rust and copies directly.
 
 use serde::Serialize;
 use tauri::State;
@@ -24,7 +24,7 @@ pub struct ClipboardCopy {
     pub clear_after_secs: u32,
 }
 
-fn platform_err(err: PlatformError) -> AppError {
+pub(crate) fn platform_err(err: PlatformError) -> AppError {
     match err {
         PlatformError::ClipboardBusy => AppError::ClipboardBusy,
         PlatformError::Unsupported | PlatformError::Os { .. } => AppError::Internal {

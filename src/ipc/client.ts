@@ -4,6 +4,24 @@
  */
 import {
   commands,
+  type AccountDetail,
+  type AccountInput,
+  type AccountStatus,
+  type AccountSummary,
+  type AccountType,
+  type AccountUrl,
+  type BackupCodeSlot,
+  type CustomFieldInput,
+  type CustomFieldType,
+  type CustomFieldView,
+  type MfaInput,
+  type MfaMethod,
+  type MfaView,
+  type PurposeView,
+  type SecretRef,
+  type SecretUpdate,
+  type TotpCodeView,
+  type UrlTarget,
   type AppInfo,
   type ClipboardCopy,
   type CloudProvider,
@@ -25,6 +43,24 @@ import {
 } from "./bindings";
 
 export type {
+  AccountDetail,
+  AccountInput,
+  AccountStatus,
+  AccountSummary,
+  AccountType,
+  AccountUrl,
+  BackupCodeSlot,
+  CustomFieldInput,
+  CustomFieldType,
+  CustomFieldView,
+  MfaInput,
+  MfaMethod,
+  MfaView,
+  PurposeView,
+  SecretRef,
+  SecretUpdate,
+  TotpCodeView,
+  UrlTarget,
   AppInfo,
   ClipboardCopy,
   CloudProvider,
@@ -112,6 +148,30 @@ async function unwrap<T>(run: () => Promise<Outcome<T>>): Promise<T> {
   throw toIpcError(outcome.error);
 }
 
+let onDataLocked: (() => void) | null = null;
+
+/**
+ * Called when a data command finds the vault locked: it locked between the
+ * page loading and the call (idle, Win+L). `VaultGate` registers the same
+ * cleanup it runs on `vault://locked`. Returns an unsubscribe function.
+ */
+export function onVaultLockedError(handler: () => void): () => void {
+  onDataLocked = handler;
+  return () => {
+    if (onDataLocked === handler) onDataLocked = null;
+  };
+}
+
+/** `unwrap` for commands that need an unlocked vault. */
+async function data<T>(run: () => Promise<Outcome<T>>): Promise<T> {
+  try {
+    return await unwrap(run);
+  } catch (err) {
+    if (isIpcError(err) && err.code === "vault_locked") onDataLocked?.();
+    throw err;
+  }
+}
+
 export const appInfo = (): Promise<AppInfo> => call(() => commands.appInfo());
 
 export const vault = {
@@ -167,4 +227,51 @@ export const clipboard = {
 export const generator = {
   password: (options: PasswordOptions): Promise<Generated> => unwrap(() => commands.generatePassword(options)),
   passphrase: (options: PassphraseOptions): Promise<Generated> => unwrap(() => commands.generatePassphrase(options)),
+};
+
+/** Accounts. Responses carry flags about secrets (`hasPassword`), never the secrets. */
+export const accounts = {
+  list: (archived: boolean): Promise<AccountSummary[]> => data(() => commands.accountList(archived)),
+  get: (id: string): Promise<AccountDetail> => data(() => commands.accountGet(id)),
+  create: (input: AccountInput): Promise<AccountDetail> => data(() => commands.accountCreate(input)),
+  update: (id: string, input: AccountInput): Promise<AccountDetail> => data(() => commands.accountUpdate(id, input)),
+  archive: (id: string): Promise<AccountDetail> => data(() => commands.accountArchive(id)),
+  unarchive: (id: string): Promise<AccountDetail> => data(() => commands.accountUnarchive(id)),
+  setFavorite: (id: string, favorite: boolean): Promise<AccountDetail> =>
+    data(() => commands.accountSetFavorite(id, favorite)),
+  markVerified: (id: string): Promise<AccountDetail> => data(() => commands.accountMarkVerified(id)),
+  /** `confirmTitle` is what the user typed; Rust checks it against the title. */
+  delete: (id: string, confirmTitle: string): Promise<null> => data(() => commands.accountDelete(id, confirmTitle)),
+  duplicateAsTemplate: (id: string): Promise<AccountDetail> => data(() => commands.accountDuplicateAsTemplate(id)),
+  urlTarget: (id: string, which: AccountUrl): Promise<UrlTarget> => data(() => commands.accountUrlTarget(id, which)),
+  /** Rust reads the stored URL itself; nothing here can choose what opens. */
+  openUrl: (id: string, which: AccountUrl): Promise<null> => data(() => commands.accountOpenUrl(id, which)),
+};
+
+export const catalog = {
+  purposes: (): Promise<PurposeView[]> => data(() => commands.purposeList()),
+  tags: (): Promise<string[]> => data(() => commands.tagList()),
+};
+
+/**
+ * Stored secrets. `reveal` returns a value for display only: keep it in
+ * component state, never in a query cache or store. `copy` never returns
+ * the value at all.
+ */
+export const secrets = {
+  reveal: async (target: SecretRef): Promise<string> => (await data(() => commands.secretReveal(target))).value,
+  copy: (target: SecretRef): Promise<ClipboardCopy> => data(() => commands.clipboardCopySecret(target)),
+};
+
+export const mfa = {
+  upsert: (accountId: string, input: MfaInput): Promise<AccountDetail> =>
+    data(() => commands.mfaUpsert(accountId, input)),
+  delete: (id: string): Promise<AccountDetail> => data(() => commands.mfaDelete(id)),
+  /** `null` removes the codes. */
+  setBackupCodes: (id: string, codes: string | null): Promise<AccountDetail> =>
+    data(() => commands.mfaSetBackupCodes(id, codes)),
+  markCodeUsed: (id: string, index: number, used: boolean): Promise<AccountDetail> =>
+    data(() => commands.mfaMarkCodeUsed(id, index, used)),
+  /** For display with a countdown; like `secrets.reveal`, keep it local. */
+  totpCode: (id: string): Promise<TotpCodeView> => data(() => commands.totpCurrentCode(id)),
 };

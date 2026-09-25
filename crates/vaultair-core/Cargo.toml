@@ -20,6 +20,7 @@ chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["
 hkdf = "0.13.0"
 hmac = "0.13.0"
 sha2 = "0.11.0"
+sha1 = "0.11.0" # TOTP (RFC 6238); same digest generation as sha2
 getrandom = "0.4.3"
 zeroize = { version = "1.9.0", features = ["derive"] }
 secrecy = "0.10.3"
@@ -37,6 +38,7 @@ time = { version = "0.3.55", features = ["formatting", "parsing"] }
 [dev-dependencies]
 tempfile = "3.27.0"
 proptest = { version = "1", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "std"] }
 
 [features]
 # Derives TS types for IPC-facing enums (used by src-tauri's bindings).

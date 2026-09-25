@@ -96,6 +96,13 @@ async fn create(state: &AppState, request: CreateVaultRequest, demo: bool) -> Ip
     .await?;
     record_recent(state, &info);
     tracing::info!(demo, "vault created");
+    if demo {
+        // The vault exists either way; if seeding fails it's simply emptier.
+        let seeded = super::with_vault(state, |v| vaultair_core::demo::seed(v, &SystemClock)).await;
+        if seeded.is_err() {
+            tracing::warn!("demo vault created without sample data");
+        }
+    }
     Ok(info)
 }
 
@@ -108,8 +115,9 @@ pub async fn vault_create(
     create(&state, request, false).await
 }
 
-/// Same as `vault_create`, but the vault is flagged as a demo (sample data
-/// arrives in Phase 7+). It's a real encrypted vault with its own password.
+/// Same as `vault_create`, but the vault is flagged as a demo and filled with
+/// sample accounts (`vaultair_core::demo`). It's a real encrypted vault with
+/// its own password.
 #[tauri::command]
 #[specta::specta]
 pub async fn vault_create_demo(

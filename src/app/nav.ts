@@ -156,3 +156,13 @@ export const SETTINGS_ITEM: NavItem = {
 };
 
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ITEM];
+
+/**
+ * Paths of sidebar pages, for links from inside features. They're typed as
+ * plain strings because these routes are built from `NAV_GROUPS` at runtime,
+ * so the router can't list them in its typed path union.
+ */
+export const PAGE_PATHS: { accounts: string; archived: string } = {
+  accounts: "/accounts",
+  archived: "/archived",
+};

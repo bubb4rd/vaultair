@@ -109,6 +109,18 @@ impl AppError {
     }
 }
 
+/// A database failure inside a data command. Logs SQLite's result code (never
+/// its message, which can quote values) and reports a generic internal error.
+impl From<rusqlite::Error> for AppError {
+    fn from(e: rusqlite::Error) -> Self {
+        let code = e.sqlite_error().map_or(-1, |s| s.extended_code);
+        tracing::warn!(code, "database error");
+        Self::Internal {
+            context: "database",
+        }
+    }
+}
+
 impl Serialize for AppError {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let field = self.field();
