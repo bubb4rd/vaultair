@@ -1,6 +1,6 @@
 //! Main window creation and hardening.
 
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const MAIN: &str = "main";
 
@@ -17,7 +17,7 @@ fn is_allowed_navigation(url: &Url) -> bool {
     }
 }
 
-pub fn create_main(app: &AppHandle) -> tauri::Result<()> {
+pub fn create_main(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     let window = WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
         .title("Vaultair")
         .inner_size(1280.0, 800.0)
@@ -37,7 +37,7 @@ pub fn create_main(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
 
     harden_webview(&window);
-    Ok(())
+    Ok(window)
 }
 
 pub fn focus_main(app: &AppHandle) {

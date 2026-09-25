@@ -27,6 +27,13 @@
     "allow-vault-pick-folder",
     "allow-recent-vaults-list",
     "allow-recent-vaults-forget",
-    "allow-strength-estimate"
+    "allow-strength-estimate",
+    "allow-session-touch",
+    "allow-session-config-get",
+    "allow-capture-protection-set",
+    "allow-session-take-lock-notice",
+    "allow-clipboard-copy-plain",
+    "allow-clipboard-cancel-clear",
+    "allow-clipboard-clear-now"
   ]
 }

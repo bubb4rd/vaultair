@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-clipboard-cancel-clear"
+description = "Enables the clipboard_cancel_clear command without any pre-configured scope."
+commands.allow = ["clipboard_cancel_clear"]
+
+[[permission]]
+identifier = "deny-clipboard-cancel-clear"
+description = "Denies the clipboard_cancel_clear command without any pre-configured scope."
+commands.deny = ["clipboard_cancel_clear"]

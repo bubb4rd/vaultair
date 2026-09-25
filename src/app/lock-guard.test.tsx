@@ -28,6 +28,17 @@ describe("vault gate", () => {
     expect(calls.some((c) => c.cmd === "vault_lock")).toBe(true);
   });
 
+  it("leaves Windows-key shortcuts to the OS", async () => {
+    const user = userEvent.setup();
+    const { calls } = await renderApp("/");
+    // Win+L (Windows lock screen) and Win+K (Cast) must not trigger app shortcuts.
+    await user.keyboard("{Meta>}l{/Meta}");
+    await user.keyboard("{Meta>}k{/Meta}");
+    await user.keyboard("{Control>}{Meta>}l{/Meta}{/Control}");
+    expect(calls.some((c) => c.cmd === "vault_lock")).toBe(false);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("the sidebar shows the open vault and a Lock button", async () => {
     const user = userEvent.setup();
     const { calls } = await renderApp("/");

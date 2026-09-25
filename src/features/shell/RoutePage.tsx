@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { NavItem } from "@/app/nav";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge, type Status } from "@/components/common/StatusBadge";
+import { DevPanel } from "@/features/settings/DevPanel";
 import { appInfo, type AppInfo } from "@/ipc/client";
 import { PageHeader } from "./PageHeader";
 
@@ -59,6 +60,7 @@ export function RoutePage({ item }: { item: NavItem }) {
         <EmptyState icon={item.icon} title={item.empty.title} description={item.empty.description}>
           {item.path === "/health" && <HealthLegend />}
           {item.path === "/settings" && <AppVersion />}
+          {item.path === "/settings" && import.meta.env.DEV && <DevPanel />}
         </EmptyState>
       </div>
     </>

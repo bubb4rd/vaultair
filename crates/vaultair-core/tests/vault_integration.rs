@@ -4,11 +4,12 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use rusqlite::params;
 use secrecy::SecretString;
-use vaultair_core::clock::SystemClock;
+use vaultair_core::clock::{Clock, ManualClock, SystemClock};
 use vaultair_core::crypto::envelope::{self, FieldRef};
 use vaultair_core::crypto::kdf::KdfParams;
 use vaultair_core::service::session::{SessionManager, VaultStatus};
@@ -489,6 +490,61 @@ fn session_manager_state_machine() {
     // Unlocking again (same vault) first locks, so it isn't "in use" by ourselves.
     session.unlock(&dir, &pw(PASSWORD)).unwrap();
     assert!(session.lock());
+}
+
+#[test]
+fn idle_lock_fires_at_the_deadline_and_touch_extends_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::default());
+    let session = SessionManager::new(clock.clone());
+    session.set_idle_lock(Some(Duration::from_secs(300)));
+    // Nothing to lock, and touching a locked session does nothing.
+    assert!(!session.lock_if_idle());
+    assert!(!session.touch());
+    assert_eq!(session.idle_deadline(), None);
+
+    session
+        .create(&opts(tmp.path(), "Idle"), &pw(PASSWORD))
+        .unwrap();
+    let opened = clock.monotonic();
+    assert_eq!(
+        session.idle_deadline(),
+        Some(opened + Duration::from_secs(300))
+    );
+
+    // Activity at 4 min pushes the deadline to 9 min.
+    clock.advance(Duration::from_secs(240));
+    assert!(!session.lock_if_idle());
+    assert!(session.touch());
+    clock.advance(Duration::from_secs(299));
+    assert!(!session.lock_if_idle());
+    assert!(matches!(session.status(), VaultStatus::Unlocked { .. }));
+
+    // Exactly at the deadline it locks, and data commands are refused.
+    clock.advance(Duration::from_secs(1));
+    assert!(session.lock_if_idle());
+    assert_eq!(session.status(), VaultStatus::Locked);
+    assert_eq!(session.integrity_check().unwrap_err(), VaultError::Locked);
+    assert!(!session.lock_if_idle());
+}
+
+#[test]
+fn idle_lock_can_be_turned_off() {
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::default());
+    let session = SessionManager::new(clock.clone());
+    session
+        .create(&opts(tmp.path(), "Never"), &pw(PASSWORD))
+        .unwrap();
+    session.set_idle_lock(None);
+    assert_eq!(session.idle_deadline(), None);
+    clock.advance(Duration::from_secs(24 * 60 * 60));
+    assert!(!session.lock_if_idle());
+    assert!(matches!(session.status(), VaultStatus::Unlocked { .. }));
+
+    // Turning it back on applies to the time already idle.
+    session.set_idle_lock(Some(Duration::from_secs(60)));
+    assert!(session.lock_if_idle());
 }
 
 // Golden fixture: a v1 vault committed to the repo, so future format or

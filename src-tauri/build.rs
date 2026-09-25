@@ -19,6 +19,13 @@ fn main() {
             "recent_vaults_list",
             "recent_vaults_forget",
             "strength_estimate",
+            "session_touch",
+            "session_config_get",
+            "capture_protection_set",
+            "session_take_lock_notice",
+            "clipboard_copy_plain",
+            "clipboard_cancel_clear",
+            "clipboard_clear_now",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

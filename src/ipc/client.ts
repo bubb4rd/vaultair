@@ -5,14 +5,17 @@
 import {
   commands,
   type AppInfo,
+  type ClipboardCopy,
   type CloudProvider,
   type CreateVaultRequest,
   type ErrorCode,
   type FolderPurpose,
   type IntegrityReport,
   type KdfParams,
+  type LockNotice,
   type LocationCheck,
   type RecentVault,
+  type SessionConfig,
   type StrengthEstimate,
   type VaultInfo,
   type VaultStatus,
@@ -20,6 +23,7 @@ import {
 
 export type {
   AppInfo,
+  ClipboardCopy,
   CloudProvider,
   CreateVaultRequest,
   ErrorCode,
@@ -27,7 +31,9 @@ export type {
   IntegrityReport,
   KdfParams,
   LocationCheck,
+  LockNotice,
   RecentVault,
+  SessionConfig,
   StrengthEstimate,
   VaultInfo,
   VaultStatus,
@@ -53,6 +59,7 @@ const KNOWN_CODES = {
   vault_in_use: true,
   vault_too_new: true,
   vault_corrupted: true,
+  clipboard_busy: true,
 } as const satisfies Record<ErrorCode, true>;
 
 const FALLBACK: IpcError = {
@@ -106,7 +113,7 @@ export const vault = {
   create: (request: CreateVaultRequest): Promise<VaultInfo> => unwrap(() => commands.vaultCreate(request)),
   unlock: (path: string, password: string): Promise<VaultInfo> =>
     unwrap(() => commands.vaultUnlock(path, password)),
-  lock: (): Promise<boolean> => call(() => commands.vaultLock()),
+  lock: (): Promise<boolean> => unwrap(() => commands.vaultLock()),
   status: (): Promise<VaultStatus> => call(() => commands.vaultStatus()),
   integrityCheck: (): Promise<IntegrityReport> => unwrap(() => commands.vaultIntegrityCheck()),
   createDemo: (request: CreateVaultRequest): Promise<VaultInfo> =>
@@ -127,3 +134,25 @@ export const recentVaults = {
 /** Scores a candidate master password in Rust. Nothing is stored. */
 export const strengthEstimate = (password: string): Promise<StrengthEstimate> =>
   call(() => commands.strengthEstimate(password));
+
+export const session = {
+  /** Activity ping for the idle lock. Resolves false if the vault is locked. */
+  touch: (): Promise<boolean> => call(() => commands.sessionTouch()),
+  config: (): Promise<SessionConfig> => call(() => commands.sessionConfigGet()),
+  setCaptureProtection: (enabled: boolean): Promise<SessionConfig> =>
+    call(() => commands.captureProtectionSet(enabled)),
+  /** Why the vault last locked, once; null after that. */
+  takeLockNotice: (): Promise<LockNotice | null> => call(() => commands.sessionTakeLockNotice()),
+};
+
+/**
+ * Copies go through Rust, which keeps them out of clipboard history and
+ * clears them automatically. Never use `navigator.clipboard` for vault data.
+ */
+export const clipboard = {
+  /** Non-secret text the UI already shows (username, email). */
+  copyPlain: (text: string): Promise<ClipboardCopy> => unwrap(() => commands.clipboardCopyPlain(text)),
+  /** "Keep in clipboard": stops the pending clear. */
+  cancelClear: (): Promise<boolean> => call(() => commands.clipboardCancelClear()),
+  clearNow: (): Promise<boolean> => unwrap(() => commands.clipboardClearNow()),
+};

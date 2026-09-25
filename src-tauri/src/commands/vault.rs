@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State, WebviewWindow};
+use tauri::{State, WebviewWindow};
 use vaultair_core::clock::{Clock, SystemClock};
 use vaultair_core::crypto::kdf::{self, KdfParams};
 use vaultair_core::service::session::VaultStatus;
@@ -17,7 +17,7 @@ use vaultair_core::vault::location::CloudProvider;
 use vaultair_core::vault::{CreateOptions, IntegrityReport, VaultError, VaultInfo};
 use vaultair_core::AppError;
 
-use crate::events::lock_and_notify;
+use crate::lock::LockReason;
 use crate::state::{ipc_err, AppState, IpcResult};
 
 /// Runs slow work (Argon2, SQLCipher, modal dialogs) off the async runtime's
@@ -134,11 +134,15 @@ pub async fn vault_unlock(
     Ok(info)
 }
 
-/// Locks and emits `vault://locked`. Returns whether a vault was open.
+/// Locks, clears our clipboard value and emits `vault://locked`. Returns
+/// whether a vault was open. Async so a busy clipboard never stalls the UI thread.
 #[tauri::command]
 #[specta::specta]
-pub fn vault_lock(app: AppHandle, state: State<'_, AppState>) -> bool {
-    lock_and_notify(&app, &state.session)
+pub async fn vault_lock(state: State<'_, AppState>) -> IpcResult<bool> {
+    let locker = state.locker.clone();
+    tauri::async_runtime::spawn_blocking(move || locker.lock(LockReason::Manual))
+        .await
+        .map_err(|_| ipc_err(AppError::Internal { context: "worker" }))
 }
 
 #[tauri::command]

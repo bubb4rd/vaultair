@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 4 (onboarding, lock screen, recent vaults, manual lock). Next: Phase 5, auto-lock, session lock, clipboard service and capture protection.
+> **Status:** Phase 5 (auto-lock, session lock, clipboard service, capture protection). Next: Phase 6, the password generator.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -75,3 +75,13 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - To drive the app from a script: set `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` before `npm run tauri dev` and attach with Playwright `chromium.connectOverCDP`. Point `LOCALAPPDATA` at a scratch folder so test vaults and `config.json` don't land in your real profile.
 - No `tauri-plugin-dialog` (it pulls in the banned `tauri-plugin-fs`); the folder picker is native, in `vaultair-platform`.
 - Not done in Phase 4: `app_config_get/update` (there is nothing user-configurable before Phase 5; `config.json` currently holds only the recent-vaults list), and routing `vault_locked` errors from data commands to the lock screen (no data commands exist until Phase 7).
+
+## Phase 5 notes
+
+- Driven end to end in the real webview (2026-09-25, 14/14): a copy lands on the clipboard with the three history/cloud exclusion formats; it clears at the timeout; "Keep in clipboard" stops the clear; a later copy by the user is never cleared; `WM_WTSSESSION_CHANGE`/`WTS_SESSION_LOCK` and `WM_POWERBROADCAST`/`PBT_APMSUSPEND` sent to the window lock the vault, clear the clipboard and return the UI to the lock screen; minimize doesn't lock (default off); idle lock fired 20.8 s after unlock with a 20 s timeout. Closing the window clears a pending copy and locks (`reason=Exit`).
+- Found while driving it: at exit the window is already destroyed, so `OpenClipboard(owner)` failed and the value stayed on the clipboard. Clearing now opens without an owner when the owner is gone; the ignored real-clipboard test covers it.
+- Checked by hand (2026-09-25, passed): Win+L locks the vault; a copied value doesn't appear in Win+V history; with capture protection on, screen capture doesn't show the window.
+- Dev-only overrides for trying timeouts: `VAULTAIR_DEV_IDLE_LOCK_SECS` and `VAULTAIR_DEV_CLIPBOARD_CLEAR_SECS` (debug builds only; release ignores them). Settings > Developer checks (debug builds only) has "Copy sample value" and a capture-protection toggle until Phase 7 and Phase 15 add the real UI.
+- Toasts (owner request): one app-wide `<Toaster />` for success, error, warning and info, with keycaps, actions and a countdown, and enter/exit/collapse transitions (see `docs/design-system.md`). The lock screen says why the vault locked, which Rust keeps across the webview reload. Try them from Settings > Developer checks > Preview notifications.
+- Real-clipboard test (overwrites your clipboard): `cargo test -p vaultair-platform -- --ignored --test-threads=1 real_clipboard`.
+- Not done in Phase 5: persisting a pending clear across a crash (optional in the plan; a crash before the timeout leaves the value on the clipboard), and editable lock and clipboard settings (Phase 15; the ADR-0004 defaults apply, and capture protection is stored in `config.json`).

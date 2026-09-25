@@ -14,8 +14,11 @@ export const commands = {
 	vaultKdfCalibrate: () => typedError<KdfParams, IpcError_Serialize>(__TAURI_INVOKE("vault_kdf_calibrate")),
 	vaultCreate: (request: CreateVaultRequest) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_create", { request })),
 	vaultUnlock: (path: string, password: string) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_unlock", { path, password })),
-	/**  Locks and emits `vault://locked`. Returns whether a vault was open. */
-	vaultLock: () => __TAURI_INVOKE<boolean>("vault_lock"),
+	/**
+	 *  Locks, clears our clipboard value and emits `vault://locked`. Returns
+	 *  whether a vault was open. Async so a busy clipboard never stalls the UI thread.
+	 */
+	vaultLock: () => typedError<boolean, IpcError_Serialize>(__TAURI_INVOKE("vault_lock")),
 	vaultStatus: () => __TAURI_INVOKE<VaultStatus>("vault_status"),
 	vaultIntegrityCheck: () => typedError<IntegrityReport, IpcError_Serialize>(__TAURI_INVOKE("vault_integrity_check")),
 	/**
@@ -41,10 +44,37 @@ export const commands = {
 	 *  scored and dropped; it is never stored or logged.
 	 */
 	strengthEstimate: (password: string) => __TAURI_INVOKE<StrengthEstimate>("strength_estimate", { password }),
+	/**
+	 *  Records user activity, pushing the idle-lock deadline back. The UI calls
+	 *  it at most every 15 s while the pointer or keyboard is in use. Returns
+	 *  false if the vault is locked.
+	 */
+	sessionTouch: () => __TAURI_INVOKE<boolean>("session_touch"),
+	/**  Current lock, clipboard and capture settings. */
+	sessionConfigGet: () => __TAURI_INVOKE<SessionConfig>("session_config_get"),
+	/**
+	 *  Turns screen-capture protection on or off, now and on future launches
+	 *  (the lock screen included). Returns the updated settings.
+	 */
+	captureProtectionSet: (enabled: boolean) => __TAURI_INVOKE<SessionConfig>("capture_protection_set", { enabled }),
+	/**
+	 *  Why the vault last locked (button or Ctrl+L, idle, Windows lock, sleep),
+	 *  so the lock screen can say so. Returns it once, then `None`.
+	 */
+	sessionTakeLockNotice: () => __TAURI_INVOKE<
+/**  The lock button or Ctrl+L. */
+{ reason: "manual" } | { reason: "idle"; afterSecs: number } | { reason: "sessionLocked" } | { reason: "signedOut" } | { reason: "disconnected" } | { reason: "sleep" } | { reason: "minimized" } | null>("session_take_lock_notice"),
+	/**  Copies non-secret text shown in the UI. Only while unlocked. */
+	clipboardCopyPlain: (text: string) => typedError<ClipboardCopy, IpcError_Serialize>(__TAURI_INVOKE("clipboard_copy_plain", { text })),
+	/**  "Keep in clipboard": cancels the pending clear. Returns false if none was pending. */
+	clipboardCancelClear: () => __TAURI_INVOKE<boolean>("clipboard_cancel_clear"),
+	/**  Clears our value from the clipboard now. Returns whether it cleared. */
+	clipboardClearNow: () => typedError<boolean, IpcError_Serialize>(__TAURI_INVOKE("clipboard_clear_now")),
 };
 
 /** Events */
 export const events = {
+	clipboardCleared: makeEvent<ClipboardCleared>("clipboard://cleared"),
 	vaultLocked: makeEvent<VaultLocked>("vault://locked"),
 };
 
@@ -57,6 +87,17 @@ export type AppInfo = {
 
 export type BuildProfile = "debug" | "release";
 
+/**
+ *  A pending clipboard clear finished (timer, "Clear now", or lock). The UI
+ *  dismisses its countdown.
+ */
+export type ClipboardCleared = null;
+
+export type ClipboardCopy = {
+	/**  The clipboard is cleared this many seconds from now. */
+	clearAfterSecs: number,
+};
+
 export type CloudProvider = "oneDrive" | "dropbox" | "googleDrive" | "iCloud" | "box";
 
 export type CreateVaultRequest = {
@@ -68,7 +109,7 @@ export type CreateVaultRequest = {
 };
 
 /**  Stable, machine-readable error codes. The frontend switches on these. */
-export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted";
+export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy";
 
 export type FolderPurpose = 
 /**  Choose where a new vault's folder goes. */
@@ -123,6 +164,15 @@ export type LocationCheck = {
 	alreadyExists: boolean,
 };
 
+/**
+ *  Why the vault last locked, for the lock screen to explain after the
+ *  webview reloads. Taken once (`session_take_lock_notice`), so a later
+ *  reload doesn't repeat it.
+ */
+export type LockNotice = 
+/**  The lock button or Ctrl+L. */
+{ reason: "manual" } | { reason: "idle"; afterSecs: number } | { reason: "sessionLocked" } | { reason: "signedOut" } | { reason: "disconnected" } | { reason: "sleep" } | { reason: "minimized" };
+
 /**  A recent vault as the lock screen shows it. */
 export type RecentVault = {
 	path: string,
@@ -137,6 +187,26 @@ export type RecentVault = {
 	 *  unplugged). The entry stays until the user removes it.
 	 */
 	available: boolean,
+};
+
+/**
+ *  Lock and clipboard behaviour. The defaults are ADR-0004 decision 11.
+ *  Phase 15 makes them editable: capture protection in the app config (it
+ *  applies while locked), the rest in the vault's settings.
+ */
+export type SessionConfig = {
+	/**  Lock after this many seconds without activity. `None` never locks. */
+	idleLockSecs: number | null,
+	/**  Lock when Windows locks (Win+L), signs out or disconnects. */
+	lockOnSessionLock: boolean,
+	lockOnSleep: boolean,
+	lockOnMinimize: boolean,
+	/**  Copied values are cleared from the clipboard after this long. */
+	clipboardClearSecs: number,
+	/**  Revealed secrets hide again after this long. */
+	revealHideSecs: number,
+	/**  Hide the window from screenshots, streaming and screen sharing. */
+	captureProtection: boolean,
 };
 
 /**
@@ -164,9 +234,9 @@ export type VaultInfo = {
 };
 
 /**
- *  The vault was locked (by the user, or later by auto-lock and OS session
- *  events). The UI reacts by reloading the webview, which discards every
- *  value the JS heap held while unlocked.
+ *  The vault was locked: by the user, the idle timer, or an OS event (see
+ *  `lock::Locker`). The UI reacts by reloading the webview, which discards
+ *  every value the JS heap held while unlocked.
  */
 export type VaultLocked = null;
 
