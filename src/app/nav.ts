@@ -40,11 +40,6 @@ export const NAV_GROUPS: NavGroup[] = [
         path: "/",
         label: "Dashboard",
         icon: SquaresFourIcon,
-        empty: {
-          title: "Your vault at a glance",
-          description:
-            "Once you add accounts, this page shows what needs attention: weak or reused passwords, missing MFA and recovery gaps.",
-        },
       },
     ],
   },
@@ -65,11 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
         path: "/identities",
         label: "Identities",
         icon: IdentificationBadgeIcon,
-        empty: {
-          title: "No identities yet",
-          description:
-            "An identity groups the accounts, emails and handles that belong to one persona, such as your main or a creator profile.",
-        },
+        keywords: ["persona", "profile"],
       },
       {
         path: "/archived",
@@ -162,7 +153,8 @@ export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), 
  * plain strings because these routes are built from `NAV_GROUPS` at runtime,
  * so the router can't list them in its typed path union.
  */
-export const PAGE_PATHS: { accounts: string; archived: string } = {
+export const PAGE_PATHS: { accounts: string; archived: string; identities: string } = {
   accounts: "/accounts",
   archived: "/archived",
+  identities: "/identities",
 };

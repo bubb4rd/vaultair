@@ -16,11 +16,12 @@ use crate::crypto::fingerprint::password_fingerprint;
 use crate::crypto::keys::VaultKeys;
 use crate::crypto::password::strength;
 use crate::db::repo::account::{self as repo, AccountFields, CustomFieldRow};
-use crate::db::repo::{new_id, open_text, purpose, seal, tag};
+use crate::db::repo::{contact, identity, new_id, open_text, purpose, seal, tag};
 use crate::domain::account::{
     AccountDetail, AccountInput, AccountStatus, AccountSummary, AccountUrl, CustomFieldInput,
     CustomFieldType, PurposeView, SecretRef, SecretUpdate, UrlTarget,
 };
+use crate::domain::identity::{ContactKind, ContactRole};
 use crate::domain::validation::{
     self as v, MAX_NOTES_CHARS, MAX_SECRET_CHARS, MAX_SHORT_CHARS, MAX_TITLE_CHARS,
 };
@@ -77,11 +78,23 @@ fn validate_fields(conn: &Connection, input: &AccountInput) -> Result<AccountFie
     if !purpose::exists(conn, &input.purpose_id)? {
         return Err(AppError::InvalidInput { field: "purposeId" });
     }
+    let identity_id = match input.identity_id.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(id) => {
+            if identity::archived(conn, id)?.is_none() {
+                return Err(AppError::InvalidInput {
+                    field: "identityId",
+                });
+            }
+            Some(id.to_owned())
+        }
+    };
     Ok(AccountFields {
         title: v::required(&input.title, "title", MAX_TITLE_CHARS)?,
         account_type: input.account_type,
         purpose_id: input.purpose_id.clone(),
         status: input.status,
+        identity_id,
         username: v::optional(input.username.as_deref(), "username", MAX_SHORT_CHARS)?,
         email: v::optional_email(input.email.as_deref(), "email")?,
         website_url: v::optional_web_url(input.website_url.as_deref(), "websiteUrl")?,
@@ -96,6 +109,56 @@ fn validate_fields(conn: &Connection, input: &AccountInput) -> Result<AccountFie
         )?,
         notes: v::optional_multiline(input.notes.as_deref(), "notes", MAX_NOTES_CHARS)?,
     })
+}
+
+/// The recovery contacts the form sends, validated.
+struct RecoveryContacts {
+    email: Option<String>,
+    phone: Option<String>,
+}
+
+fn validate_recovery(input: &AccountInput) -> Result<RecoveryContacts, AppError> {
+    Ok(RecoveryContacts {
+        email: v::optional_email(input.recovery_email.as_deref(), "recoveryEmail")?,
+        phone: v::optional(
+            input.recovery_phone.as_deref(),
+            "recoveryPhone",
+            MAX_SHORT_CHARS,
+        )?,
+    })
+}
+
+/// Links the account to contact points for its login email, recovery email
+/// and recovery phone (upserting them), then drops contact points nothing
+/// uses any more.
+fn sync_contacts(
+    conn: &Connection,
+    id: &str,
+    login_email: Option<&str>,
+    recovery: &RecoveryContacts,
+    now: &str,
+) -> Result<(), AppError> {
+    let links = [
+        (ContactRole::LoginEmail, ContactKind::Email, login_email),
+        (
+            ContactRole::RecoveryEmail,
+            ContactKind::Email,
+            recovery.email.as_deref(),
+        ),
+        (
+            ContactRole::RecoveryPhone,
+            ContactKind::Phone,
+            recovery.phone.as_deref(),
+        ),
+    ];
+    for (role, kind, value) in links {
+        let cid = value
+            .map(|v| contact::upsert(conn, kind, v, now))
+            .transpose()?;
+        contact::set_account_role(conn, id, role, cid.as_deref())?;
+    }
+    contact::prune_unused(conn)?;
+    Ok(())
 }
 
 /// A password is taken as typed (spaces are allowed and kept), but it can't
@@ -301,6 +364,7 @@ pub fn create(
     let (conn, keys) = vault.conn_and_keys();
     let tx = conn.transaction()?;
     let fields = validate_fields(&tx, input)?;
+    let recovery = validate_recovery(input)?;
     let tags = v::tags(&input.tags)?;
     check_sensitive_notes(&input.sensitive_notes)?;
     let custom = plan_custom_fields(keys, &input.custom_fields, &[])?;
@@ -310,6 +374,7 @@ pub fn create(
     apply_sensitive_notes(&tx, keys, &id, &input.sensitive_notes)?;
     tag::set_for_account(&tx, &id, &tags)?;
     repo::replace_custom_fields(&tx, &id, &custom)?;
+    sync_contacts(&tx, &id, fields.email.as_deref(), &recovery, &now)?;
     repo::reindex(&tx, &id)?;
     tx.commit()?;
     tracing::info!(account = %id, "account created");
@@ -326,6 +391,7 @@ pub fn update(
     let (conn, keys) = vault.conn_and_keys();
     let tx = conn.transaction()?;
     let fields = validate_fields(&tx, input)?;
+    let recovery = validate_recovery(input)?;
     let tags = v::tags(&input.tags)?;
     check_sensitive_notes(&input.sensitive_notes)?;
     let existing = repo::custom_fields(&tx, id)?;
@@ -339,6 +405,7 @@ pub fn update(
     tag::set_for_account(&tx, id, &tags)?;
     tag::prune_unused(&tx)?;
     repo::replace_custom_fields(&tx, id, &custom)?;
+    sync_contacts(&tx, id, fields.email.as_deref(), &recovery, &now)?;
     repo::reindex(&tx, id)?;
     tx.commit()?;
     tracing::info!(account = %id, "account updated");
@@ -400,6 +467,7 @@ pub fn delete(vault: &mut OpenVault, id: &str, confirm_title: &str) -> Result<()
     }
     repo::delete(&tx, id)?;
     tag::prune_unused(&tx)?;
+    contact::prune_unused(&tx)?;
     tx.commit()?;
     tracing::info!(account = %id, "account deleted");
     Ok(())
@@ -407,8 +475,9 @@ pub fn delete(vault: &mut OpenVault, id: &str, confirm_title: &str) -> Result<()
 
 /// "Duplicate as alt template": a new account on the same platform and game
 /// with the same publisher, region, URLs, identity, tags and custom-field
-/// labels, but none of the credentials. Username, email, password, player ID,
-/// display name, notes, custom-field values and MFA are left empty.
+/// labels, but none of the credentials. Username, email, password, recovery
+/// contacts, player ID, display name, notes, custom-field values and MFA are
+/// left empty.
 pub fn duplicate_as_template(
     vault: &mut OpenVault,
     clock: &dyn Clock,

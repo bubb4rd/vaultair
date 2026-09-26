@@ -142,10 +142,17 @@ pub struct AccountInput {
     pub account_type: AccountType,
     pub purpose_id: String,
     pub status: AccountStatus,
+    /// The identity it belongs to, if any.
+    pub identity_id: Option<String>,
     pub username: Option<String>,
+    /// The login email. Saving upserts it as a contact point.
     pub email: Option<String>,
     #[serde(default)]
     pub password: SecretUpdate,
+    /// Where a password reset goes, if not the login email.
+    pub recovery_email: Option<String>,
+    /// A phone reference such as "Pixel, ends 42" (ADR-0004 decision 12).
+    pub recovery_phone: Option<String>,
     pub website_url: Option<String>,
     pub login_url: Option<String>,
     pub publisher: Option<String>,
@@ -248,6 +255,8 @@ pub struct AccountSummary {
     pub purpose_id: String,
     pub purpose_name: String,
     pub status: AccountStatus,
+    pub identity_id: Option<String>,
+    pub identity_name: Option<String>,
     pub username: Option<String>,
     pub email: Option<String>,
     pub publisher: Option<String>,
@@ -316,8 +325,12 @@ pub struct AccountDetail {
     pub purpose_id: String,
     pub purpose_name: String,
     pub status: AccountStatus,
+    pub identity_id: Option<String>,
+    pub identity_name: Option<String>,
     pub username: Option<String>,
     pub email: Option<String>,
+    pub recovery_email: Option<String>,
+    pub recovery_phone: Option<String>,
     pub has_password: bool,
     pub password_strength: Option<u8>,
     pub password_changed_at: Option<String>,

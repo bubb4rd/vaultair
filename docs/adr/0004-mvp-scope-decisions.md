@@ -17,7 +17,7 @@
 | 7 | Backup restore | **In the MVP:** create, verify, and restore to a new location. |
 | 8 | Change master password | **In the MVP** (DEK re-wrap, with a warning about old backups). "Rotate encryption key" is post-MVP. |
 | 9 | Full-text search over notes | Normal notes indexed; a separate encrypted "Sensitive notes" field is never indexed. |
-| 10 | Windows Hello / quick unlock | **Deferred.** Master password only in the MVP; the key-slot header keeps it possible. |
+| 10 | Windows Hello / quick unlock | ~~Deferred.~~ **Superseded by [ADR-0005](0005-quick-unlock.md) (2026-09-25):** opt-in Windows Hello quick unlock in Phase 15b, with the master password still required after a restart, every 7 days and for sensitive actions. |
 | 11 | Timeouts | Auto-lock after 5 min inactivity; lock on Windows session lock and sleep (on), on minimize (off). Clipboard clears at 30 s. Revealed secrets hide at 20 s. |
 | 12 | Phone numbers | Store a reference ("Pixel, ends 42") by default; a full number is optional. |
 | 13 | Typed IPC | tauri-specta, with ts-rs as the fallback. |

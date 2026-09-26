@@ -10,18 +10,19 @@ import {
   ShieldSlashIcon,
   StarIcon,
 } from "@phosphor-icons/react";
-import { useAccounts, useOpenVault } from "@/app/queries";
+import { useAccounts, useIdentityRefs, useOpenVault } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/features/shell/PageHeader";
-import type { AccountSummary } from "@/ipc/client";
+import { IdentityChip } from "@/features/identities/IdentityAvatar";
+import type { AccountSummary, IdentityColor } from "@/ipc/client";
 import { accountStatus, accountType, formatRelative, passwordStrength } from "./labels";
 
 function matches(a: AccountSummary, q: string) {
   if (!q) return true;
-  const hay = [a.title, a.username, a.email, a.publisher, a.purposeName, ...a.tags]
+  const hay = [a.title, a.username, a.email, a.publisher, a.purposeName, a.identityName, ...a.tags]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -66,7 +67,13 @@ function DemoNotice() {
   );
 }
 
-function AccountRow({ account }: { account: AccountSummary }) {
+function AccountRow({
+  account,
+  identityColor,
+}: {
+  account: AccountSummary;
+  identityColor: (id: string | null) => IdentityColor | null;
+}) {
   const navigate = useNavigate();
   const type = accountType(account.accountType);
   const status = accountStatus(account.status);
@@ -104,6 +111,13 @@ function AccountRow({ account }: { account: AccountSummary }) {
           </div>
         </div>
       </td>
+      <td className="py-2.5 pr-4 text-[13px] text-muted-foreground">
+        {account.identityName ? (
+          <IdentityChip name={account.identityName} color={identityColor(account.identityId)} />
+        ) : (
+          <span className="text-subtle-foreground">None</span>
+        )}
+      </td>
       <td className="py-2.5 pr-4 text-[13px] text-muted-foreground">{account.purposeName}</td>
       <td className="py-2.5 pr-4">
         <StatusBadge status={status.badge} label={status.label} />
@@ -126,6 +140,8 @@ function AccountRow({ account }: { account: AccountSummary }) {
 export function AccountsPage({ archived = false }: { archived?: boolean }) {
   const list = useAccounts(archived);
   const vault = useOpenVault();
+  const refs = useIdentityRefs();
+  const identityColor = (id: string | null) => refs.data?.find((r) => r.id === id)?.color ?? null;
   const [query, setQuery] = useState("");
   const rows = useMemo(() => (list.data ?? []).filter((a) => matches(a, query.trim())), [list.data, query]);
   const title = archived ? "Archived" : "All Accounts";
@@ -179,7 +195,7 @@ export function AccountsPage({ archived = false }: { archived?: boolean }) {
                 <Input
                   type="search"
                   aria-label={`Filter ${title.toLowerCase()}`}
-                  placeholder="Filter by name, username, email or tag"
+                  placeholder="Filter by name, email, identity or tag"
                   value={query}
                   autoComplete="off"
                   spellCheck={false}
@@ -207,6 +223,9 @@ export function AccountsPage({ archived = false }: { archived?: boolean }) {
                         Account
                       </th>
                       <th scope="col" className="py-2 pr-4 font-medium">
+                        Identity
+                      </th>
+                      <th scope="col" className="py-2 pr-4 font-medium">
                         Purpose
                       </th>
                       <th scope="col" className="py-2 pr-4 font-medium">
@@ -222,7 +241,7 @@ export function AccountsPage({ archived = false }: { archived?: boolean }) {
                   </thead>
                   <tbody>
                     {rows.map((a) => (
-                      <AccountRow key={a.id} account={a} />
+                      <AccountRow key={a.id} account={a} identityColor={identityColor} />
                     ))}
                   </tbody>
                 </table>

@@ -49,6 +49,18 @@ fn main() {
             "mfa_set_backup_codes",
             "mfa_mark_code_used",
             "totp_current_code",
+            "identity_list",
+            "identity_refs",
+            "identity_get",
+            "identity_overview",
+            "identity_create",
+            "identity_update",
+            "identity_archive",
+            "identity_unarchive",
+            "identity_delete",
+            "identity_assign_accounts",
+            "contact_point_list",
+            "dashboard_summary",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

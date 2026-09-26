@@ -2,7 +2,14 @@ import { useRef, useState, type SubmitEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { PAGE_PATHS } from "@/app/nav";
 import { ArrowCounterClockwiseIcon, KeyIcon, PasswordIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
-import { useAccount, useAccountUpdated, usePurposes, useTags } from "@/app/queries";
+import {
+  useAccount,
+  useAccountUpdated,
+  useContactPoints,
+  useIdentityRefs,
+  usePurposes,
+  useTags,
+} from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Field, FieldError, describedBy } from "@/components/common/Field";
 import { PasswordInput } from "@/components/common/PasswordInput";
@@ -31,8 +38,11 @@ interface FormState {
   accountType: AccountType;
   purposeId: string;
   status: AccountStatus;
+  identityId: string;
   username: string;
   email: string;
+  recoveryEmail: string;
+  recoveryPhone: string;
   websiteUrl: string;
   loginUrl: string;
   publisher: string;
@@ -51,7 +61,10 @@ type Errors = Partial<Record<string, string>>;
 const MESSAGES: Record<string, string> = {
   title: "Enter a name for this account.",
   purposeId: "Choose a purpose.",
+  identityId: "That identity no longer exists. Choose another one.",
   email: "Enter an email address like name@example.com.",
+  recoveryEmail: "Enter an email address like name@example.com.",
+  recoveryPhone: "Keep the phone reference on one line.",
   websiteUrl: "Enter a web address that starts with https:// or http://.",
   loginUrl: "Enter a web address that starts with https:// or http://.",
   password: "A password can't contain control characters or be longer than 4,096 characters.",
@@ -61,14 +74,17 @@ const MESSAGES: Record<string, string> = {
   customFields: "Check the custom fields: each needs a label, and each value has to match its type.",
 };
 
-function blank(purposeId: string): FormState {
+function blank(purposeId: string, identityId: string): FormState {
   return {
     title: "",
     accountType: "launcher",
     purposeId,
     status: "active",
+    identityId,
     username: "",
     email: "",
+    recoveryEmail: "",
+    recoveryPhone: "",
     websiteUrl: "",
     loginUrl: "",
     publisher: "",
@@ -89,8 +105,11 @@ function fromDetail(d: AccountDetail): FormState {
     accountType: d.accountType,
     purposeId: d.purposeId,
     status: d.status,
+    identityId: d.identityId ?? "",
     username: d.username ?? "",
     email: d.email ?? "",
+    recoveryEmail: d.recoveryEmail ?? "",
+    recoveryPhone: d.recoveryPhone ?? "",
     websiteUrl: d.websiteUrl ?? "",
     loginUrl: d.loginUrl ?? "",
     publisher: d.publisher ?? "",
@@ -113,9 +132,12 @@ function toInput(f: FormState): AccountInput {
     accountType: f.accountType,
     purposeId: f.purposeId,
     status: f.status,
+    identityId: opt(f.identityId),
     username: opt(f.username),
     email: opt(f.email),
     password: toUpdate(f.password),
+    recoveryEmail: opt(f.recoveryEmail),
+    recoveryPhone: opt(f.recoveryPhone),
     websiteUrl: opt(f.websiteUrl),
     loginUrl: opt(f.loginUrl),
     publisher: opt(f.publisher),
@@ -160,6 +182,7 @@ function TextField({
   placeholder?: string;
   required?: boolean;
   inputMode?: "email" | "url" | "text";
+  list?: string;
 }) {
   return (
     <Field id={id} label={label} error={error} help={help}>
@@ -237,7 +260,20 @@ export function StoredSecret({
   );
 }
 
-function TagsInput({ tags, onChange, error }: { tags: string[]; onChange: (t: string[]) => void; error?: string | undefined }) {
+/** Tag chips plus an input with suggestions. Shared by the account and identity forms. */
+export function TagsInput({
+  id = "acct-tags",
+  listLabel = "Tags on this account",
+  tags,
+  onChange,
+  error,
+}: {
+  id?: string;
+  listLabel?: string;
+  tags: string[];
+  onChange: (t: string[]) => void;
+  error?: string | undefined;
+}) {
   const suggestions = useTags();
   const [draft, setDraft] = useState("");
   function add(raw: string) {
@@ -247,10 +283,10 @@ function TagsInput({ tags, onChange, error }: { tags: string[]; onChange: (t: st
     setDraft("");
   }
   return (
-    <Field id="acct-tags" label="Tags" error={error} help="Press Enter or type a comma to add a tag.">
+    <Field id={id} label="Tags" error={error} help="Press Enter or type a comma to add a tag.">
       <div className="flex flex-col gap-2">
         {tags.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5" aria-label="Tags on this account">
+          <ul className="flex flex-wrap gap-1.5" aria-label={listLabel}>
             {tags.map((t) => (
               <li key={t} className="inline-flex h-7 items-center gap-1 rounded-md bg-muted pr-1 pl-2.5 text-[13px]">
                 {t}
@@ -269,15 +305,15 @@ function TagsInput({ tags, onChange, error }: { tags: string[]; onChange: (t: st
           </ul>
         )}
         <Input
-          id="acct-tags"
-          list="acct-tag-suggestions"
+          id={id}
+          list={`${id}-suggestions`}
           value={draft}
           maxLength={40}
           autoComplete="off"
           spellCheck={false}
           placeholder="ranked, pc, shared-email"
           aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy("acct-tags", { help: true, error: Boolean(error) })}
+          aria-describedby={describedBy(id, { help: true, error: Boolean(error) })}
           onChange={(e) => {
             const v = e.target.value;
             if (v.endsWith(",")) add(v);
@@ -295,7 +331,7 @@ function TagsInput({ tags, onChange, error }: { tags: string[]; onChange: (t: st
             add(draft);
           }}
         />
-        <datalist id="acct-tag-suggestions">
+        <datalist id={`${id}-suggestions`}>
           {(suggestions.data ?? [])
             .filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()))
             .map((s) => (
@@ -310,8 +346,18 @@ function TagsInput({ tags, onChange, error }: { tags: string[]; onChange: (t: st
 function Form({ initial, existing }: { initial: FormState; existing: AccountDetail | null }) {
   const navigate = useNavigate();
   const purposes = usePurposes();
+  const identityRefs = useIdentityRefs();
+  const contacts = useContactPoints();
   const updated = useAccountUpdated();
   const [form, setForm] = useState(initial);
+  // An archived identity isn't offered for new picks, but an account that
+  // already has one keeps showing it.
+  const identityOptions = [...(identityRefs.data ?? [])];
+  if (existing?.identityId && existing.identityName && !identityOptions.some((r) => r.id === existing.identityId)) {
+    identityOptions.push({ id: existing.identityId, name: `${existing.identityName} (archived)`, color: null });
+  }
+  const emails = (contacts.data ?? []).filter((c) => c.kind === "email").map((c) => c.value);
+  const phones = (contacts.data ?? []).filter((c) => c.kind === "phone").map((c) => c.value);
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -382,7 +428,7 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                 set("title", v);
               }}
             />
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <Field id="acct-accountType" label="Type">
                 <NativeSelect
                   id="acct-accountType"
@@ -411,6 +457,24 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                   {(purposes.data ?? []).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <Field id="acct-identityId" label="Identity" error={errors.identityId}>
+                <NativeSelect
+                  id="acct-identityId"
+                  value={form.identityId}
+                  aria-invalid={errors.identityId ? true : undefined}
+                  aria-describedby={describedBy("acct-identityId", { error: Boolean(errors.identityId) })}
+                  onChange={(e) => {
+                    set("identityId", e.target.value);
+                  }}
+                >
+                  <option value="">No identity</option>
+                  {identityOptions.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
                     </option>
                   ))}
                 </NativeSelect>
@@ -449,6 +513,7 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                 label="Email"
                 type="email"
                 inputMode="email"
+                list="acct-email-suggestions"
                 value={form.email}
                 error={errors.email}
                 onChange={(v) => {
@@ -538,6 +603,48 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                 }}
               />
             </div>
+          </Section>
+
+          <Section
+            title="Recovery"
+            description="Where a password reset goes. Vaultair uses these to show which accounts depend on which email or phone."
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <TextField
+                id="acct-recoveryEmail"
+                label="Recovery email"
+                type="email"
+                inputMode="email"
+                list="acct-email-suggestions"
+                value={form.recoveryEmail}
+                error={errors.recoveryEmail}
+                onChange={(v) => {
+                  set("recoveryEmail", v);
+                }}
+              />
+              <TextField
+                id="acct-recoveryPhone"
+                label="Recovery phone"
+                placeholder="Pixel, ends 42"
+                list="acct-phone-suggestions"
+                help="A reference is enough; a full number is optional."
+                value={form.recoveryPhone}
+                error={errors.recoveryPhone}
+                onChange={(v) => {
+                  set("recoveryPhone", v);
+                }}
+              />
+            </div>
+            <datalist id="acct-email-suggestions">
+              {emails.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+            <datalist id="acct-phone-suggestions">
+              {phones.map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
           </Section>
 
           <Section title="Game details">
@@ -665,8 +772,11 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
 }
 
 /** New account (`accountId` undefined) or edit an existing one. */
-export function AccountForm({ accountId }: { accountId?: string }) {
+export function AccountForm({ accountId, identityId }: { accountId?: string; identityId?: string }) {
   const purposes = usePurposes();
+  // Loaded before the form renders, so the identity select never flashes the
+  // current identity as archived while the list is still on its way.
+  const identityRefs = useIdentityRefs();
   const existing = useAccount(accountId ?? "", accountId !== undefined);
   const editing = accountId !== undefined;
   const title = editing ? "Edit account" : "New account";
@@ -678,8 +788,8 @@ export function AccountForm({ accountId }: { accountId?: string }) {
         <EmptyState icon={KeyIcon} title="Account not found" description="It may have been deleted." />
       </div>
     );
-  } else if (purposes.data && (!editing || existing.data)) {
-    const initial = editing && existing.data ? fromDetail(existing.data) : blank(purposes.data[0]?.id ?? "");
+  } else if (purposes.data && !identityRefs.isPending && (!editing || existing.data)) {
+    const initial = editing && existing.data ? fromDetail(existing.data) : blank(purposes.data[0]?.id ?? "", identityId ?? "");
     body = <Form key={accountId ?? "new"} initial={initial} existing={editing ? (existing.data ?? null) : null} />;
   }
 

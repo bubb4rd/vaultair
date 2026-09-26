@@ -2,6 +2,7 @@ pub mod account;
 pub mod app;
 pub mod clipboard;
 pub mod generator;
+pub mod identity;
 pub mod mfa;
 pub mod password;
 pub mod recent;
