@@ -783,7 +783,7 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
 - **Risks:** the header replacement race. Mitigation: `.prev` retention and atomic replace.
 
 ### Phase 15b: Quick unlock with Windows Hello, and tray (M–L)
-- **Decided in** [ADR-0005](adr/0005-quick-unlock.md). Before any of this, a 1–2 day spike that isn't merged: check that the Hello prompt shows in front of the frameless window, and that `RequestSignAsync` returns the same signature for the same challenge.
+- **Decided in** [ADR-0005](adr/0005-quick-unlock.md). The spike that came first passed: the Hello prompt shows in front of the frameless window, and `RequestSignAsync` returns the same signature for the same challenge ([notes](spikes/hello-quick-unlock.md)).
 - **Files:**
   - `vaultair-platform`: a `QuickUnlockKey` trait (`available`, `enroll`, `sign`, `delete`), `windows/{hello, dpapi}.rs`, and `FakeHello` in `fake.rs`.
   - `vaultair-core`: `vault/device_slot.rs`, an `open_with_dek` split out of `open.rs`, `service/quick_unlock.rs` (policy), and `unlock_quick` in `service/session.rs`.
@@ -793,7 +793,7 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
   - The wrapped DEK is kept in `%LOCALAPPDATA%\Vaultair\devices\<vault_id>.qu` (DPAPI plus a Hello-derived key, bound to the password slot). `vault.vhdr` doesn't change.
   - The master password is required on enable, after a Windows restart, after 7 days, after 3 failed or cancelled Hello attempts, after a password change, and for sensitive actions.
   - Non-TPM Hello is allowed with a warning. "Keep running in the tray" is optional, and closing then hides to the tray.
-- **Windows crate features:** `Security_Credentials`, `Security_Credentials_UI`, `Security_Cryptography`, `Storage_Streams`, `Foundation`, `Win32_Security_Cryptography`, `Win32_System_SystemInformation`; Tauri `tray-icon`.
+- **Windows crate features:** `Security_Credentials`, `Security_Credentials_UI`, `Security_Cryptography`, `Storage_Streams`, `Foundation`, `Win32_Security_Cryptography`, `Win32_System_SystemInformation`, `Win32_System_TpmBaseServices` (TPM detection); Tauri `tray-icon`.
 - **Commands:** `quick_unlock_status`, `quick_unlock_enable`, `quick_unlock_unlock`, `quick_unlock_forget`, and settings for the tray.
 - **Tests:**
   - A round trip with `FakeHello`.

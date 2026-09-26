@@ -35,13 +35,13 @@ Options considered, against a stolen laptop, malware running as the user, a shar
 5. **Policy record.** `last_password_at` and the boot time at the last password unlock are kept in the sidecar, MACed with a key derived from the DEK. Malware can delete the record (the user then types the password) but can't extend it.
 6. **Relock is unchanged.** Idle timeout, Win+L and sleep still wipe keys. The next unlock uses Hello unless one of the rules in decision 4 applies.
 7. **Revocation.** A password change invalidates the sidecar automatically (the password-slot hash in the AAD changes). "Forget this device" deletes the sidecar and the Hello key. Removing Hello from Windows also revokes it.
-8. **No TPM.** A Hello key that isn't hardware-backed is **allowed with a warning** at enrollment, explaining that the protection is weaker.
+8. **No TPM.** A Hello key that isn't hardware-backed is **allowed with a warning** at enrollment, explaining that the protection is weaker. Detect the TPM with `Tbsi_GetDeviceInfo` (TPM Base Services), not Hello attestation: the spike showed that a working firmware TPM reports attestation `NotSupported`. Attestation is logged for information only.
 9. **Tray.** An optional "Keep running in the tray" setting. When it's on, closing the window hides it to the tray instead of quitting, and the tray menu has Lock and Quit. The vault stays under the same lock rules; this saves startup time only.
 10. Every quick-unlock error is a static code with no dynamic data. Any Hello failure or cancel falls back to the password field.
 
 ## Consequences
 
 - New phase **15b (Quick unlock)** after Phase 15, since it reuses the Settings screens and the change-password flow. Landing before Phase 16 means the release threat-model review covers it.
-- A 1–2 day spike comes first. It checks that the Hello prompt shows in front of the frameless window, and that the signature is identical across calls on real hardware. If the signature isn't deterministic, this design is revisited before any code merges.
+- A 1–2 day spike comes first. It checks that the Hello prompt shows in front of the frameless window, and that the signature is identical across calls on real hardware. If the signature isn't deterministic, this design is revisited before any code merges. **Spike done (2026-09-25), both checks pass:** the signature was identical within a process, across processes, after a reboot and after a PIN change, and the prompt took focus by itself in front of the window (normal, maximized and minimized), with no workaround needed. See [the spike notes](../spikes/hello-quick-unlock.md).
 - `threat-model.md`, `security-assumptions.md`, `vault-format.md` (a device-sidecar section) and `implementation-plan.md` §5 are updated in Phase 15b.
 - Residual risks: a weak Hello PIN lowers protection on a stolen laptop to that PIN plus TPM lockout, and non-TPM Hello keys are software-protected. Both are mitigated by the enrollment warnings and the restart and 7-day password rules.

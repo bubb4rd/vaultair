@@ -1,6 +1,6 @@
 # Spike: Windows Hello quick unlock
 
-- **Status:** in progress (Part A done: A1–A6 and A8 passed, A7 skipped. Part B next)
+- **Status:** **done, 2026-09-25. Verdict: go.** Both parts pass, and ADR-0005 stands as written, apart from the TPM detection wording (finding 3).
 - **Started:** 2026-09-25
 - **Decision it de-risks:** [ADR-0005](../adr/0005-quick-unlock.md), Phase 15b in `implementation-plan.md`
 - **Throwaway code:** `D:\hello-spike` (a standalone crate outside the repo, not committed). `windows = "=0.61.3"` with features `Foundation`, `Security_Credentials`, `Security_Credentials_UI`, `Security_Cryptography` and `Storage_Streams`, plus `sha2`.
@@ -34,11 +34,25 @@ The credential name is `Vaultair-spike-0000` and the challenge is fixed at `[7u8
 
 **Expected hash for every remaining step:** `bee69178f523ee9290b39707fb7939f27d913f45d8a3b12ac1364b848ff89be4`
 
+## Part B results (in the app, branch `spike/hello`)
+
+The debug command `spike_hello_sign` polled the foreground window every 50 ms while a request was in flight. The new key from "create" (ReplaceExisting) gave `001ec0d4…2205` on every sign in the app, 5 of 5 plus the rerun.
+
+| Window state | Result |
+|---|---|
+| Normal | **Pass.** The dialog host (`Credential Dialog Xaml Host`, "Windows Security") was visible within about 50–100 ms and **became the foreground window by itself** at about 1.1–1.8 s, which is the dialog's entrance animation |
+| Maximized | **Pass.** Same as normal |
+| Minimized (the terminal had focus) | **Pass.** The dialog still took the foreground at about 1.2 s, and focus went back to the previous window when it closed |
+
+- **No focus workaround is needed.** The first version of the probe reported `foreground: false` because it checked at first sighting, before the animation finished. The Bitwarden `SetForegroundWindow` fix isn't needed.
+- If another window grabs focus mid-prompt (a Firefox Picture-in-Picture window did once), the dialog stays open and takes focus back. Approval still succeeded.
+- Phase 15b: trigger the Hello prompt when the lock screen is shown or focused, not while Vaultair is minimized, so the prompt appears in context.
+
 ## Findings (feed back into ADR-0005 / Phase 15b)
 
 1. **Hello rejects `/` in credential names.** `Vaultair/spike-0000` failed with `0x80090027` (`NTE_INVALID_PARAMETER`) on `OpenAsync`. Use `Vaultair-<vault_id>`. ADR-0005 already has the fix.
 2. **Check every `KeyCredentialStatus` before calling `.Credential()` or `.Result()`.** Reading them on a non-success result fails with an unhelpful `HRESULT(0)`. The statuses are Success 0, UnknownError 1, NotFound 2, UserCanceled 3, UserPrefersPassword 4, CredentialAlreadyExists 5, SecurityDeviceLocked 6.
-3. **Attestation doesn't reliably detect a TPM.** This PC has a working AMD firmware TPM (`Get-Tpm`: present, ready, TPM 2.0 fTPM 6.32), yet attestation reports `NotSupported`. Firmware TPMs often can't attest. Phase 15b must detect the TPM with `Tbsi_GetDeviceInfo` (TPM Base Services), show the "weaker protection" warning only when no TPM is present, and log attestation as information only. ADR-0005 decision 8 still needs this wording.
+3. **Attestation doesn't reliably detect a TPM.** This PC has a working AMD firmware TPM (`Get-Tpm`: present, ready, TPM 2.0 fTPM 6.32), yet attestation reports `NotSupported`. Firmware TPMs often can't attest. Phase 15b must detect the TPM with `Tbsi_GetDeviceInfo` (TPM Base Services), show the "weaker protection" warning only when no TPM is present, and log attestation as information only. ADR-0005 decision 8 now has this wording.
 4. A sign straight after `create` needs no second prompt (Windows reuses the approval), and every later sign prompts. In the real flow that's one prompt per unlock, which is fine.
 
 ## Remaining steps
@@ -48,8 +62,9 @@ The credential name is `Vaultair-spike-0000` and the challenge is fixed at `[7u8
 - [x] **A6:** `cargo run` and press Cancel → the output shows `UserCanceled` (3), with no crash. (Passed.)
 - [x] **A7:** optional, because it removes Hello from Windows: remove Hello, then `cargo run` → `open: NotFound` (2). (**Skipped** by choice. `NotFound` is expected but untested. Phase 15b treats any non-success `open` as "fall back to the password, and turn quick unlock on again".)
 - [x] **A8:** `cargo run -- delete`. (Done.)
-- [ ] **Part B:** on a throwaway branch `spike/hello`, add a debug-only `spike_hello_sign` command, called from `DevPanel.tsx`. Check the prompt shows in front with Vaultair focused, maximized, and minimized. If the prompt opens behind the window, try `FindWindowW("Credential Dialog Xaml Host")` + `SetForegroundWindow` (Bitwarden's workaround). Delete the branch afterwards.
-- [ ] Write the final verdict here, and update ADR-0005 (decision 8 TPM detection, spike outcome).
+- [x] **Part B:** on a throwaway branch `spike/hello`, add a debug-only `spike_hello_sign` command, called from `DevPanel.tsx`. Check the prompt shows in front with Vaultair focused, maximized, and minimized. If the prompt opens behind the window, try `FindWindowW("Credential Dialog Xaml Host")` + `SetForegroundWindow` (Bitwarden's workaround). Delete the branch afterwards.
+- [x] Write the final verdict here, and update ADR-0005 (decision 8 TPM detection, spike outcome).
+- [ ] Clean up: in the app, click "Hello: delete" (removes `Vaultair-spike-0000`), then `git branch -D spike/hello` and delete `D:\hello-spike` (including `part-b.log`).
 
 **Stop rule:** if any hash differs in A4 or A5, stop. ADR-0005's key derivation has to be redesigned before Phase 15b.
 
