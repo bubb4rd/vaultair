@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { IdentificationBadgeIcon, KeyIcon, PlusIcon, SquaresFourIcon, StarIcon } from "@phosphor-icons/react";
+import { PAGE_PATHS } from "@/app/nav";
 import { useDashboardSummary, useIdentityRefs } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
-import { StatusBadge } from "@/components/common/StatusBadge";
+import { StatusBadge, type Status } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { NativeSelect } from "@/components/ui/textarea";
 import { accountType, formatRelative } from "@/features/accounts/labels";
 import { IdentityChip } from "@/features/identities/IdentityAvatar";
+import { FixLink } from "@/features/health/FixLink";
+import { ruleLabel, severityStatus } from "@/features/health/labels";
 import { PageHeader } from "@/features/shell/PageHeader";
-import type { DashboardSummary } from "@/ipc/client";
+import type { DashboardSummary, HealthIssue } from "@/ipc/client";
+import { IdentityFilter } from "./IdentityFilter";
 import { useIdentityFilter } from "./useIdentityFilter";
 
 const number = new Intl.NumberFormat();
@@ -23,31 +26,6 @@ function Tile({ label, value, note }: { label: string; value: number; note?: Rea
         <span className="text-2xl font-semibold tracking-[-0.02em] text-foreground">{number.format(value)}</span>
         {note}
       </dd>
-    </div>
-  );
-}
-
-function IdentityFilter() {
-  const refs = useIdentityRefs();
-  const [identityId, setIdentityId] = useIdentityFilter();
-  if (!refs.data || refs.data.length === 0) return null;
-  return (
-    <div className="w-48">
-      <NativeSelect
-        aria-label="Filter by identity"
-        className="h-7 text-[13px]"
-        value={identityId ?? ""}
-        onChange={(e) => {
-          setIdentityId(e.target.value || null);
-        }}
-      >
-        <option value="">All identities</option>
-        {refs.data.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.name}
-          </option>
-        ))}
-      </NativeSelect>
     </div>
   );
 }
@@ -90,6 +68,57 @@ function Recent({ summary }: { summary: DashboardSummary }) {
   );
 }
 
+function HealthLink({
+  label,
+  value,
+  status,
+  badge,
+}: {
+  label: string;
+  value: number;
+  status: Status;
+  badge: string;
+}) {
+  return (
+    <Link
+      to={PAGE_PATHS.health}
+      className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3.5 hover:border-border-strong focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-2xl font-semibold tracking-[-0.02em] text-foreground">{number.format(value)}</span>
+      {value > 0 && <StatusBadge status={status} label={badge} />}
+    </Link>
+  );
+}
+
+function NeedsAttention({ issues }: { issues: HealthIssue[] }) {
+  return (
+    <section aria-labelledby="attention-heading" className="rounded-lg border border-border bg-card px-4 pt-3 pb-1">
+      <h2 id="attention-heading" className="pb-1 text-[13px] font-semibold">
+        Needs attention
+      </h2>
+      {issues.length === 0 ? (
+        <p className="py-2 text-[13px] text-muted-foreground">Nothing needs attention.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {issues.map((issue) => (
+            <li key={`${issue.accountId}-${issue.rule}`} className="flex items-center gap-3 py-2">
+              <StatusBadge status={severityStatus(issue.severity)} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] text-foreground">{issue.title}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {ruleLabel(issue.rule)} · {issue.reason}
+                </p>
+              </div>
+              <FixLink issue={issue} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function QuickActions() {
   return (
     <section aria-labelledby="actions-heading" className="flex flex-col gap-2">
@@ -115,8 +144,8 @@ function QuickActions() {
 }
 
 /**
- * The vault at a glance, for everything or one identity. Security health
- * (weak and reused passwords, attention items) joins it in Phase 12.
+ * The vault at a glance, for everything or one identity: account counts,
+ * security health, what was edited recently, and what needs attention.
  */
 export function DashboardPage() {
   const [identityId] = useIdentityFilter();
@@ -172,12 +201,26 @@ export function DashboardPage() {
             />
             <Tile label="Favorites" value={s.favorites} />
           </dl>
+          <section aria-labelledby="health-counts-heading" className="flex flex-col gap-3">
+            <h2 id="health-counts-heading" className="text-[13px] font-semibold">
+              Security health
+            </h2>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+              <HealthLink label="Weak passwords" value={s.weak} status="risk" badge="High risk" />
+              <HealthLink label="Reused passwords" value={s.reused} status="risk" badge="High risk" />
+              <HealthLink label="Missing recovery codes" value={s.missingRecoveryCodes} status="attention" badge="Needs attention" />
+              <HealthLink label="Dormant" value={s.dormant} status="dormant" badge="Dormant" />
+            </div>
+          </section>
           <div className="grid grid-cols-[minmax(0,1fr)_240px] items-start gap-6">
-            {s.recent.length > 0 ? (
-              <Recent summary={s} />
-            ) : (
-              <p className="text-[13px] text-muted-foreground">No accounts in this identity yet.</p>
-            )}
+            <div className="flex min-w-0 flex-col gap-6">
+              {s.recent.length > 0 ? (
+                <Recent summary={s} />
+              ) : (
+                <p className="text-[13px] text-muted-foreground">No accounts in this identity yet.</p>
+              )}
+              <NeedsAttention issues={s.needsAttention} />
+            </div>
             <QuickActions />
           </div>
         </div>

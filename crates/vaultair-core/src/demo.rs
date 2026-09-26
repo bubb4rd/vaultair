@@ -34,14 +34,17 @@ fn password(length: u16) -> Result<SecretUpdate, AppError> {
 
 /// A deliberately weak password (a common word and two digits), so the demo
 /// shows what a weak one looks like. The digits are random; nothing here is
-/// anyone's real password.
-fn weak_password() -> Result<SecretUpdate, AppError> {
+/// anyone's real password. The two weak demo accounts share one value so
+/// reuse shows up as well.
+fn weak_password_value() -> Result<zeroize::Zeroizing<String>, AppError> {
     const WORDS: [&str; 4] = ["dragon", "sunshine", "shadow", "monkey"];
     let [a, b, c] = *rng::secret_bytes::<3>().map_err(rng_err)?;
     let word = WORDS[usize::from(a) % WORDS.len()];
-    Ok(SecretUpdate::Set {
-        value: format!("{word}{}{}", b % 10, c % 10),
-    })
+    Ok(zeroize::Zeroizing::new(format!(
+        "{word}{}{}",
+        b % 10,
+        c % 10
+    )))
 }
 
 fn totp_key() -> Result<SecretUpdate, AppError> {
@@ -346,6 +349,7 @@ pub fn seed(vault: &mut OpenVault, clock: &dyn Clock) -> Result<(), AppError> {
             })
     };
 
+    let shared_weak = weak_password_value()?;
     for s in samples() {
         let custom_fields = if s.favorite && s.account_type == AccountType::Launcher {
             vec![
@@ -380,7 +384,10 @@ pub fn seed(vault: &mut OpenVault, clock: &dyn Clock) -> Result<(), AppError> {
             password: if s.strong_password {
                 password(20)?
             } else {
-                weak_password()?
+                // The two weak accounts share this one, so the demo shows reuse.
+                SecretUpdate::Set {
+                    value: shared_weak.to_string(),
+                }
             },
             website_url: s.website.map(Into::into),
             login_url: None,

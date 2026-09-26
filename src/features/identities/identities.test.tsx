@@ -402,6 +402,11 @@ describe("dashboard", () => {
     missingMfa: identityId ? 0 : 3,
     favorites: 1,
     recent: [account({ id: "a1", title: "Arena ranked", identityId: "i1", identityName: "Competitive" })],
+    weak: 0,
+    reused: 0,
+    missingRecoveryCodes: 0,
+    dormant: 0,
+    needsAttention: [],
   });
 
   it("filters the summary by identity", async () => {
@@ -452,6 +457,11 @@ describe("accessibility", () => {
           missingMfa: 1,
           favorites: 0,
           recent: [account()],
+          weak: 0,
+          reused: 0,
+          missingRecoveryCodes: 0,
+          dormant: 0,
+          needsAttention: [],
         }),
       }),
     );

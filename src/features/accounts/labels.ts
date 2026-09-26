@@ -52,7 +52,8 @@ export const FORM_STATUSES = ACCOUNT_STATUSES.filter((s) => s.value !== "archive
  * Days without activity (an edit, "Mark verified", or using the password
  * from Vaultair) before an active account shows as Stale, then Dormant.
  * Vaultair can't see logins elsewhere, so shorter spans would mark nearly
- * everything stale.
+ * everything stale. `DORMANT_AFTER_DAYS` matches `health/thresholds.rs`,
+ * which the dormant health check uses.
  */
 export const STALE_AFTER_DAYS = 30;
 export const DORMANT_AFTER_DAYS = 90;

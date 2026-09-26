@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::account::{text_enum, AccountStatus, AccountSummary, AccountType};
+use crate::domain::health::HealthIssue;
 
 text_enum!(
     /// What a contact point is. Only emails and phones are created in the
@@ -233,8 +234,7 @@ pub enum IdentityDeletePlan {
     },
 }
 
-/// The dashboard's numbers, optionally for one identity. Health counts
-/// (weak, reused, attention) arrive with Phase 12.
+/// The dashboard's numbers, optionally for one identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
@@ -250,6 +250,16 @@ pub struct DashboardSummary {
     pub favorites: u32,
     /// The five most recently edited accounts.
     pub recent: Vec<AccountSummary>,
+    /// Active accounts with a weak password (strength 0 or 1).
+    pub weak: u32,
+    /// Active accounts sharing a password with another active account.
+    pub reused: u32,
+    /// MFA is on and no backup codes are left.
+    pub missing_recovery_codes: u32,
+    /// Saved status dormant, or active with no activity for 90 days.
+    pub dormant: u32,
+    /// Up to five issues, highest severity first.
+    pub needs_attention: Vec<HealthIssue>,
 }
 
 #[cfg(test)]

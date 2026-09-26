@@ -169,6 +169,13 @@ export const commands = {
 	contactPointList: () => typedError<ContactPointView[], IpcError_Serialize>(__TAURI_INVOKE("contact_point_list")),
 	/**  The dashboard's numbers, for the whole vault or one identity. */
 	dashboardSummary: (identityId: string | null) => typedError<DashboardSummary, IpcError_Serialize>(__TAURI_INVOKE("dashboard_summary", { identityId })),
+	/**
+	 *  How many active accounts each rule matches. `identity_id` null is the
+	 *  whole vault; an unknown identity is `not_found`.
+	 */
+	healthSummary: (identityId: string | null) => typedError<HealthSummary, IpcError_Serialize>(__TAURI_INVOKE("health_summary", { identityId })),
+	/**  Issues, highest severity first. `rule` keeps one check. */
+	healthIssues: (identityId: string | null, rule: "weak" | "reused" | "missing_mfa" | "missing_recovery_codes" | "dormant" | null) => typedError<HealthIssue[], IpcError_Serialize>(__TAURI_INVOKE("health_issues", { identityId, rule })),
 	/**  Every platform, built-in and user-added, with how many accounts use each. */
 	platformList: () => typedError<PlatformView[], IpcError_Serialize>(__TAURI_INVOKE("platform_list")),
 	platformCreate: (input: PlatformInput) => typedError<PlatformView, IpcError_Serialize>(__TAURI_INVOKE("platform_create", { input })),
@@ -300,9 +307,8 @@ export type AccountFilter = {
 	/**  The login email is some identity's primary email. */
 	usesPrimaryEmail?: boolean,
 	/**
-	 *  Favorites, and accounts with the Main or Recovery purpose (ADR-0004
-	 *  decision 19). Accounts with high-severity health issues join them
-	 *  once health checks exist (Phase 12).
+	 *  Favorites, accounts with the Main or Recovery purpose, and accounts
+	 *  with a high-severity health issue (a weak or reused password).
 	 */
 	highPriority?: boolean,
 };
@@ -489,10 +495,7 @@ export type CustomFieldView = {
 	hasValue: boolean,
 };
 
-/**
- *  The dashboard's numbers, optionally for one identity. Health counts
- *  (weak, reused, attention) arrive with Phase 12.
- */
+/**  The dashboard's numbers, optionally for one identity. */
 export type DashboardSummary = {
 	/**  The identity the numbers are for; `None` means the whole vault. */
 	identityId: string | null,
@@ -505,6 +508,16 @@ export type DashboardSummary = {
 	favorites: number,
 	/**  The five most recently edited accounts. */
 	recent: AccountSummary[],
+	/**  Active accounts with a weak password (strength 0 or 1). */
+	weak: number,
+	/**  Active accounts sharing a password with another active account. */
+	reused: number,
+	/**  MFA is on and no backup codes are left. */
+	missingRecoveryCodes: number,
+	/**  Saved status dormant, or active with no activity for 90 days. */
+	dormant: number,
+	/**  Up to five issues, highest severity first. */
+	needsAttention: HealthIssue[],
 };
 
 /**  An account that depends on a contact point, and how. */
@@ -602,6 +615,50 @@ export type Generated = {
 	entropyBits: number | null,
 	/**  zxcvbn score, 0 (trivial) to 4 (very strong). */
 	score: number,
+};
+
+/**  Where "Fix" goes. The account id is on the issue; this is only the screen. */
+export type HealthFix = 
+/**  The account form, where the password is changed. */
+"edit_account" | 
+/**  The account page, scrolled to the MFA section. */
+"mfa_section" | 
+/**  The account page. Mark verified clears an activity-based dormant issue. */
+"account";
+
+/**  One problem on one active account. */
+export type HealthIssue = {
+	accountId: string,
+	title: string,
+	rule: HealthRule,
+	severity: HealthSeverity,
+	reason: string,
+	fix: HealthFix,
+};
+
+/**  Which check found the issue. Also the optional filter on `health_issues`. */
+export type HealthRule = "weak" | "reused" | "missing_mfa" | "missing_recovery_codes" | "dormant";
+
+/**
+ *  How serious the issue is. High is weak and reused passwords; those are
+ *  what the High-priority saved view adds.
+ */
+export type HealthSeverity = "high" | "medium" | "low" | "info";
+
+/**
+ *  How many active accounts each rule matches, for the whole vault or one
+ *  identity. Reuse is counted across the whole vault: an account is reused
+ *  when any other active account shares its password, including one outside
+ *  the identity filter.
+ */
+export type HealthSummary = {
+	/**  The identity the numbers are for; `None` means the whole vault. */
+	identityId: string | null,
+	weak: number,
+	reused: number,
+	missingMfa: number,
+	missingRecoveryCodes: number,
+	dormant: number,
 };
 
 /**

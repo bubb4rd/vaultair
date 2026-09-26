@@ -594,7 +594,7 @@ fn dashboard_summary_filters_by_identity() {
     let gone = accounts::create(&mut v, &clock, &account("Gone", Some(&comp), None)).unwrap();
     accounts::set_archived(&mut v, &clock, &gone.id, true).unwrap();
 
-    let all = dashboard::summary(&v, None).unwrap();
+    let all = dashboard::summary(&v, None, clock.now_utc()).unwrap();
     assert_eq!(
         (all.total_accounts, all.main_accounts, all.alt_accounts),
         (3, 2, 1)
@@ -602,7 +602,7 @@ fn dashboard_summary_filters_by_identity() {
     assert_eq!((all.identities, all.missing_mfa, all.favorites), (2, 2, 1));
     assert_eq!(all.recent.len(), 3);
 
-    let one = dashboard::summary(&v, Some(&comp)).unwrap();
+    let one = dashboard::summary(&v, Some(&comp), clock.now_utc()).unwrap();
     assert_eq!(one.identity_id.as_deref(), Some(comp.as_str()));
     assert_eq!(
         (one.total_accounts, one.main_accounts, one.alt_accounts),
@@ -615,7 +615,7 @@ fn dashboard_summary_filters_by_identity() {
         .all(|a| a.identity_id.as_deref() == Some(comp.as_str())));
 
     assert_eq!(
-        dashboard::summary(&v, Some("nope")).unwrap_err(),
+        dashboard::summary(&v, Some("nope"), clock.now_utc()).unwrap_err(),
         AppError::NotFound
     );
 }
@@ -642,8 +642,13 @@ fn identity_dtos_carry_no_secrets() {
     }
     json.push_str(&serde_json::to_string(&identities::list(&v, false).unwrap()).unwrap());
     json.push_str(&serde_json::to_string(&identities::contacts(&v).unwrap()).unwrap());
-    json.push_str(&serde_json::to_string(&dashboard::summary(&v, Some(&id)).unwrap()).unwrap());
-    json.push_str(&serde_json::to_string(&dashboard::summary(&v, None).unwrap()).unwrap());
+    json.push_str(
+        &serde_json::to_string(&dashboard::summary(&v, Some(&id), clock.now_utc()).unwrap())
+            .unwrap(),
+    );
+    json.push_str(
+        &serde_json::to_string(&dashboard::summary(&v, None, clock.now_utc()).unwrap()).unwrap(),
+    );
     assert!(!json.contains(SECRET));
 }
 
