@@ -64,7 +64,7 @@ The debug command `spike_hello_sign` polled the foreground window every 50 ms wh
 - [x] **A8:** `cargo run -- delete`. (Done.)
 - [x] **Part B:** on a throwaway branch `spike/hello`, add a debug-only `spike_hello_sign` command, called from `DevPanel.tsx`. Check the prompt shows in front with Vaultair focused, maximized, and minimized. If the prompt opens behind the window, try `FindWindowW("Credential Dialog Xaml Host")` + `SetForegroundWindow` (Bitwarden's workaround). Delete the branch afterwards.
 - [x] Write the final verdict here, and update ADR-0005 (decision 8 TPM detection, spike outcome).
-- [ ] Clean up: in the app, click "Hello: delete" (removes `Vaultair-spike-0000`), then `git branch -D spike/hello` and delete `D:\hello-spike` (including `part-b.log`).
+- [x] Clean up (done 2026-09-25; the key was deleted from the console spike, which uses the same name): in the app, click "Hello: delete" (removes `Vaultair-spike-0000`), then `git branch -D spike/hello` and delete `D:\hello-spike` (including `part-b.log`).
 
 **Stop rule:** if any hash differs in A4 or A5, stop. ADR-0005's key derivation has to be redesigned before Phase 15b.
 
