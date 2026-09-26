@@ -42,6 +42,9 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::account::account_duplicate_as_template,
             commands::account::account_url_target,
             commands::account::account_open_url,
+            commands::account::account_bulk_tag,
+            commands::account::account_bulk_archive,
+            commands::account::account_bulk_delete,
             commands::account::purpose_list,
             commands::account::tag_list,
             commands::secret::secret_reveal,
@@ -73,6 +76,12 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::catalog::game_profile_create,
             commands::catalog::game_profile_update,
             commands::catalog::game_profile_delete,
+            commands::search::search,
+            commands::search::search_rebuild_index,
+            commands::search::saved_view_list,
+            commands::search::saved_view_create,
+            commands::search::saved_view_update,
+            commands::search::saved_view_delete,
         ])
         .events(collect_events![
             events::VaultLocked,
@@ -102,5 +111,41 @@ mod tests {
         builder()
             .export(export_config(), BINDINGS_PATH)
             .expect("failed to export TS bindings");
+    }
+
+    /// The quoted names after each `marker` in `text`.
+    fn quoted_after<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
+        text.split(marker)
+            .skip(1)
+            .filter_map(|rest| rest.split('"').next())
+            .collect()
+    }
+
+    /// A command the webview can call must be listed in `build.rs` (which
+    /// generates its permission) and allowed in the main capability, or
+    /// Tauri rejects it at runtime with "not allowed". Mocked frontend
+    /// tests can't see that, so this checks every command in the bindings.
+    #[test]
+    fn every_command_is_allowed() {
+        let bindings = std::fs::read_to_string(BINDINGS_PATH).expect("bindings.ts");
+        let build = include_str!("../build.rs");
+        let capability = include_str!("../capabilities/main.json");
+        let commands = quoted_after(&bindings, "__TAURI_INVOKE(\"");
+        assert!(
+            commands.len() > 50,
+            "found only {} commands",
+            commands.len()
+        );
+        for cmd in commands {
+            assert!(
+                build.contains(&format!("\"{cmd}\"")),
+                "{cmd} is missing from build.rs"
+            );
+            let allow = format!("\"allow-{}\"", cmd.replace('_', "-"));
+            assert!(
+                capability.contains(&allow),
+                "{allow} is missing from capabilities/main.json"
+            );
+        }
     }
 }

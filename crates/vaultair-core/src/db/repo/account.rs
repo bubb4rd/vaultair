@@ -1,14 +1,14 @@
 //! Accounts and their custom fields, plus the account rows of the search
 //! index (kept in step inside the same transaction as every write).
 
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row};
 
 use crate::domain::account::{
-    AccountDetail, AccountFilter, AccountStatus, AccountSummary, AccountType, CustomFieldType,
-    CustomFieldView,
+    AccountDetail, AccountStatus, AccountSummary, AccountType, CustomFieldType, CustomFieldView,
 };
 use crate::domain::identity::ContactRole;
 use crate::domain::notes_hints::NotesSuggestions;
+use crate::search::filters::{self, AccountFilter, AccountSort};
 
 /// The non-secret columns an account form edits, already validated.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -341,32 +341,31 @@ fn summary_row(r: &Row<'_>) -> rusqlite::Result<AccountSummary> {
     })
 }
 
-/// Active (`archived` false) or archived accounts matching `filter`, by
-/// title. A game filter also matches accounts with a profile for that game.
+/// Accounts matching a validated `filter` (active or archived, as it says),
+/// in `sort` order. `now` places Stale, Dormant and day-count filters.
 pub fn summaries(
     conn: &Connection,
-    archived: bool,
     filter: &AccountFilter,
+    sort: AccountSort,
+    now: time::OffsetDateTime,
 ) -> rusqlite::Result<Vec<AccountSummary>> {
+    let compiled = filters::compile(filter, now);
     let sql = format!(
-        "{SUMMARY_SELECT} WHERE (a.archived_at IS NOT NULL) = ?1
-           AND (?2 IS NULL OR a.platform_id = ?2)
-           AND (?3 IS NULL OR a.game_id = ?3
-                OR EXISTS(SELECT 1 FROM game_profile gp
-                          WHERE gp.account_id = a.id AND gp.game_id = ?3))
-           AND (?4 IS NULL OR trim(a.publisher) = ?4 COLLATE NOCASE)
-         ORDER BY a.title COLLATE NOCASE, a.id"
+        "{SUMMARY_SELECT} WHERE {} ORDER BY {}",
+        compiled.sql,
+        sort.key.order_by(sort.descending)
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map(
-        params![
-            archived,
-            filter.platform_id,
-            filter.game_id,
-            filter.publisher.as_deref().map(str::trim)
-        ],
-        summary_row,
-    )?;
+    let rows = stmt.query_map(params_from_iter(compiled.params.iter()), summary_row)?;
+    rows.collect()
+}
+
+/// Which of `ids` exist, in no particular order.
+pub fn existing(conn: &Connection, ids: &[String]) -> rusqlite::Result<Vec<String>> {
+    let list = serde_json::to_string(ids).unwrap_or_else(|_| "[]".to_owned());
+    let mut stmt =
+        conn.prepare("SELECT id FROM account WHERE id IN (SELECT value FROM json_each(?1))")?;
+    let rows = stmt.query_map([list], |r| r.get(0))?;
     rows.collect()
 }
 

@@ -42,7 +42,11 @@ pub struct VaultInfo {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct IntegrityReport {
+    /// Every page's HMAC and the SQLite structure check out.
     pub ok: bool,
+    /// The search index has exactly one row per account, identity and game
+    /// profile. If not, `search_rebuild_index` repairs it; nothing is lost.
+    pub search_index_ok: bool,
 }
 
 /// An unlocked vault. Dropping it locks: the connection closes (SQLCipher
@@ -101,10 +105,13 @@ impl OpenVault {
         (&mut self.conn, &self.keys)
     }
 
-    /// Verifies every page's HMAC (SQLCipher) and the SQLite structure.
+    /// Verifies every page's HMAC (SQLCipher) and the SQLite structure, and
+    /// compares the search index with the tables.
     pub fn integrity_check(&self) -> Result<IntegrityReport, VaultError> {
+        let ok = crate::db::connection::integrity_ok(&self.conn)?;
         Ok(IntegrityReport {
-            ok: crate::db::connection::integrity_ok(&self.conn)?,
+            ok,
+            search_index_ok: ok && crate::search::index::consistent(&self.conn)?,
         })
     }
 }

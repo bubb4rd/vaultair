@@ -618,7 +618,13 @@ fn golden_fixture_v1_still_opens() {
     // Migrated to the latest schema: the v1 account is readable through the
     // account service, and the built-in purposes were added around the
     // fixture's own "main" (which keeps its id).
-    let listed = vaultair_core::service::accounts::list(&v, false, &Default::default()).unwrap();
+    let listed = vaultair_core::service::accounts::list(
+        &v,
+        &SystemClock,
+        Default::default(),
+        Default::default(),
+    )
+    .unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].purpose_id, "p1");
     assert!(listed[0].has_password);

@@ -72,6 +72,15 @@ fn main() {
             "game_profile_create",
             "game_profile_update",
             "game_profile_delete",
+            "account_bulk_tag",
+            "account_bulk_archive",
+            "account_bulk_delete",
+            "search",
+            "search_rebuild_index",
+            "saved_view_list",
+            "saved_view_create",
+            "saved_view_update",
+            "saved_view_delete",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

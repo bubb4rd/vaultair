@@ -1,317 +1,256 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import type { Icon } from "@phosphor-icons/react";
 import {
   ArchiveIcon,
-  FlaskIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   KeyIcon,
   MagnifyingGlassIcon,
-  PasswordIcon,
   PlusIcon,
-  ShieldCheckIcon,
-  ShieldSlashIcon,
-  StarIcon,
-  UserIcon,
+  RowsIcon,
+  SortAscendingIcon,
+  SquaresFourIcon,
+  TableIcon,
 } from "@phosphor-icons/react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useAccounts, useGames, useIdentityRefs, useOpenVault, usePlatforms } from "@/app/queries";
+import {
+  useAccountList,
+  useAccounts,
+  useGames,
+  useIdentityRefs,
+  useOpenVault,
+  usePlatforms,
+  usePurposes,
+  useSavedViews,
+  useTags,
+} from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { NativeSelect } from "@/components/ui/textarea";
-import { AccountLogo } from "@/features/catalog/CatalogLogo";
-import { copySecret, copyToClipboard } from "@/features/clipboard/copy";
 import { PageHeader } from "@/features/shell/PageHeader";
-import { IdentityChip } from "@/features/identities/IdentityAvatar";
-import type { AccountFilter, AccountSummary, GameView, IdentityColor, PlatformView } from "@/ipc/client";
-import { displayStatus, passwordStrength } from "./labels";
+import {
+  DEFAULT_SORT,
+  EMPTY_FILTER,
+  type AccountFilter,
+  type AccountSort,
+  type AccountSummary,
+  type SavedView,
+  type SortKey,
+} from "@/ipc/client";
+import { cn } from "@/lib/utils";
+import { DemoNotice } from "./AccountBits";
+import { AccountCards } from "./AccountCards";
+import { AccountCompact } from "./AccountCompact";
+import { AccountTable } from "./AccountTable";
+import { BulkActionBar } from "./BulkActionBar";
+import { FilterChips } from "./FilterChips";
+import { SORT_OPTIONS, sameSpec, type FilterContext } from "./filters";
+import { openView, setListState, useListState, type ListKey, type ListLayout } from "./listState";
+import { ViewMenu } from "./SavedViews";
+import { useSelection } from "./useSelection";
 
-function matches(a: AccountSummary, q: string) {
-  if (!q) return true;
-  const hay = [
-    a.title,
-    a.username,
-    a.email,
-    a.publisher,
-    a.platformName,
-    a.gameName,
-    a.purposeName,
-    a.identityName,
-    ...a.tags,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return q
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => hay.includes(word));
-}
+/** Typing waits this long before the list asks Rust again. */
+const SEARCH_DELAY_MS = 150;
 
-/** Password strength and MFA at a glance: icon and text, never colour alone. */
-function Security({ account }: { account: AccountSummary }) {
-  const strength = account.passwordStrength === null ? null : passwordStrength(account.passwordStrength);
+const LAYOUTS: { value: ListLayout; label: string; icon: Icon }[] = [
+  { value: "table", label: "Table", icon: TableIcon },
+  { value: "cards", label: "Cards", icon: SquaresFourIcon },
+  { value: "compact", label: "Compact", icon: RowsIcon },
+];
+
+function LayoutToggle({ value, onChange }: { value: ListLayout; onChange: (layout: ListLayout) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {strength && strength.status !== "secure" && <StatusBadge status={strength.status} label={`${strength.label} password`} />}
-      {!account.hasPassword && <StatusBadge status="unknown" label="No password" />}
-      {account.mfaEnabled ? (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <ShieldCheckIcon aria-hidden="true" className="size-3.5 text-status-secure" weight="bold" />
-          MFA
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <ShieldSlashIcon aria-hidden="true" className="size-3.5 text-status-warning" weight="bold" />
-          No MFA
-        </span>
-      )}
+    <div role="radiogroup" aria-label="Layout" className="flex h-7 items-center rounded-md border border-border-strong p-0.5">
+      {LAYOUTS.map((l) => {
+        const LayoutIcon = l.icon;
+        const on = l.value === value;
+        return (
+          <button
+            key={l.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            aria-label={l.label}
+            title={l.label}
+            className={cn(
+              "grid h-full w-7 cursor-pointer place-items-center rounded-sm text-subtle-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
+              on && "bg-muted text-foreground",
+            )}
+            onClick={() => {
+              onChange(l.value);
+            }}
+          >
+            <LayoutIcon aria-hidden="true" className="size-4" />
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-/** An icon button in a row; it doesn't open the account. */
-function RowAction({
-  label,
-  tip,
-  onClick,
-  children,
-}: {
-  label: string;
-  tip: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function SortMenu({ sort, onChange }: { sort: AccountSort; onChange: (sort: AccountSort) => void }) {
+  const label = SORT_OPTIONS.find((o) => o.key === sort.key)?.label ?? "Name";
+  const Arrow = sort.descending ? ArrowDownIcon : ArrowUpIcon;
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={label}
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-        >
-          {children}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="h-7" aria-label={`Sort by ${label}`}>
+          <SortAscendingIcon aria-hidden="true" />
+          {label}
+          <Arrow aria-hidden="true" className="size-3" />
         </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{tip}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-/**
- * Copy the username (or the email, without one) and the password without
- * opening the account. Both go through Rust and clear from the clipboard;
- * the password is never sent to the page. Copying the password counts as
- * activity, so the row's status is refreshed.
- */
-function QuickCopy({ account }: { account: AccountSummary }) {
-  const queryClient = useQueryClient();
-  const login = account.username ?? account.email;
-  const loginLabel = account.username ? "username" : "email";
-  const gap = <span aria-hidden="true" className="size-7" />;
-  return (
-    <div className="flex items-center justify-end gap-0.5">
-      {login ? (
-        <RowAction
-          label={`Copy ${loginLabel} for ${account.title}`}
-          tip={`Copy ${loginLabel}`}
-          onClick={() => void copyToClipboard(login, account.username ? "Username" : "Email")}
-        >
-          <UserIcon aria-hidden="true" />
-        </RowAction>
-      ) : (
-        gap
-      )}
-      {account.hasPassword ? (
-        <RowAction
-          label={`Copy password for ${account.title}`}
-          tip="Copy password"
-          onClick={() => {
-            void copySecret({ kind: "accountPassword", id: account.id }, "Password").then((copied) => {
-              if (copied) void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-            });
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        <DropdownMenuLabel className="text-xs text-subtle-foreground">Sort by</DropdownMenuLabel>
+        <DropdownMenuRadioGroup
+          value={sort.key}
+          onValueChange={(key) => {
+            onChange({ ...sort, key: key as SortKey });
           }}
         >
-          <PasswordIcon aria-hidden="true" />
-        </RowAction>
-      ) : (
-        gap
-      )}
-    </div>
+          {SORT_OPTIONS.map((o) => (
+            <DropdownMenuRadioItem key={o.key} value={o.key} className="text-[13px]">
+              {o.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={sort.descending ? "desc" : "asc"}
+          onValueChange={(dir) => {
+            onChange({ ...sort, descending: dir === "desc" });
+          }}
+        >
+          <DropdownMenuRadioItem value="asc" className="text-[13px]">
+            Ascending
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="desc" className="text-[13px]">
+            Descending
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-function DemoNotice() {
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-status-linked/40 bg-status-linked/8 px-4 py-3">
-      <FlaskIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-status-linked" weight="bold" />
-      <p className="text-[13px] text-muted-foreground">
-        <span className="font-medium text-foreground">Demo vault.</span> These sample accounts use reserved example
-        domains and randomly generated passwords. Create a new vault for your real accounts.
-      </p>
-    </div>
-  );
-}
-
-function AccountRow({
-  account,
-  identityColor,
-}: {
-  account: AccountSummary;
-  identityColor: (id: string | null) => IdentityColor | null;
-}) {
-  const navigate = useNavigate();
-  const status = displayStatus(account);
-  const secondary = account.username ?? account.email;
-  return (
-    <tr
-      className="group cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-muted/60"
-      onClick={() => {
-        void navigate({ to: "/accounts/$accountId", params: { accountId: account.id } });
-      }}
-    >
-      <td className="py-2.5 pr-4 pl-4">
-        <div className="flex items-center gap-3">
-          <AccountLogo account={account} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <Link
-                to="/accounts/$accountId"
-                params={{ accountId: account.id }}
-                className="truncate rounded-sm text-[13px] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                {account.title}
-              </Link>
-              {account.favorite && (
-                <StarIcon aria-label="Favorite" weight="fill" className="size-3.5 shrink-0 text-status-attention" />
-              )}
-            </div>
-            {secondary && <p className="truncate text-xs text-muted-foreground">{secondary}</p>}
-          </div>
-        </div>
-      </td>
-      <td className="py-2.5 pr-4 text-[13px] text-muted-foreground">
-        {account.identityName ? (
-          <IdentityChip name={account.identityName} color={identityColor(account.identityId)} />
-        ) : (
-          <span className="text-subtle-foreground">None</span>
-        )}
-      </td>
-      <td className="py-2.5 pr-4 text-[13px] text-muted-foreground">{account.purposeName}</td>
-      <td className="py-2.5 pr-4">
-        <div className="flex flex-col items-start gap-0.5">
-          <StatusBadge status={status.badge} label={status.label} />
-          <span className="text-xs whitespace-nowrap text-subtle-foreground">{status.activity}</span>
-        </div>
-      </td>
-      <td className="py-2.5 pr-4">
-        <Security account={account} />
-      </td>
-      <td className="py-2.5 pr-3">
-        <QuickCopy account={account} />
-      </td>
-    </tr>
-  );
-}
-
-/** A platform, game or publisher filter. Empty string means "any". */
-function FilterSelect({
+/**
+ * The list's text search. Keeps its own text while typing and hands it on
+ * once typing pauses. Re-keyed when a view replaces the filter.
+ */
+function SearchBox({
   label,
-  value,
-  onChange,
-  options,
+  initial,
+  onSettle,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  initial: string;
+  onSettle: (text: string | null) => void;
 }) {
+  const [text, setText] = useState(initial);
+  const settle = useRef(onSettle);
+  useEffect(() => {
+    settle.current = onSettle;
+  });
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      settle.current(text.trim() || null);
+    }, SEARCH_DELAY_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [text]);
   return (
-    <NativeSelect
-      aria-label={`Filter by ${label.toLowerCase()}`}
-      value={value}
-      className="h-8 w-auto max-w-44 text-[13px]"
-      onChange={(e) => {
-        onChange(e.target.value);
-      }}
-    >
-      <option value="">Any {label.toLowerCase()}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </NativeSelect>
+    <div className="relative w-full max-w-xs">
+      <MagnifyingGlassIcon
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle-foreground"
+      />
+      <Input
+        type="search"
+        aria-label={label}
+        placeholder="Name, gamertag, email, tag or notes"
+        value={text}
+        autoComplete="off"
+        spellCheck={false}
+        className="h-7 pl-9 text-[13px]"
+        onChange={(e) => {
+          setText(e.target.value);
+        }}
+      />
+    </div>
   );
 }
 
-const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);
-
-/**
- * Only what this list uses: the platforms and publishers of its accounts,
- * and games they're for or have a profile in (plus the current choice).
- */
-function filterOptions(
-  accounts: AccountSummary[],
-  platforms: PlatformView[],
-  games: GameView[],
-  filter: AccountFilter,
-  archived: boolean,
-) {
-    const platformIds = new Set(accounts.map((a) => a.platformId));
-  const gameIds = new Set(accounts.map((a) => a.gameId));
-  const publishers = new Map<string, string>();
-  for (const a of accounts) {
-    const p = a.publisher?.trim();
-    if (p && !publishers.has(p.toLowerCase())) publishers.set(p.toLowerCase(), p);
-  }
-  return {
-    platforms: platforms
-      .filter((p) => platformIds.has(p.id) || p.id === filter.platformId)
-      .map((p) => ({ value: p.id, label: p.name }))
-      .sort(byLabel),
-    games: games
-      .filter((g) => gameIds.has(g.id) || (!archived && g.profileCount > 0) || g.id === filter.gameId)
-      .map((g) => ({ value: g.id, label: g.name }))
-      .sort(byLabel),
-    publishers: [...publishers.values()].map((p) => ({ value: p, label: p })).sort(byLabel),
-  };
+/** What the filter menus offer: only what the vault has. */
+function useFilterContext(all: AccountSummary[]): FilterContext {
+  const identities = useIdentityRefs().data;
+  const purposes = usePurposes().data;
+  const platforms = usePlatforms().data;
+  const games = useGames().data;
+  const tags = useTags().data;
+  return useMemo(() => {
+    const publishers = new Map<string, string>();
+    for (const a of all) {
+      const p = a.publisher?.trim();
+      if (p && !publishers.has(p.toLowerCase())) publishers.set(p.toLowerCase(), p);
+    }
+    const usedPlatforms = new Set(all.map((a) => a.platformId));
+    return {
+      identities: identities ?? [],
+      purposes: purposes ?? [],
+      platforms: (platforms ?? []).filter((p) => usedPlatforms.has(p.id)),
+      games: (games ?? []).filter((g) => g.accountCount > 0 || g.profileCount > 0),
+      tags: tags ?? [],
+      publishers: [...publishers.values()].sort((a, b) => a.localeCompare(b)),
+    };
+  }, [all, identities, purposes, platforms, games, tags]);
 }
 
 /**
- * All Accounts, or the Archived list. Platform, game and publisher filters
- * run in Rust (a game filter also finds accounts with a profile for that
- * game); the text box then narrows by title, username, email, platform,
- * game, publisher, purpose and tags. Full search and saved views arrive in
- * Phase 11.
+ * All Accounts (optionally through a saved view), or the Archived list,
+ * which is the built-in Archived view. Text, filters and sort all run in
+ * Rust against the search index; the list only renders the rows on screen.
  */
 export function AccountsPage({ archived = false }: { archived?: boolean }) {
-  const [filter, setFilter] = useState<AccountFilter>({ platformId: null, gameId: null, publisher: null });
-  const filtering = Boolean(filter.platformId ?? filter.gameId ?? filter.publisher);
+  const key: ListKey = archived ? "archived" : "accounts";
+  const state = useListState(key);
+  const views = useSavedViews().data ?? [];
+  const current = state.viewId ? (views.find((v) => v.id === state.viewId) ?? null) : null;
+  const filter: AccountFilter = { ...state.filter, archived };
+
   const all = useAccounts(archived);
-  const filtered = useAccounts(archived, filter);
-  const list = filtering ? filtered : all;
-  const platforms = usePlatforms();
-  const games = useGames();
+  const list = useAccountList(filter, state.sort);
   const vault = useOpenVault();
   const refs = useIdentityRefs();
   const identityColor = (id: string | null) => refs.data?.find((r) => r.id === id)?.color ?? null;
-  const [query, setQuery] = useState("");
-  const rows = useMemo(() => (list.data ?? []).filter((a) => matches(a, query.trim())), [list.data, query]);
-  const title = archived ? "Archived" : "All Accounts";
-  const total = all.data?.length ?? 0;
+  const ctx = useFilterContext(all.data ?? []);
+  const rows = useMemo(() => list.data ?? [], [list.data]);
+  const ids = useMemo(() => rows.map((a) => a.id), [rows]);
+  const selection = useSelection(ids);
+  const selected = rows.filter((a) => selection.selected.has(a.id));
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const used = filterOptions(all.data ?? [], platforms.data ?? [], games.data ?? [], filter, archived);
+  const total = all.data?.length ?? 0;
+  const title = archived ? "Archived" : (current?.name ?? "All Accounts");
+  const baseline = current?.spec ?? { v: 1, filter: { ...EMPTY_FILTER, archived }, sort: DEFAULT_SORT };
+  const edited = !sameSpec({ filter, sort: state.sort }, baseline);
+
+  const update = (next: Partial<{ filter: AccountFilter; sort: AccountSort; layout: ListLayout }>) => {
+    setListState(key, next);
+  };
+  const showView = (view: SavedView | null) => {
+    openView(key, view);
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
 
   const newButton = !archived && (
     <Button asChild size="sm">
@@ -322,14 +261,16 @@ export function AccountsPage({ archived = false }: { archived?: boolean }) {
     </Button>
   );
 
-  return (
-    <>
-      <PageHeader title={title} actions={newButton} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
-        {all.isPending ? null : all.isError || list.isError ? (
-          <EmptyState icon={KeyIcon} title="Couldn't load accounts" description="Lock and unlock the vault, then try again." />
-        ) : total === 0 ? (
-          archived ? (
+  if (all.isPending) return <PageHeader title={title} actions={newButton} />;
+
+  if (all.isError || list.isError || total === 0) {
+    return (
+      <>
+        <PageHeader title={title} actions={newButton} />
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-10">
+          {all.isError || list.isError ? (
+            <EmptyState icon={KeyIcon} title="Couldn't load accounts" description="Lock and unlock the vault, then try again." />
+          ) : archived ? (
             <EmptyState
               icon={ArchiveIcon}
               title="Nothing archived"
@@ -348,108 +289,96 @@ export function AccountsPage({ archived = false }: { archived?: boolean }) {
                 </Link>
               </Button>
             </EmptyState>
-          )
-        ) : (
-          <div className="flex max-w-6xl flex-col gap-4">
-            {vault?.demo && !archived && <DemoNotice />}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative w-full max-w-xs">
-                <MagnifyingGlassIcon
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle-foreground"
-                />
-                <Input
-                  type="search"
-                  aria-label={`Filter ${title.toLowerCase()}`}
-                  placeholder="Filter by name, email, identity or tag"
-                  value={query}
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="h-8 pl-9"
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                  }}
-                />
-              </div>
-              {used.platforms.length > 0 && (
-                <FilterSelect
-                  label="Platform"
-                  value={filter.platformId ?? ""}
-                  options={used.platforms}
-                  onChange={(v) => {
-                    setFilter((f) => ({ ...f, platformId: v || null }));
-                  }}
-                />
-              )}
-              {used.games.length > 0 && (
-                <FilterSelect
-                  label="Game"
-                  value={filter.gameId ?? ""}
-                  options={used.games}
-                  onChange={(v) => {
-                    setFilter((f) => ({ ...f, gameId: v || null }));
-                  }}
-                />
-              )}
-              {used.publishers.length > 0 && (
-                <FilterSelect
-                  label="Publisher"
-                  value={filter.publisher ?? ""}
-                  options={used.publishers}
-                  onChange={(v) => {
-                    setFilter((f) => ({ ...f, publisher: v || null }));
-                  }}
-                />
-              )}
-              <p className="ml-1 text-xs text-subtle-foreground" aria-live="polite">
-                {list.isPending
-                  ? ""
-                  : rows.length === total
-                    ? `${String(total)} ${total === 1 ? "account" : "accounts"}`
-                    : `${String(rows.length)} of ${String(total)}`}
-              </p>
-            </div>
-            {list.isPending ? null : rows.length === 0 ? (
-              <p className="py-8 text-[13px] text-muted-foreground">
-                {query.trim() ? `No accounts match “${query.trim()}”.` : "No accounts match these filters."}
-              </p>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-border bg-card">
-                <table className="w-full border-collapse text-left">
-                  <caption className="sr-only">{title}</caption>
-                  <thead>
-                    <tr className="border-b border-border text-xs text-subtle-foreground">
-                      <th scope="col" className="py-2 pr-4 pl-4 font-medium">
-                        Account
-                      </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Identity
-                      </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Purpose
-                      </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Status
-                      </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
-                        Security
-                      </th>
-                      <th scope="col" className="py-2 pr-3">
-                        <span className="sr-only">Quick copy</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((a) => (
-                      <AccountRow key={a.id} account={a} identityColor={identityColor} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          )}
+        </div>
+      </>
+    );
+  }
+
+  const listProps = { rows, scrollRef, selection, identityColor, label: title };
+  const count =
+    rows.length === total
+      ? `${String(total)} ${total === 1 ? "account" : "accounts"}`
+      : `${String(rows.length)} of ${String(total)}`;
+
+  return (
+    <>
+      <PageHeader title={title} actions={newButton} />
+      <div className="flex max-w-6xl shrink-0 flex-col gap-3 px-6 pt-5 pb-3">
+        {vault?.demo && !archived && <DemoNotice />}
+        <div className="flex flex-wrap items-center gap-2">
+          {!archived && (
+            <ViewMenu
+              views={views}
+              current={current}
+              spec={{ v: 1, filter, sort: state.sort }}
+              edited={edited}
+              onOpen={showView}
+              onSaved={(view) => {
+                setListState(key, { viewId: view.id });
+              }}
+            />
+          )}
+          <SearchBox
+            key={state.revision}
+            label={archived ? "Search archived accounts" : "Search accounts"}
+            initial={state.filter.text ?? ""}
+            onSettle={(text) => {
+              if (text !== (state.filter.text ?? null)) update({ filter: { ...state.filter, text } });
+            }}
+          />
+          <div className="ml-auto flex items-center gap-1.5">
+            <SortMenu
+              sort={state.sort}
+              onChange={(sort) => {
+                update({ sort });
+              }}
+            />
+            <LayoutToggle
+              value={state.layout}
+              onChange={(layout) => {
+                update({ layout });
+              }}
+            />
           </div>
-        )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterChips
+            filter={filter}
+            ctx={ctx}
+            onChange={(f) => {
+              update({ filter: f });
+            }}
+          />
+          <p className="ml-1 text-xs text-subtle-foreground" aria-live="polite">
+            {list.isPending ? "" : count}
+          </p>
+        </div>
       </div>
+
+      <div ref={scrollRef} data-list-scroll className="min-h-0 flex-1 overflow-y-auto px-6 pb-10">
+        <div className="max-w-6xl">
+          {list.isPending ? null : rows.length === 0 ? (
+            <p className="py-8 text-[13px] text-muted-foreground">
+              {filter.text ? `No accounts match “${filter.text}”.` : "No accounts match these filters."}
+            </p>
+          ) : state.layout === "cards" ? (
+            <AccountCards {...listProps} />
+          ) : state.layout === "compact" ? (
+            <AccountCompact {...listProps} />
+          ) : (
+            <AccountTable
+              {...listProps}
+              sort={state.sort}
+              onSort={(sort) => {
+                update({ sort });
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      {selected.length > 0 && <BulkActionBar selected={selected} archived={archived} onClear={selection.clear} />}
     </>
   );
 }

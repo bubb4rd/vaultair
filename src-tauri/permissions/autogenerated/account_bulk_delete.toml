@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-bulk-delete"
+description = "Enables the account_bulk_delete command without any pre-configured scope."
+commands.allow = ["account_bulk_delete"]
+
+[[permission]]
+identifier = "deny-account-bulk-delete"
+description = "Denies the account_bulk_delete command without any pre-configured scope."
+commands.deny = ["account_bulk_delete"]

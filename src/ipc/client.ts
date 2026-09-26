@@ -6,6 +6,14 @@ import {
   commands,
   type AccountDetail,
   type AccountFilter,
+  type AccountSort,
+  type BulkResult,
+  type SavedView,
+  type SavedViewInput,
+  type SearchHit,
+  type SortKey,
+  type StatusFilter,
+  type ViewSpec,
   type GameInput,
   type GameProfileFilter,
   type GameProfileInput,
@@ -72,6 +80,14 @@ import {
 export type {
   AccountDetail,
   AccountFilter,
+  AccountSort,
+  BulkResult,
+  SavedView,
+  SavedViewInput,
+  SearchHit,
+  SortKey,
+  StatusFilter,
+  ViewSpec,
   GameInput,
   GameProfileFilter,
   GameProfileInput,
@@ -283,12 +299,33 @@ export const generator = {
   passphrase: (options: PassphraseOptions): Promise<Generated> => unwrap(() => commands.generatePassphrase(options)),
 };
 
-/** Accounts. Responses carry flags about secrets (`hasPassword`), never the secrets. */
-export const NO_ACCOUNT_FILTER: AccountFilter = { platformId: null, gameId: null, publisher: null };
+/** No filter: every active account. Rust fills in omitted fields the same way. */
+export const EMPTY_FILTER: AccountFilter = {
+  text: null,
+  archived: false,
+  identityIds: [],
+  purposeIds: [],
+  platformIds: [],
+  gameIds: [],
+  publishers: [],
+  statuses: [],
+  tags: [],
+  mfa: null,
+  recoveryCodes: null,
+  favorite: null,
+  notVerifiedInDays: null,
+  updatedInDays: null,
+  usesPrimaryEmail: false,
+  highPriority: false,
+};
 
+export const DEFAULT_SORT: AccountSort = { key: "title", descending: false };
+
+/** Accounts. Responses carry flags about secrets (`hasPassword`), never the secrets. */
 export const accounts = {
-  list: (archived: boolean, filter: AccountFilter = NO_ACCOUNT_FILTER): Promise<AccountSummary[]> =>
-    data(() => commands.accountList(archived, filter)),
+  /** Filters (the versioned filter language) are validated and run in Rust. */
+  list: (filter: AccountFilter = EMPTY_FILTER, sort: AccountSort = DEFAULT_SORT): Promise<AccountSummary[]> =>
+    data(() => commands.accountList(filter, sort)),
   get: (id: string): Promise<AccountDetail> => data(() => commands.accountGet(id)),
   create: (input: AccountInput): Promise<AccountDetail> => data(() => commands.accountCreate(input)),
   update: (id: string, input: AccountInput): Promise<AccountDetail> => data(() => commands.accountUpdate(id, input)),
@@ -306,6 +343,30 @@ export const accounts = {
   urlTarget: (id: string, which: AccountUrl): Promise<UrlTarget> => data(() => commands.accountUrlTarget(id, which)),
   /** Rust reads the stored URL itself; nothing here can choose what opens. */
   openUrl: (id: string, which: AccountUrl): Promise<null> => data(() => commands.accountOpenUrl(id, which)),
+  /** All or nothing: an id that no longer exists fails the whole action. */
+  bulkTag: (ids: string[], add: string[], remove: string[]): Promise<BulkResult> =>
+    data(() => commands.accountBulkTag(ids, add, remove)),
+  bulkArchive: (ids: string[], archived: boolean): Promise<BulkResult> =>
+    data(() => commands.accountBulkArchive(ids, archived)),
+  /** `confirm` is what the user typed; Rust checks it against `bulkDeletePhrase`. */
+  bulkDelete: (ids: string[], confirm: string): Promise<BulkResult> =>
+    data(() => commands.accountBulkDelete(ids, confirm)),
+};
+
+/** What the user types to delete `n` accounts at once. Must match Rust's `bulk_delete_phrase`. */
+export function bulkDeletePhrase(n: number): string {
+  return n === 1 ? "DELETE 1 ACCOUNT" : `DELETE ${String(n)} ACCOUNTS`;
+}
+
+/** Global search over the (secret-free) index, and saved list views. */
+export const search = {
+  query: (query: string, limit = 20): Promise<SearchHit[]> => data(() => commands.search(query, limit)),
+  rebuildIndex: (): Promise<number> => data(() => commands.searchRebuildIndex()),
+  views: (): Promise<SavedView[]> => data(() => commands.savedViewList()),
+  createView: (input: SavedViewInput): Promise<SavedView> => data(() => commands.savedViewCreate(input)),
+  updateView: (id: string, input: SavedViewInput): Promise<SavedView> =>
+    data(() => commands.savedViewUpdate(id, input)),
+  deleteView: (id: string): Promise<null> => data(() => commands.savedViewDelete(id)),
 };
 
 /** Identities, and the accounts assigned to them. */

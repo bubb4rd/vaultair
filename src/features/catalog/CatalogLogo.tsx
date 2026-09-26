@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { emailProvider, logoColor, logoFor, monogram } from "./logos";
 
 const SIZES = {
+  xs: { box: "size-6 rounded", glyph: "size-[18px]", text: "text-[9px]" },
   sm: { box: "size-8 rounded-md", glyph: "size-6", text: "text-[11px]" },
   lg: { box: "size-11 rounded-lg", glyph: "size-9", text: "text-sm" },
 } as const;

@@ -18,14 +18,16 @@ use crate::crypto::password::strength;
 use crate::db::repo::account::{self as repo, AccountFields, CustomFieldRow};
 use crate::db::repo::{catalog, contact, identity, new_id, open_text, purpose, seal, tag};
 use crate::domain::account::{
-    AccountDetail, AccountFilter, AccountInput, AccountStatus, AccountSummary, AccountUrl,
-    CustomFieldInput, CustomFieldType, PurposeView, SecretRef, SecretUpdate, UrlTarget,
+    AccountDetail, AccountInput, AccountStatus, AccountSummary, AccountUrl, CustomFieldInput,
+    CustomFieldType, PurposeView, SecretRef, SecretUpdate, UrlTarget,
 };
 use crate::domain::identity::{ContactKind, ContactRole};
 use crate::domain::notes_hints;
+use crate::domain::search::BulkResult;
 use crate::domain::validation::{
     self as v, MAX_NOTES_CHARS, MAX_SECRET_CHARS, MAX_SHORT_CHARS, MAX_TITLE_CHARS,
 };
+use crate::search::{AccountFilter, AccountSort};
 use crate::service::mfa;
 use crate::vault::OpenVault;
 use crate::AppError;
@@ -54,13 +56,21 @@ pub fn tags(vault: &OpenVault) -> Result<Vec<String>, AppError> {
     Ok(tag::list(vault.conn())?)
 }
 
-/// Active accounts, or archived ones, matching `filter`.
+/// Accounts matching `filter` (active ones, or archived ones if it says
+/// so), in `sort` order.
 pub fn list(
     vault: &OpenVault,
-    archived: bool,
-    filter: &AccountFilter,
+    clock: &dyn Clock,
+    filter: AccountFilter,
+    sort: AccountSort,
 ) -> Result<Vec<AccountSummary>, AppError> {
-    Ok(repo::summaries(vault.conn(), archived, filter)?)
+    let filter = filter.validated()?;
+    Ok(repo::summaries(
+        vault.conn(),
+        &filter,
+        sort,
+        clock.now_utc(),
+    )?)
 }
 
 pub fn get(vault: &OpenVault, id: &str) -> Result<AccountDetail, AppError> {
@@ -579,6 +589,118 @@ pub fn url_target(vault: &OpenVault, id: &str, which: AccountUrl) -> Result<UrlT
         host,
         from_catalog,
     })
+}
+
+// ---- Bulk actions ------------------------------------------------------------
+
+/// Accounts one bulk action can touch.
+pub const MAX_BULK: usize = 10_000;
+
+/// What the user types to delete `n` accounts at once. The UI shows it, and
+/// the backend checks it, so a stray call can't delete anything.
+pub fn bulk_delete_phrase(n: usize) -> String {
+    if n == 1 {
+        "DELETE 1 ACCOUNT".to_owned()
+    } else {
+        format!("DELETE {n} ACCOUNTS")
+    }
+}
+
+/// De-duplicated ids that all exist. All or nothing: one missing id fails
+/// the whole action, so the result never depends on a stale selection.
+fn bulk_ids(conn: &Connection, ids: &[String]) -> Result<Vec<String>, AppError> {
+    let mut unique: Vec<String> = Vec::with_capacity(ids.len());
+    for id in ids {
+        if !unique.contains(id) {
+            unique.push(id.clone());
+        }
+    }
+    if unique.is_empty() || unique.len() > MAX_BULK {
+        return Err(AppError::InvalidInput { field: "ids" });
+    }
+    if repo::existing(conn, &unique)?.len() != unique.len() {
+        return Err(AppError::NotFound);
+    }
+    Ok(unique)
+}
+
+fn bulk_result(n: usize) -> BulkResult {
+    BulkResult {
+        changed: u32::try_from(n).unwrap_or(u32::MAX),
+    }
+}
+
+/// Adds `add` and removes `remove` (by name, case-insensitively) on every
+/// account in `ids`, in one transaction. An account may not end up with
+/// more than the usual tag limit.
+pub fn bulk_tag(
+    vault: &mut OpenVault,
+    clock: &dyn Clock,
+    ids: &[String],
+    add: &[String],
+    remove: &[String],
+) -> Result<BulkResult, AppError> {
+    let add = v::tags(add)?;
+    let remove = v::tags(remove)?;
+    if add.is_empty() && remove.is_empty() {
+        return Err(AppError::InvalidInput { field: "tags" });
+    }
+    let now = clock.now_rfc3339();
+    let tx = vault.conn_mut().transaction()?;
+    let ids = bulk_ids(&tx, ids)?;
+    for id in &ids {
+        tag::remove_from_account(&tx, id, &remove)?;
+        tag::add_to_account(&tx, id, &add)?;
+        if tag::for_account(&tx, id)?.len() > v::MAX_TAGS {
+            return Err(AppError::InvalidInput { field: "tags" });
+        }
+        repo::touch(&tx, id, &now)?;
+        repo::reindex(&tx, id)?;
+    }
+    tag::prune_unused(&tx)?;
+    tx.commit()?;
+    tracing::info!(accounts = ids.len(), "accounts tagged in bulk");
+    Ok(bulk_result(ids.len()))
+}
+
+pub fn bulk_set_archived(
+    vault: &mut OpenVault,
+    clock: &dyn Clock,
+    ids: &[String],
+    archived: bool,
+) -> Result<BulkResult, AppError> {
+    let now = clock.now_rfc3339();
+    let archived_at = archived.then_some(now.as_str());
+    let tx = vault.conn_mut().transaction()?;
+    let ids = bulk_ids(&tx, ids)?;
+    for id in &ids {
+        repo::set_archived(&tx, id, archived_at, &now)?;
+    }
+    tx.commit()?;
+    tracing::info!(accounts = ids.len(), archived, "accounts archived in bulk");
+    Ok(bulk_result(ids.len()))
+}
+
+/// Permanently deletes every account in `ids`. `confirm` must be
+/// `bulk_delete_phrase` for exactly that many accounts.
+pub fn bulk_delete(
+    vault: &mut OpenVault,
+    ids: &[String],
+    confirm: &str,
+) -> Result<BulkResult, AppError> {
+    let tx = vault.conn_mut().transaction()?;
+    let ids = bulk_ids(&tx, ids)?;
+    if confirm.trim() != bulk_delete_phrase(ids.len()) {
+        return Err(AppError::InvalidInput { field: "confirm" });
+    }
+    for id in &ids {
+        repo::delete(&tx, id)?;
+    }
+    tag::prune_unused(&tx)?;
+    contact::prune_unused(&tx)?;
+    tx.commit()?;
+    tracing::info!(accounts = ids.len(), "accounts deleted in bulk");
+    Ok(bulk_result(ids.len()))
 }
 
 // ---- Secret reads ------------------------------------------------------------

@@ -80,6 +80,15 @@
     "allow-game-profile-list",
     "allow-game-profile-create",
     "allow-game-profile-update",
-    "allow-game-profile-delete"
+    "allow-game-profile-delete",
+    "allow-account-bulk-tag",
+    "allow-account-bulk-archive",
+    "allow-account-bulk-delete",
+    "allow-search",
+    "allow-search-rebuild-index",
+    "allow-saved-view-list",
+    "allow-saved-view-create",
+    "allow-saved-view-update",
+    "allow-saved-view-delete"
   ]
 }

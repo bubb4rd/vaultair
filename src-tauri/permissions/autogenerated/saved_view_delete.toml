@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-saved-view-delete"
+description = "Enables the saved_view_delete command without any pre-configured scope."
+commands.allow = ["saved_view_delete"]
+
+[[permission]]
+identifier = "deny-saved-view-delete"
+description = "Denies the saved_view_delete command without any pre-configured scope."
+commands.deny = ["saved_view_delete"]

@@ -73,8 +73,11 @@ export const commands = {
 	clipboardCancelClear: () => __TAURI_INVOKE<boolean>("clipboard_cancel_clear"),
 	/**  Clears our value from the clipboard now. Returns whether it cleared. */
 	clipboardClearNow: () => typedError<boolean, IpcError_Serialize>(__TAURI_INVOKE("clipboard_clear_now")),
-	/**  Active accounts, or archived ones (`archived: true`), matching `filter`, by title. */
-	accountList: (archived: boolean, filter: AccountFilter) => typedError<AccountSummary[], IpcError_Serialize>(__TAURI_INVOKE("account_list", { archived, filter })),
+	/**
+	 *  Accounts matching `filter` (active ones, or archived ones if it says
+	 *  so), in `sort` order. An invalid filter is `invalid_input` on `filter`.
+	 */
+	accountList: (filter: AccountFilter, sort: AccountSort) => typedError<AccountSummary[], IpcError_Serialize>(__TAURI_INVOKE("account_list", { filter, sort })),
 	accountGet: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_get", { id })),
 	accountCreate: (input: AccountInput) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_create", { input })),
 	/**  Saves the whole form. Secret fields say `unchanged`, `set` or `clear`. */
@@ -104,6 +107,18 @@ export const commands = {
 	 *  can't pass one in. Nothing is filled in or logged in automatically.
 	 */
 	accountOpenUrl: (id: string, which: AccountUrl) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("account_open_url", { id, which })),
+	/**
+	 *  Adds and removes tags on many accounts at once. All or nothing: one
+	 *  unknown id is `not_found` and changes nothing.
+	 */
+	accountBulkTag: (ids: string[], add: string[], remove: string[]) => typedError<BulkResult, IpcError_Serialize>(__TAURI_INVOKE("account_bulk_tag", { ids, add, remove })),
+	/**  Archives (`archived: true`) or restores many accounts at once. */
+	accountBulkArchive: (ids: string[], archived: boolean) => typedError<BulkResult, IpcError_Serialize>(__TAURI_INVOKE("account_bulk_archive", { ids, archived })),
+	/**
+	 *  Permanently deletes many accounts. `confirm` must be "DELETE <n>
+	 *  ACCOUNTS" for exactly that many, as typed by the user.
+	 */
+	accountBulkDelete: (ids: string[], confirm: string) => typedError<BulkResult, IpcError_Serialize>(__TAURI_INVOKE("account_bulk_delete", { ids, confirm })),
 	/**  Purposes the account form offers. */
 	purposeList: () => typedError<PurposeView[], IpcError_Serialize>(__TAURI_INVOKE("purpose_list")),
 	/**  Every tag in the vault, for suggestions. */
@@ -170,6 +185,22 @@ export const commands = {
 	gameProfileCreate: (accountId: string, input: GameProfileInput) => typedError<GameProfileView, IpcError_Serialize>(__TAURI_INVOKE("game_profile_create", { accountId, input })),
 	gameProfileUpdate: (id: string, input: GameProfileInput) => typedError<GameProfileView, IpcError_Serialize>(__TAURI_INVOKE("game_profile_update", { id, input })),
 	gameProfileDelete: (id: string) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("game_profile_delete", { id })),
+	/**
+	 *  Accounts, identities and game profiles matching `query`, best first
+	 *  (archived ones last). At most `limit`, capped at 50.
+	 */
+	search: (query: string, limit: number) => typedError<SearchHit[], IpcError_Serialize>(__TAURI_INVOKE("search", { query, limit })),
+	/**
+	 *  Rewrites the search index from the tables, for when the integrity check
+	 *  reports it out of step. Returns the number of rows written.
+	 */
+	searchRebuildIndex: () => typedError<number, IpcError_Serialize>(__TAURI_INVOKE("search_rebuild_index")),
+	/**  Built-in views first, then the user's, by name. */
+	savedViewList: () => typedError<SavedView[], IpcError_Serialize>(__TAURI_INVOKE("saved_view_list")),
+	savedViewCreate: (input: SavedViewInput) => typedError<SavedView, IpcError_Serialize>(__TAURI_INVOKE("saved_view_create", { input })),
+	/**  Renames a user view or replaces its filter. Built-ins can't change. */
+	savedViewUpdate: (id: string, input: SavedViewInput) => typedError<SavedView, IpcError_Serialize>(__TAURI_INVOKE("saved_view_update", { id, input })),
+	savedViewDelete: (id: string) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("saved_view_delete", { id })),
 };
 
 /** Events */
@@ -235,13 +266,45 @@ export type AccountDetail = {
 };
 
 /**
- *  Narrows the account list. Every set field must match; `publisher`
- *  compares case-insensitively.
+ *  Narrows the account list. Every set field must match (AND); several
+ *  values in one list field match any of them (OR). `text` searches the
+ *  index: every word must appear in the account, or in one of its game
+ *  profiles.
  */
 export type AccountFilter = {
-	platformId: string | null,
-	gameId: string | null,
-	publisher: string | null,
+	text?: string | null,
+	/**  Archived accounts instead of active ones. */
+	archived?: boolean,
+	identityIds?: string[],
+	purposeIds?: string[],
+	platformIds?: string[],
+	/**  Also matches accounts with a game profile for the game. */
+	gameIds?: string[],
+	/**  Compared case-insensitively. */
+	publishers?: string[],
+	statuses?: StatusFilter[],
+	/**  Accounts with any of these tags, compared case-insensitively. */
+	tags?: string[],
+	/**  At least one enabled MFA method (true) or none (false). */
+	mfa?: boolean | null,
+	/**
+	 *  true: unused backup codes left. false: MFA is on but no backup codes
+	 *  are left (the "missing recovery codes" health rule).
+	 */
+	recoveryCodes?: boolean | null,
+	favorite?: boolean | null,
+	/**  Never marked verified, or not in this many days. */
+	notVerifiedInDays?: number | null,
+	/**  Edited in the last this many days. */
+	updatedInDays?: number | null,
+	/**  The login email is some identity's primary email. */
+	usesPrimaryEmail?: boolean,
+	/**
+	 *  Favorites, and accounts with the Main or Recovery purpose (ADR-0004
+	 *  decision 19). Accounts with high-severity health issues join them
+	 *  once health checks exist (Phase 12).
+	 */
+	highPriority?: boolean,
 };
 
 /**  Everything the account form edits. Sent whole on create and update. */
@@ -276,6 +339,11 @@ export type AccountInput = {
 	sensitiveNotes?: SecretUpdate,
 	tags?: string[],
 	customFields?: CustomFieldInput[],
+};
+
+export type AccountSort = {
+	key: SortKey,
+	descending: boolean,
 };
 
 /**
@@ -346,6 +414,12 @@ export type BackupCodeSlot = {
 };
 
 export type BuildProfile = "debug" | "release";
+
+/**  What a bulk action did. */
+export type BulkResult = {
+	/**  Accounts the action applied to. */
+	changed: number,
+};
 
 /**
  *  A pending clipboard clear finished (timer, "Clear now", or lock). The UI
@@ -610,7 +684,13 @@ export type IdentitySummary = {
 };
 
 export type IntegrityReport = {
+	/**  Every page's HMAC and the SQLite structure check out. */
 	ok: boolean,
+	/**
+	 *  The search index has exactly one row per account, identity and game
+	 *  profile. If not, `search_rebuild_index` repairs it; nothing is lost.
+	 */
+	searchIndexOk: boolean,
 };
 
 /**
@@ -844,6 +924,32 @@ export type RevealedSecret = {
 };
 
 /**
+ *  A saved view: a named filter and sort for the account list. Built-ins
+ *  (seeded by migration V7) can't be edited or deleted.
+ */
+export type SavedView = {
+	id: string,
+	name: string,
+	/**  A short icon name the UI maps to a glyph ("crown", "clock"...). */
+	icon: string | null,
+	spec: ViewSpec,
+	isBuiltin: boolean,
+};
+
+export type SavedViewInput = {
+	name: string,
+	spec: ViewSpec,
+};
+
+/**
+ *  One result in the Ctrl+K palette. Carries what the row shows, never a
+ *  secret.
+ */
+export type SearchHit = { kind: "account"; account: AccountSummary } | { kind: "identity"; id: string; name: string; color: IdentityColor | null; primaryEmail: string | null; archived: boolean } | 
+/**  A game profile; opening it opens the account it's on. */
+{ kind: "gameProfile"; id: string; gamertag: string | null; gameName: string; gameIcon: string | null; account: AccountSummary };
+
+/**
  *  Addresses one stored secret for `secret_reveal` and `clipboard_copy_secret`.
  *  The UI names the cell; Rust decrypts it. `id` is the owning row's id.
  */
@@ -891,6 +997,19 @@ export type SharedEmail = {
 	/**  This identity's accounts using it, by title. */
 	accounts: OverviewAccount[],
 };
+
+/**
+ *  Columns the list sorts by. `Activity` is the last activity (see
+ *  `AccountSummary::last_activity_at`).
+ */
+export type SortKey = "title" | "identity" | "purpose" | "status" | "updated" | "activity" | "created";
+
+/**
+ *  The status an account shows: the one the user set, except that an active
+ *  account with no recent activity shows as Stale, then Dormant. Archived
+ *  accounts keep the status they had.
+ */
+export type StatusFilter = "active" | "stale" | "dormant" | "locked" | "suspended" | "retired" | "unknown";
 
 /**
  *  Live feedback for the "create master password" form. Computed in Rust so
@@ -942,6 +1061,13 @@ export type VaultInfo = {
 export type VaultLocked = null;
 
 export type VaultStatus = { state: "locked" } | { state: "unlocked"; vault: VaultInfo };
+
+/**  What a saved view stores: a versioned filter and sort. */
+export type ViewSpec = {
+	v: number,
+	filter: AccountFilter,
+	sort?: AccountSort,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
