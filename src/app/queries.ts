@@ -1,4 +1,4 @@
-import { QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   accounts,
   catalog,
@@ -6,12 +6,15 @@ import {
   dashboard,
   gameProfiles,
   identities,
-  NO_ACCOUNT_FILTER,
+  EMPTY_FILTER,
+  DEFAULT_SORT,
   recentVaults,
+  search,
   session,
   vault,
   type AccountDetail,
   type AccountFilter,
+  type AccountSort,
   type GameProfileFilter,
   type IdentityDetail,
   type VaultInfo,
@@ -25,8 +28,8 @@ export const queryKeys = {
   vaultStatus: ["vault", "status"] as const,
   recentVaults: ["recentVaults"] as const,
   accounts: ["accounts"] as const,
-  accountList: (archived: boolean, filter: AccountFilter = NO_ACCOUNT_FILTER) =>
-    ["accounts", "list", archived ? "archived" : "active", filter] as const,
+  accountList: (filter: AccountFilter, sort: AccountSort = DEFAULT_SORT) =>
+    ["accounts", "list", filter, sort] as const,
   account: (id: string) => ["accounts", "detail", id] as const,
   sessionConfig: ["session", "config"] as const,
   purposes: ["purposes"] as const,
@@ -44,6 +47,7 @@ export const queryKeys = {
   games: ["catalog", "games"] as const,
   gameProfiles: ["gameProfiles"] as const,
   gameProfileList: (filter: GameProfileFilter) => ["gameProfiles", filter] as const,
+  savedViews: ["savedViews"] as const,
 };
 
 /**
@@ -78,9 +82,26 @@ export function useSessionConfig() {
   return useQuery({ queryKey: queryKeys.sessionConfig, queryFn: session.config });
 }
 
-/** Active accounts, or archived ones, optionally narrowed by platform, game or publisher. */
-export function useAccounts(archived = false, filter: AccountFilter = NO_ACCOUNT_FILTER) {
-  return useQuery({ queryKey: queryKeys.accountList(archived, filter), queryFn: () => accounts.list(archived, filter) });
+/** Every active account, or every archived one, by title. */
+export function useAccounts(archived = false) {
+  return useAccountList(archived ? { ...EMPTY_FILTER, archived } : EMPTY_FILTER);
+}
+
+/**
+ * Accounts matching a filter (run in Rust), in `sort` order. While a new
+ * filter loads, the previous rows stay on screen instead of blinking out.
+ */
+export function useAccountList(filter: AccountFilter, sort: AccountSort = DEFAULT_SORT) {
+  return useQuery({
+    queryKey: queryKeys.accountList(filter, sort),
+    queryFn: () => accounts.list(filter, sort),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Built-in saved views first, then the user's. */
+export function useSavedViews() {
+  return useQuery({ queryKey: queryKeys.savedViews, queryFn: search.views });
 }
 
 export function useAccount(id: string, enabled = true) {

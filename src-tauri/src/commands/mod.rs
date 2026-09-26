@@ -7,6 +7,7 @@ pub mod identity;
 pub mod mfa;
 pub mod password;
 pub mod recent;
+pub mod search;
 pub mod secret;
 pub mod session;
 pub mod vault;

@@ -6,23 +6,29 @@
 use tauri::State;
 use vaultair_core::clock::SystemClock;
 use vaultair_core::domain::account::{
-    AccountDetail, AccountFilter, AccountInput, AccountSummary, AccountUrl, PurposeView, UrlTarget,
+    AccountDetail, AccountInput, AccountSummary, AccountUrl, PurposeView, UrlTarget,
 };
+use vaultair_core::domain::search::BulkResult;
+use vaultair_core::search::{AccountFilter, AccountSort};
 use vaultair_core::service::accounts;
 use vaultair_core::AppError;
 
 use super::with_vault;
 use crate::state::{AppState, IpcResult};
 
-/// Active accounts, or archived ones (`archived: true`), matching `filter`, by title.
+/// Accounts matching `filter` (active ones, or archived ones if it says
+/// so), in `sort` order. An invalid filter is `invalid_input` on `filter`.
 #[tauri::command]
 #[specta::specta]
 pub async fn account_list(
     state: State<'_, AppState>,
-    archived: bool,
     filter: AccountFilter,
+    sort: AccountSort,
 ) -> IpcResult<Vec<AccountSummary>> {
-    with_vault(&state, move |v| accounts::list(v, archived, &filter)).await
+    with_vault(&state, move |v| {
+        accounts::list(v, &SystemClock, filter, sort)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -175,6 +181,48 @@ fn open_url(url: &str) -> Result<(), AppError> {
 #[cfg(not(windows))]
 fn open_url(_url: &str) -> Result<(), AppError> {
     Err(AppError::Internal { context: "browser" })
+}
+
+/// Adds and removes tags on many accounts at once. All or nothing: one
+/// unknown id is `not_found` and changes nothing.
+#[tauri::command]
+#[specta::specta]
+pub async fn account_bulk_tag(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    add: Vec<String>,
+    remove: Vec<String>,
+) -> IpcResult<BulkResult> {
+    with_vault(&state, move |v| {
+        accounts::bulk_tag(v, &SystemClock, &ids, &add, &remove)
+    })
+    .await
+}
+
+/// Archives (`archived: true`) or restores many accounts at once.
+#[tauri::command]
+#[specta::specta]
+pub async fn account_bulk_archive(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    archived: bool,
+) -> IpcResult<BulkResult> {
+    with_vault(&state, move |v| {
+        accounts::bulk_set_archived(v, &SystemClock, &ids, archived)
+    })
+    .await
+}
+
+/// Permanently deletes many accounts. `confirm` must be "DELETE <n>
+/// ACCOUNTS" for exactly that many, as typed by the user.
+#[tauri::command]
+#[specta::specta]
+pub async fn account_bulk_delete(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    confirm: String,
+) -> IpcResult<BulkResult> {
+    with_vault(&state, move |v| accounts::bulk_delete(v, &ids, &confirm)).await
 }
 
 /// Purposes the account form offers.

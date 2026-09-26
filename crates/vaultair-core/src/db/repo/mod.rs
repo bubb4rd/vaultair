@@ -12,6 +12,7 @@ pub mod game_profile;
 pub mod identity;
 pub mod mfa;
 pub mod purpose;
+pub mod saved_view;
 pub mod tag;
 
 use zeroize::Zeroizing;

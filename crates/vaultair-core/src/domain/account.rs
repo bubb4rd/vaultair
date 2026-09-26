@@ -223,17 +223,6 @@ impl SecretRef {
     }
 }
 
-/// Narrows the account list. Every set field must match; `publisher`
-/// compares case-insensitively.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[serde(rename_all = "camelCase")]
-pub struct AccountFilter {
-    pub platform_id: Option<String>,
-    pub game_id: Option<String>,
-    pub publisher: Option<String>,
-}
-
 /// Which stored URL "Open in browser" uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]

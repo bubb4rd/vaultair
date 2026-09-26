@@ -96,3 +96,34 @@ pub fn prune_unused(conn: &Connection) -> rusqlite::Result<()> {
     )?;
     Ok(())
 }
+
+/// Adds tags to an account, keeping the ones it has (bulk tagging).
+pub fn add_to_account(
+    conn: &Connection,
+    account_id: &str,
+    names: &[String],
+) -> rusqlite::Result<()> {
+    for name in names {
+        conn.execute(
+            "INSERT OR IGNORE INTO account_tag (account_id, tag_id) VALUES (?1, ?2)",
+            params![account_id, tag_id(conn, name)?],
+        )?;
+    }
+    Ok(())
+}
+
+/// Removes tags from an account by name, case-insensitively (bulk tagging).
+pub fn remove_from_account(
+    conn: &Connection,
+    account_id: &str,
+    names: &[String],
+) -> rusqlite::Result<()> {
+    for name in names {
+        conn.execute(
+            "DELETE FROM account_tag WHERE account_id = ?1
+               AND tag_id IN (SELECT id FROM tag WHERE name = ?2)",
+            params![account_id, name],
+        )?;
+    }
+    Ok(())
+}

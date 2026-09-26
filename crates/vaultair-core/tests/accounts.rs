@@ -30,6 +30,13 @@ const USER: &str = "CANARYUSER";
 /// RFC 6238's SHA-1 test key ("12345678901234567890") in base32.
 const TOTP_KEY: &str = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 
+fn archived_filter() -> vaultair_core::search::AccountFilter {
+    vaultair_core::search::AccountFilter {
+        archived: true,
+        ..Default::default()
+    }
+}
+
 fn new_vault(parent: &Path, clock: &dyn Clock) -> OpenVault {
     create_vault(
         &CreateOptions {
@@ -290,9 +297,11 @@ fn required_fields_and_urls_are_validated() {
         Some("customFields")
     );
     // Nothing half-made was left behind by any rejection.
-    assert!(accounts::list(&v, false, &Default::default())
-        .unwrap()
-        .is_empty());
+    assert!(
+        accounts::list(&v, &SystemClock, Default::default(), Default::default())
+            .unwrap()
+            .is_empty()
+    );
 
     // An id from another account can't be smuggled into a custom field list.
     let a = accounts::create(
@@ -344,16 +353,20 @@ fn archive_favorite_verify_and_open_url() {
 
     let archived = accounts::set_archived(&mut v, &clock, &a.id, true).unwrap();
     assert!(archived.archived_at.is_some());
-    assert!(accounts::list(&v, false, &Default::default())
-        .unwrap()
-        .is_empty());
+    assert!(
+        accounts::list(&v, &SystemClock, Default::default(), Default::default())
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(
-        accounts::list(&v, true, &Default::default()).unwrap().len(),
+        accounts::list(&v, &SystemClock, archived_filter(), Default::default())
+            .unwrap()
+            .len(),
         1
     );
     accounts::set_archived(&mut v, &clock, &a.id, false).unwrap();
     assert_eq!(
-        accounts::list(&v, false, &Default::default())
+        accounts::list(&v, &SystemClock, Default::default(), Default::default())
             .unwrap()
             .len(),
         1
@@ -361,7 +374,8 @@ fn archive_favorite_verify_and_open_url() {
 
     let starred = accounts::set_favorite(&mut v, &clock, &a.id, true).unwrap();
     assert!(starred.favorite);
-    let summary = &accounts::list(&v, false, &Default::default()).unwrap()[0];
+    let summary =
+        &accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0];
     assert!(summary.favorite && summary.favorited_at.is_some());
     assert!(
         !accounts::set_favorite(&mut v, &clock, &a.id, false)
@@ -440,16 +454,18 @@ fn delete_needs_the_title_and_cascades() {
         Some("confirmTitle")
     );
     assert_eq!(
-        accounts::list(&v, false, &Default::default())
+        accounts::list(&v, &SystemClock, Default::default(), Default::default())
             .unwrap()
             .len(),
         1
     );
 
     accounts::delete(&mut v, &a.id, " Delete me ").unwrap();
-    assert!(accounts::list(&v, false, &Default::default())
-        .unwrap()
-        .is_empty());
+    assert!(
+        accounts::list(&v, &SystemClock, Default::default(), Default::default())
+            .unwrap()
+            .is_empty()
+    );
     for sql in [
         "SELECT count(*) FROM account_custom_field WHERE account_id = ?1",
         "SELECT count(*) FROM account_tag WHERE account_id = ?1",
@@ -598,7 +614,8 @@ fn mfa_totp_backup_codes_and_recovery() {
     let m = &d.mfa[0];
     assert!(m.has_totp && m.has_recovery_instructions);
     assert_eq!((m.totp_digits, m.totp_period), (Some(6), Some(30)));
-    let summary = &accounts::list(&v, false, &Default::default()).unwrap()[0];
+    let summary =
+        &accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0];
     assert!(summary.mfa_enabled);
 
     // The ManualClock starts at the Unix epoch; advance to an RFC 6238 time.
@@ -623,7 +640,8 @@ fn mfa_totp_backup_codes_and_recovery() {
     assert_eq!(d.mfa[0].backup_codes_remaining, 2);
     assert!(d.mfa[0].backup_codes[1].used);
     assert_eq!(
-        accounts::list(&v, false, &Default::default()).unwrap()[0].backup_codes_remaining,
+        accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0]
+            .backup_codes_remaining,
         2
     );
     let second = accounts::reveal(
@@ -657,7 +675,10 @@ fn mfa_totp_backup_codes_and_recovery() {
     )
     .unwrap();
     assert!(d.mfa[0].has_totp, "unchanged keeps the key");
-    assert!(!accounts::list(&v, false, &Default::default()).unwrap()[0].mfa_enabled);
+    assert!(
+        !accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0]
+            .mfa_enabled
+    );
 
     let cleared = mfa::set_backup_codes(&mut v, &clock, &m.id, None).unwrap();
     assert!(cleared.mfa[0].backup_codes.is_empty());
@@ -789,8 +810,12 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
             serde_json::to_string(&dup),
             serde_json::to_string(&archived),
             serde_json::to_string(&accounts::get(&v, &a.id).unwrap()),
-            serde_json::to_string(&accounts::list(&v, false, &Default::default()).unwrap()),
-            serde_json::to_string(&accounts::list(&v, true, &Default::default()).unwrap()),
+            serde_json::to_string(
+                &accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap(),
+            ),
+            serde_json::to_string(
+                &accounts::list(&v, &SystemClock, archived_filter(), Default::default()).unwrap(),
+            ),
             serde_json::to_string(&accounts::tags(&v).unwrap()),
             serde_json::to_string(&accounts::purposes(&v).unwrap()),
             serde_json::to_string(&accounts::url_target(&v, &a.id, AccountUrl::Website).unwrap()),
@@ -879,8 +904,8 @@ fn demo_seed_is_browsable_and_uses_example_domains() {
     let mut v = new_vault(tmp.path(), &clock);
     vaultair_core::demo::seed(&mut v, &clock).unwrap();
 
-    let active = accounts::list(&v, false, &Default::default()).unwrap();
-    let archived = accounts::list(&v, true, &Default::default()).unwrap();
+    let active = accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap();
+    let archived = accounts::list(&v, &SystemClock, archived_filter(), Default::default()).unwrap();
     assert_eq!(active.len(), 9);
     assert_eq!(archived.len(), 1);
     assert!(active.iter().all(|a| a.has_password));
@@ -978,6 +1003,7 @@ fn last_activity_follows_edits_verification_and_password_use() {
     assert!(used.last_activity_at > verified.last_activity_at);
     assert_eq!(Some(&used.last_activity_at), used.last_used_at.as_ref());
     assert_eq!(used.updated_at, a.updated_at, "using it isn't an edit");
-    let summary = &accounts::list(&v, false, &Default::default()).unwrap()[0];
+    let summary =
+        &accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0];
     assert_eq!(summary.last_activity_at, used.last_activity_at);
 }

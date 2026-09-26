@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-bulk-tag"
+description = "Enables the account_bulk_tag command without any pre-configured scope."
+commands.allow = ["account_bulk_tag"]
+
+[[permission]]
+identifier = "deny-account-bulk-tag"
+description = "Denies the account_bulk_tag command without any pre-configured scope."
+commands.deny = ["account_bulk_tag"]

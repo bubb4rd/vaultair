@@ -8,11 +8,12 @@ use secrecy::SecretString;
 use vaultair_core::clock::{Clock, SystemClock};
 use vaultair_core::crypto::kdf::KdfParams;
 use vaultair_core::domain::account::{
-    AccountFilter, AccountInput, AccountStatus, AccountType, AccountUrl, SecretUpdate,
+    AccountInput, AccountStatus, AccountType, AccountUrl, SecretUpdate,
 };
 use vaultair_core::domain::catalog::{
     GameInput, GameProfileFilter, GameProfileInput, PlatformInput, PlatformKind,
 };
+use vaultair_core::search::AccountFilter;
 use vaultair_core::service::{accounts, catalog};
 use vaultair_core::vault::{create_vault, CreateOptions, OpenVault};
 use vaultair_core::AppError;
@@ -83,7 +84,7 @@ fn field_of<T>(r: Result<T, AppError>) -> Option<&'static str> {
 }
 
 fn titles(v: &OpenVault, filter: &AccountFilter) -> Vec<String> {
-    accounts::list(v, false, filter)
+    accounts::list(v, &SystemClock, filter.clone(), Default::default())
         .unwrap()
         .into_iter()
         .map(|a| a.title)
@@ -129,7 +130,13 @@ fn accounts_carry_their_platform_and_game_and_reject_unknown_ids() {
     .unwrap();
     assert_eq!(created.platform_name.as_deref(), Some("Riot Games"));
     assert_eq!(created.game_icon.as_deref(), Some("valorant"));
-    let summary = &accounts::list(&v, false, &AccountFilter::default()).unwrap()[0];
+    let summary = &accounts::list(
+        &v,
+        &SystemClock,
+        AccountFilter::default(),
+        Default::default(),
+    )
+    .unwrap()[0];
     assert_eq!(summary.platform_icon.as_deref(), Some("riotgames"));
     assert_eq!(summary.game_name.as_deref(), Some("Valorant"));
     assert_eq!(
@@ -169,24 +176,24 @@ fn the_account_list_filters_by_platform_game_and_publisher() {
     catalog::create_profile(&mut v, c, &steam.id, &profile(VALORANT)).unwrap();
 
     let by_platform = AccountFilter {
-        platform_id: Some(STEAM.into()),
+        platform_ids: vec![STEAM.into()],
         ..Default::default()
     };
     assert_eq!(titles(&v, &by_platform), ["Steam main"]);
     let by_game = AccountFilter {
-        game_id: Some(VALORANT.into()),
+        game_ids: vec![VALORANT.into()],
         ..Default::default()
     };
     assert_eq!(titles(&v, &by_game), ["Riot main", "Steam main"]);
     let by_publisher = AccountFilter {
-        publisher: Some(" example PUBLISHER ".into()),
+        publishers: vec![" example PUBLISHER ".into()],
         ..Default::default()
     };
     assert_eq!(titles(&v, &by_publisher), ["Publisher account"]);
     let both = AccountFilter {
-        platform_id: Some(RIOT.into()),
-        game_id: Some(LOL.into()),
-        publisher: None,
+        platform_ids: vec![RIOT.into()],
+        game_ids: vec![LOL.into()],
+        ..Default::default()
     };
     assert!(titles(&v, &both).is_empty());
 }

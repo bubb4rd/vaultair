@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountDetail, AccountSummary, PurposeView } from "@/ipc/client";
+import { DEFAULT_SORT, EMPTY_FILTER, type AccountDetail, type AccountFilter, type AccountSummary, type PurposeView } from "@/ipc/client";
 import { PAGE_PATHS } from "@/app/nav";
 import { reloadWebview } from "@/lib/webview";
 import { axeViolations } from "@/test/axe";
@@ -111,10 +111,24 @@ const DETAIL: AccountDetail = {
   ],
 };
 
+/** Stands in for Rust's filtering: the archived side and the text search. */
+function listFilter(list: AccountSummary[]) {
+  return (a: Record<string, unknown>) => {
+    const f = a.filter as AccountFilter;
+    if (f.archived) return list.filter((x) => x.archivedAt !== null);
+    const text = f.text?.toLowerCase();
+    return list.filter(
+      (x) =>
+        x.archivedAt === null &&
+        (!text || [x.title, x.username, x.email, ...x.tags].some((v) => v?.toLowerCase().includes(text))),
+    );
+  };
+}
+
 function withAccounts(extra: RenderOptions["handlers"] = {}, list: AccountSummary[] = [summary()]): RenderOptions {
   return {
     handlers: {
-      account_list: (a) => (a.archived ? [] : list),
+      account_list: listFilter(list),
       account_get: () => DETAIL,
       purpose_list: () => PURPOSES,
       tag_list: () => ["pc", "ranked"],
@@ -124,9 +138,9 @@ function withAccounts(extra: RenderOptions["handlers"] = {}, list: AccountSummar
 }
 
 describe("account list", () => {
-  it("lists accounts and filters them by any visible field", async () => {
+  it("lists accounts and searches them in Rust", async () => {
     const user = userEvent.setup();
-    await renderApp(
+    const { calls } = await renderApp(
       "/accounts",
       withAccounts({}, [
         summary(),
@@ -138,10 +152,16 @@ describe("account list", () => {
     expect(within(table).getByText("Weak password")).toBeInTheDocument();
     expect(within(table).getByText("No MFA")).toBeInTheDocument();
 
-    await user.type(screen.getByRole("searchbox", { name: "Filter all accounts" }), "ranked");
+    await user.type(screen.getByRole("searchbox", { name: "Search accounts" }), "ranked");
+    await waitFor(() => {
+      expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    });
     expect(within(table).getAllByRole("row")).toHaveLength(2);
     expect(within(table).getByRole("link", { name: "Arena alt" })).toBeInTheDocument();
-    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+    expect(calls).toContainEqual({
+      cmd: "account_list",
+      args: { filter: { ...EMPTY_FILTER, text: "ranked" }, sort: DEFAULT_SORT },
+    });
   });
 
   it("shows how to add the first account when the vault is empty", async () => {
@@ -155,7 +175,7 @@ describe("account list", () => {
     expect(await screen.findByRole("heading", { name: "Nothing archived" })).toBeInTheDocument();
     expect(calls).toContainEqual({
       cmd: "account_list",
-      args: { archived: true, filter: { platformId: null, gameId: null, publisher: null } },
+      args: { filter: { ...EMPTY_FILTER, archived: true }, sort: DEFAULT_SORT },
     });
   });
 

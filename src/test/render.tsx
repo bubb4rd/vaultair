@@ -4,6 +4,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { App } from "@/app/App";
 import { createQueryClient } from "@/app/queries";
 import { createAppRouter } from "@/app/router";
+import { resetListState } from "@/features/accounts/listState";
 import type { RecentVault, SessionConfig, VaultInfo } from "@/ipc/client";
 
 export const TEST_VAULT: VaultInfo = {
@@ -46,6 +47,8 @@ export interface RenderOptions {
 /** Renders the whole app at `path` with Tauri IPC and events mocked. */
 export async function renderApp(path = "/", { unlocked = true, recents = [], handlers = {} }: RenderOptions = {}) {
   const calls: { cmd: string; args: Record<string, unknown> }[] = [];
+  // The account lists remember their filters for the session; each test starts a new one.
+  resetListState();
   mockWindows("main");
   mockIPC(
     (cmd, args) => {
@@ -68,6 +71,9 @@ export async function renderApp(path = "/", { unlocked = true, recents = [], han
           return { clearAfterSecs: DEFAULT_SESSION_CONFIG.clipboardClearSecs };
         case "plugin:window|is_maximized":
           return false;
+        case "saved_view_list":
+        case "search":
+          return [];
         default:
           return null;
       }

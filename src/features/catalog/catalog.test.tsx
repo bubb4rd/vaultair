@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountDetail, AccountSummary, GameProfileView, GameView, PlatformView, PurposeView } from "@/ipc/client";
+import {
+  DEFAULT_SORT,
+  EMPTY_FILTER,
+  type AccountDetail,
+  type AccountFilter,
+  type AccountSummary,
+  type GameProfileView,
+  type GameView,
+  type PlatformView,
+  type PurposeView,
+} from "@/ipc/client";
 import { axeViolations } from "@/test/axe";
 import { renderApp, type RenderOptions } from "@/test/render";
 import { accountMark } from "./CatalogLogo";
@@ -179,10 +189,11 @@ function handlers(extra: RenderOptions["handlers"] = {}): RenderOptions {
   return {
     handlers: {
       account_list: (a) => {
-        if (a.archived) return [];
-        const f = a.filter as { platformId: string | null } | undefined;
+        const f = a.filter as AccountFilter;
+        if (f.archived) return [];
         const all = [STEAM_ACCOUNT, XBOX_ACCOUNT, PLAIN_ACCOUNT];
-        return f?.platformId ? all.filter((x) => x.platformId === f.platformId) : all;
+        const platforms = f.platformIds ?? [];
+        return platforms.length ? all.filter((x) => x.platformId && platforms.includes(x.platformId)) : all;
       },
       account_get: () => DETAIL,
       platform_list: () => PLATFORMS,
@@ -312,20 +323,18 @@ describe("account list logos and filters", () => {
     const user = userEvent.setup();
     const { calls } = await renderApp("/accounts", handlers());
     await screen.findByRole("table", { name: "All Accounts" });
-    await user.selectOptions(await screen.findByRole("combobox", { name: "Filter by platform" }), "Steam");
+    // By keyboard: Add filter, Platform, then tick Steam.
+    await user.click(screen.getByRole("button", { name: "Add filter" }));
+    (await screen.findByRole("menuitem", { name: "Platform" })).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(await screen.findByRole("menuitemcheckbox", { name: "Steam" })).toHaveFocus();
+    await user.keyboard("{Enter}");
     await waitFor(() => {
       expect(screen.getByText("1 of 3")).toBeInTheDocument();
     });
     expect(calls).toContainEqual({
       cmd: "account_list",
-      args: {
-        archived: false,
-        filter: {
-          platformId: "builtin-pl-steam",
-          gameId: null,
-          publisher: null,
-        },
-      },
+      args: { filter: { ...EMPTY_FILTER, platformIds: ["builtin-pl-steam"] }, sort: DEFAULT_SORT },
     });
   });
 });
