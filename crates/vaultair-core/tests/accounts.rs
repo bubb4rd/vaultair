@@ -19,7 +19,7 @@ use vaultair_core::domain::account::{
     SecretRef, SecretUpdate,
 };
 use vaultair_core::domain::mfa::{MfaInput, MfaMethod, TotpAlgorithm};
-use vaultair_core::service::{accounts, mfa};
+use vaultair_core::service::{accounts, dashboard, health, mfa};
 use vaultair_core::vault::layout::DB_FILE;
 use vaultair_core::vault::{create_vault, CreateOptions, OpenVault};
 use vaultair_core::AppError;
@@ -819,6 +819,9 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
             serde_json::to_string(&accounts::tags(&v).unwrap()),
             serde_json::to_string(&accounts::purposes(&v).unwrap()),
             serde_json::to_string(&accounts::url_target(&v, &a.id, AccountUrl::Website).unwrap()),
+            serde_json::to_string(&health::summary(&v, None, clock.now_utc()).unwrap()),
+            serde_json::to_string(&health::issues(&v, None, None, clock.now_utc()).unwrap()),
+            serde_json::to_string(&dashboard::summary(&v, None, clock.now_utc()).unwrap()),
         ] {
             dtos.push(json.unwrap());
         }

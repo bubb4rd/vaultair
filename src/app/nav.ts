@@ -108,11 +108,7 @@ export const NAV_GROUPS: NavGroup[] = [
         path: "/health",
         label: "Security Health",
         icon: PulseIcon,
-        empty: {
-          title: "No checks to run yet",
-          description:
-            "Vaultair checks for weak and reused passwords, missing MFA and missing recovery codes. Results appear here with these labels.",
-        },
+        keywords: ["weak password", "reused", "mfa", "recovery codes", "dormant"],
       },
     ],
   },
@@ -146,10 +142,11 @@ export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), 
  * plain strings because these routes are built from `NAV_GROUPS` at runtime,
  * so the router can't list them in its typed path union.
  */
-export const PAGE_PATHS: Record<"accounts" | "archived" | "identities" | "games" | "platforms", string> = {
+export const PAGE_PATHS: Record<"accounts" | "archived" | "identities" | "games" | "platforms" | "health", string> = {
   accounts: "/accounts",
   archived: "/archived",
   identities: "/identities",
   games: "/games",
   platforms: "/platforms",
+  health: "/health",
 };

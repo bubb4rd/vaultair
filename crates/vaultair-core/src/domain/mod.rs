@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod catalog;
+pub mod health;
 pub mod identity;
 pub mod mfa;
 pub mod notes_hints;

@@ -5,6 +5,7 @@ import {
   contactPoints,
   dashboard,
   gameProfiles,
+  health,
   identities,
   EMPTY_FILTER,
   DEFAULT_SORT,
@@ -16,6 +17,7 @@ import {
   type AccountFilter,
   type AccountSort,
   type GameProfileFilter,
+  type HealthRule,
   type IdentityDetail,
   type VaultInfo,
 } from "@/ipc/client";
@@ -42,6 +44,10 @@ export const queryKeys = {
   contactPoints: ["contactPoints"] as const,
   dashboard: ["dashboard"] as const,
   dashboardSummary: (identityId: string | null) => ["dashboard", "summary", identityId ?? "all"] as const,
+  health: ["health"] as const,
+  healthSummary: (identityId: string | null) => ["health", "summary", identityId ?? "all"] as const,
+  healthIssues: (identityId: string | null, rule: HealthRule | null) =>
+    ["health", "issues", identityId ?? "all", rule ?? "all"] as const,
   catalog: ["catalog"] as const,
   platforms: ["catalog", "platforms"] as const,
   games: ["catalog", "games"] as const,
@@ -159,6 +165,22 @@ export function useDashboardSummary(identityId: string | null) {
   });
 }
 
+export function useHealthSummary(identityId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.healthSummary(identityId),
+    queryFn: () => health.summary(identityId),
+  });
+}
+
+/** `rule` null is every check. Archived accounts are never included. */
+export function useHealthIssues(identityId: string | null, rule: HealthRule | null, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.healthIssues(identityId, rule),
+    queryFn: () => health.issues(identityId, rule),
+    enabled,
+  });
+}
+
 /**
  * Everything derived from accounts and identities together: account and
  * identity lists, identity overviews (counts, shared emails), contact points
@@ -170,6 +192,7 @@ function invalidateDerived(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.identities });
   void queryClient.invalidateQueries({ queryKey: queryKeys.contactPoints });
   void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.health });
   void queryClient.invalidateQueries({ queryKey: queryKeys.tags });
   void queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
   void queryClient.invalidateQueries({ queryKey: queryKeys.gameProfiles });

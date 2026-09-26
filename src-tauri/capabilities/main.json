@@ -71,6 +71,8 @@
     "allow-identity-assign-accounts",
     "allow-contact-point-list",
     "allow-dashboard-summary",
+    "allow-health-summary",
+    "allow-health-issues",
     "allow-platform-list",
     "allow-platform-create",
     "allow-platform-update",

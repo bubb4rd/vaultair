@@ -14,7 +14,7 @@ import {
   StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useAccount, useAccountRemoved, useAccountUpdated } from "@/app/queries";
+import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountLogo } from "@/features/catalog/CatalogLogo";
+import { FixLink } from "@/features/health/FixLink";
+import { ruleLabel, severityStatus } from "@/features/health/labels";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
 import { accounts, toIpcError, type AccountDetail, type AccountUrl } from "@/ipc/client";
@@ -211,6 +213,8 @@ function Security({ account }: { account: AccountDetail }) {
   const strength = account.passwordStrength === null ? null : passwordStrength(account.passwordStrength);
   const enabled = account.mfa.filter((m) => m.enabled);
   const codes = enabled.reduce((n, m) => n + m.backupCodesRemaining, 0);
+  const issues = useHealthIssues(null, null, account.archivedAt === null);
+  const mine = account.archivedAt ? [] : (issues.data ?? []).filter((issue) => issue.accountId === account.id);
   return (
     <Panel id="security-heading" title="Security">
       <FieldRow label="Password">
@@ -239,6 +243,18 @@ function Security({ account }: { account: AccountDetail }) {
           <StatusBadge status="attention" label="None saved" />
         )}
       </FieldRow>
+      {mine.map((issue) => (
+        <FieldRow
+          key={issue.rule}
+          label={ruleLabel(issue.rule)}
+          actions={issue.fix === "account" ? undefined : <FixLink issue={issue} />}
+        >
+          <span className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={severityStatus(issue.severity)} />
+            <span>{issue.reason}</span>
+          </span>
+        </FieldRow>
+      ))}
     </Panel>
   );
 }

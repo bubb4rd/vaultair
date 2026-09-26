@@ -66,6 +66,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::identity::identity_assign_accounts,
             commands::identity::contact_point_list,
             commands::identity::dashboard_summary,
+            commands::health::health_summary,
+            commands::health::health_issues,
             commands::catalog::platform_list,
             commands::catalog::platform_create,
             commands::catalog::platform_update,

@@ -12,6 +12,7 @@ pub mod demo;
 pub mod domain;
 pub mod error;
 pub mod generator;
+pub mod health;
 pub mod redact;
 pub mod search;
 pub mod service;

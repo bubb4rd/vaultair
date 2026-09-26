@@ -34,6 +34,11 @@ import {
   type ContactRole,
   type DashboardSummary,
   type Dependent,
+  type HealthFix,
+  type HealthIssue,
+  type HealthRule,
+  type HealthSeverity,
+  type HealthSummary,
   type IdentityColor,
   type IdentityDeletePlan,
   type IdentityDetail,
@@ -108,6 +113,11 @@ export type {
   ContactRole,
   DashboardSummary,
   Dependent,
+  HealthFix,
+  HealthIssue,
+  HealthRule,
+  HealthSeverity,
+  HealthSummary,
   IdentityColor,
   IdentityDeletePlan,
   IdentityDetail,
@@ -397,6 +407,14 @@ export const contactPoints = {
 export const dashboard = {
   /** `identityId` null means the whole vault. */
   summary: (identityId: string | null): Promise<DashboardSummary> => data(() => commands.dashboardSummary(identityId)),
+};
+
+export const health = {
+  /** `identityId` null means the whole vault. */
+  summary: (identityId: string | null): Promise<HealthSummary> => data(() => commands.healthSummary(identityId)),
+  /** `rule` null is every check. */
+  issues: (identityId: string | null, rule: HealthRule | null): Promise<HealthIssue[]> =>
+    data(() => commands.healthIssues(identityId, rule)),
 };
 
 export const catalog = {

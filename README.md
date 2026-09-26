@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 11 (global search and list views). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 12, health checks. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 12 (health checks). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 13, the relationship map. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -132,6 +132,19 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - **Every command must be allowed.** A new command needs its name in `src-tauri/build.rs` and `allow-<name>` in `capabilities/main.json`, or Tauri rejects it at runtime. `ipc.rs`'s `every_command_is_allowed` test now checks both against the bindings (the live run below caught this; the mocked frontend tests couldn't).
 - Driven end to end in the real webview (2026-09-26, demo vault): Ctrl+K found `NightOwl#2231` from `owl#2` and opened its account; text search, an MFA chip (by mouse), the High-priority view, cards and compact layouts, shift-range selection, bulk tag then finding by the new tag, bulk archive, and bulk delete (disabled for a wrong count or lowercase phrase; Rust rejects a wrong phrase on its own). Afterwards `searchIndexOk` was true and "password" and "answer" found nothing.
 - **The list** renders only the rows on screen (`@tanstack/react-virtual`), in table, card or compact layout. The view, filters, sort and layout are remembered in memory per list for the session (`listState.ts`), never on disk. Ctrl+K searches the vault, opens saved views, and jumps to pages.
+
+## Phase 12 notes
+
+- **Five checks**, all local, over active accounts only. Archived accounts are left out of every count and list.
+  - **Weak** (high): password strength 0 or 1. No saved password is not weak. Score 2 is not weak.
+  - **Reused** (high): the password fingerprint matches another active account. The group is counted across the whole vault; an identity filter only chooses which accounts are listed. A match that exists only on an archived account does not count. The screen says how many other accounts share it. The fingerprint never leaves Rust, and it is never selected into a result.
+  - **Missing MFA** (medium): no MFA method is turned on.
+  - **Missing recovery codes** (low): MFA is on and no backup codes are left.
+  - **Dormant** (info): saved status dormant, or active with no activity for 90 days. Activity is the same latest-of edit, "Mark verified", and password use as the account list (`DORMANT_AFTER_DAYS` in `health/thresholds.rs` and `labels.ts`). Mark verified clears an activity-based dormant issue. A status the user set to dormant stays until they change it.
+- **High-priority** saved view is favorites, the Main and Recovery purposes, and accounts with a weak or reused password.
+- **Fix** opens the account form for a weak or reused password, the account's MFA section for missing MFA or missing codes, and the account page for a dormant account.
+- The dashboard's health counts and "Needs attention" list (five issues, highest severity first) come from the same rules as Security Health. Both pages share the session identity filter.
+
 
 ## Phase 17: Passkeys and login credentials (scoped)
 

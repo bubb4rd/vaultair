@@ -3,7 +3,7 @@
 //! vault. Nothing here carries a secret.
 
 use tauri::State;
-use vaultair_core::clock::SystemClock;
+use vaultair_core::clock::{Clock, SystemClock};
 use vaultair_core::domain::identity::{
     ContactPointView, DashboardSummary, IdentityDeletePlan, IdentityDetail, IdentityInput,
     IdentityOverview, IdentityRef, IdentitySummary,
@@ -137,7 +137,7 @@ pub async fn dashboard_summary(
     identity_id: Option<String>,
 ) -> IpcResult<DashboardSummary> {
     with_vault(&state, move |v| {
-        dashboard::summary(v, identity_id.as_deref())
+        dashboard::summary(v, identity_id.as_deref(), SystemClock.now_utc())
     })
     .await
 }

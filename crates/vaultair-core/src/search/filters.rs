@@ -1,7 +1,8 @@
 //! The account filter language: what the filter chips, saved views and the
 //! list's text box send, validated here and compiled to SQL predicates.
 //!
-//! SQL text only ever comes from the constants in this file. Every value
+//! SQL text only ever comes from the constants in this file and the health
+//! rule predicates in `health::rules` (weak, reused, dormant). Every value
 //! the user chose is bound as a parameter; lists are bound as one JSON array
 //! and read back with `json_each`, so no SQL is built from UI strings.
 
@@ -9,6 +10,7 @@ use rusqlite::types::Value;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::account::AccountStatus;
+use crate::health::rules::{dormant_predicate, high_severity_predicate, LAST_ACTIVITY};
 use crate::AppError;
 
 /// The version saved views store their filter under. Bump it (and migrate
@@ -23,11 +25,11 @@ const MAX_VALUE_CHARS: usize = 200;
 const MAX_DAYS: u32 = 3650;
 
 /// Days without activity (an edit, "Mark verified", or using the password
-/// from Vaultair) before an active account counts as Stale, then Dormant.
-/// Must match `STALE_AFTER_DAYS` and `DORMANT_AFTER_DAYS` in the UI's
-/// `labels.ts`, which shows the same status.
+/// from Vaultair) before an active account counts as Stale. Dormant is
+/// [`DORMANT_AFTER_DAYS`] in the health rules, so the list and the health
+/// check share one cutoff. Both must match `labels.ts`.
 pub const STALE_AFTER_DAYS: u32 = 30;
-pub const DORMANT_AFTER_DAYS: u32 = 90;
+pub use crate::health::thresholds::DORMANT_AFTER_DAYS;
 
 /// The status an account shows: the one the user set, except that an active
 /// account with no recent activity shows as Stale, then Dormant. Archived
@@ -93,9 +95,8 @@ pub struct AccountFilter {
     /// The login email is some identity's primary email.
     #[serde(default)]
     pub uses_primary_email: bool,
-    /// Favorites, and accounts with the Main or Recovery purpose (ADR-0004
-    /// decision 19). Accounts with high-severity health issues join them
-    /// once health checks exist (Phase 12).
+    /// Favorites, accounts with the Main or Recovery purpose, and accounts
+    /// with a high-severity health issue (a weak or reused password).
     #[serde(default)]
     pub high_priority: bool,
 }
@@ -263,10 +264,6 @@ fn cutoff(now: time::OffsetDateTime, days: u32) -> Value {
     )
 }
 
-/// The latest of the last edit, "Mark verified" and last use.
-const LAST_ACTIVITY: &str =
-    "max(a.updated_at, COALESCE(a.last_verified_at, ''), COALESCE(a.last_used_at, ''))";
-
 const HAS_MFA: &str =
     "EXISTS(SELECT 1 FROM mfa_method m WHERE m.account_id = a.id AND m.enabled = 1)";
 const BACKUP_CODES: &str = "(SELECT COALESCE(SUM(m.backup_codes_remaining), 0) FROM mfa_method m
@@ -369,8 +366,12 @@ pub fn compile(filter: &AccountFilter, now: time::OffsetDateTime) -> Compiled {
     }
     if filter.high_priority {
         c.push(
-            "(a.favorite = 1 OR a.purpose_id IN
-                (SELECT id FROM purpose_label WHERE slug IN ('main', 'recovery')))",
+            &format!(
+                "(a.favorite = 1 OR a.purpose_id IN
+                    (SELECT id FROM purpose_label WHERE slug IN ('main', 'recovery'))
+                 OR {})",
+                high_severity_predicate()
+            ),
             [],
         );
     }
@@ -399,9 +400,7 @@ fn push_statuses(c: &mut Compiled, statuses: &[StatusFilter], now: time::OffsetD
                 values.push(cutoff(now, DORMANT_AFTER_DAYS));
             }
             StatusFilter::Dormant => {
-                parts.push(format!(
-                    "(a.status = 'dormant' OR ({derived} AND {LAST_ACTIVITY} < ?#))"
-                ));
+                parts.push(dormant_predicate());
                 values.push(cutoff(now, DORMANT_AFTER_DAYS));
             }
             StatusFilter::Locked => parts.push(set_status(AccountStatus::Locked)),

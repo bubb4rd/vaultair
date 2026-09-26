@@ -567,7 +567,7 @@ fn each_filter_alone_and_together() {
             "Main riot",
             "Old dormant"
         ],
-        "favorites, and the Main and Recovery purposes"
+        "favorites and the Main and Recovery purposes"
     );
 
     // Statuses as the list shows them: 100 days idle is Dormant, 50 is Stale.
@@ -1141,4 +1141,65 @@ fn search_is_fast_at_five_thousand_accounts() {
     let p95 = times[times.len() * 95 / 100];
     eprintln!("p95 = {p95:?} over {} queries", times.len());
     assert!(p95 < Duration::from_millis(50), "p95 {p95:?}");
+}
+
+/// A casual account is high-priority when its password is weak or reused,
+/// and not when the password is merely fair and unique.
+#[test]
+fn high_priority_includes_weak_and_reused_passwords() {
+    let dir = tempfile::tempdir().unwrap();
+    let clock = ManualClock::default();
+    let c = &clock;
+    let mut v = new_vault(dir.path(), c);
+
+    let casual = |v: &mut OpenVault, title: &str, password: Option<&str>| {
+        let mut form = input(title);
+        form.purpose_id = "builtin-casual".into();
+        if let Some(password) = password {
+            form.password = set(password);
+        }
+        accounts::create(v, c, &form).unwrap()
+    };
+
+    let weak = casual(&mut v, "Weak casual", Some("unique-weak-password"));
+    v.conn()
+        .execute(
+            "UPDATE account SET password_strength = 1 WHERE id = ?1",
+            [&weak.id],
+        )
+        .unwrap();
+    let fair = casual(&mut v, "Fair casual", Some("unique-fair-password"));
+    v.conn()
+        .execute(
+            "UPDATE account SET password_strength = 2 WHERE id = ?1",
+            [&fair.id],
+        )
+        .unwrap();
+    let one = casual(&mut v, "Reused one", Some("same-password-for-both"));
+    let two = casual(&mut v, "Reused two", Some("same-password-for-both"));
+    v.conn()
+        .execute(
+            "UPDATE account SET password_strength = 4 WHERE id = ?1 OR id = ?2",
+            [&one.id, &two.id],
+        )
+        .unwrap();
+    let fav = casual(&mut v, "Just favorite", None);
+    accounts::set_favorite(&mut v, c, &fav.id, true).unwrap();
+
+    let found = titles(
+        &v,
+        c,
+        AccountFilter {
+            high_priority: true,
+            ..Default::default()
+        },
+    );
+    assert!(found.contains(&"Weak casual".to_owned()));
+    assert!(found.contains(&"Reused one".to_owned()));
+    assert!(found.contains(&"Reused two".to_owned()));
+    assert!(found.contains(&"Just favorite".to_owned()));
+    assert!(
+        !found.contains(&"Fair casual".to_owned()),
+        "strength 2 is not a high-severity issue: {found:?}"
+    );
 }

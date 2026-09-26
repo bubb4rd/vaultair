@@ -62,6 +62,8 @@ fn main() {
             "identity_assign_accounts",
             "contact_point_list",
             "dashboard_summary",
+            "health_summary",
+            "health_issues",
             "platform_list",
             "platform_create",
             "platform_update",

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-health-summary"
+description = "Enables the health_summary command without any pre-configured scope."
+commands.allow = ["health_summary"]
+
+[[permission]]
+identifier = "deny-health-summary"
+description = "Denies the health_summary command without any pre-configured scope."
+commands.deny = ["health_summary"]
