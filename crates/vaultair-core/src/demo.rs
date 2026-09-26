@@ -1,17 +1,20 @@
 //! Sample data for demo vaults, so the app can be explored without real
 //! accounts. Every domain is reserved for examples (RFC 2606: `example.com`,
 //! `.invalid`), and every password, TOTP key and backup code is generated
-//! at seeding time from OS randomness, never hardcoded.
+//! at seeding time from OS randomness, never hardcoded. Accounts link to
+//! built-in catalog platforms and games (so their logos show), but every
+//! address and URL stays an example one.
 
 use crate::clock::Clock;
 use crate::crypto::{rng, totp};
 use crate::domain::account::{
     AccountInput, AccountStatus, AccountType, CustomFieldInput, CustomFieldType, SecretUpdate,
 };
+use crate::domain::catalog::GameProfileInput;
 use crate::domain::identity::{IdentityColor, IdentityInput};
 use crate::domain::mfa::{MfaInput, MfaMethod};
 use crate::generator::{generate_password, PasswordOptions};
-use crate::service::{accounts, identities, mfa};
+use crate::service::{accounts, catalog, identities, mfa};
 use crate::vault::OpenVault;
 use crate::AppError;
 
@@ -111,6 +114,12 @@ struct Sample {
     recovery_email: Option<&'static str>,
     recovery_phone: Option<&'static str>,
     website: Option<&'static str>,
+    /// A built-in catalog platform id.
+    platform: Option<&'static str>,
+    /// A built-in catalog game id.
+    game: Option<&'static str>,
+    /// A game profile on the account.
+    profile: Option<SampleProfile>,
     publisher: Option<&'static str>,
     region: Option<&'static str>,
     player_id: Option<&'static str>,
@@ -121,6 +130,14 @@ struct Sample {
     backup_codes: usize,
     favorite: bool,
     archived: bool,
+}
+
+struct SampleProfile {
+    game: &'static str,
+    gamertag: &'static str,
+    rank: &'static str,
+    season: Option<&'static str>,
+    region: Option<&'static str>,
 }
 
 const fn sample(title: &'static str, account_type: AccountType, purpose: &'static str) -> Sample {
@@ -135,6 +152,9 @@ const fn sample(title: &'static str, account_type: AccountType, purpose: &'stati
         recovery_email: None,
         recovery_phone: None,
         website: None,
+        platform: None,
+        game: None,
+        profile: None,
         publisher: None,
         region: None,
         player_id: None,
@@ -161,13 +181,28 @@ fn samples() -> Vec<Sample> {
             notes: Some("Main game library. Family sharing is on for the second PC."),
             identity: Some("Main"),
             recovery_phone: Some("Pixel, ends 42"),
+            platform: Some("builtin-pl-steam"),
+            profile: Some(SampleProfile {
+                game: "builtin-game-cs2",
+                gamertag: "nightowl",
+                rank: "Premier 14,200",
+                season: None,
+                region: Some("Europe"),
+            }),
             ..sample("Game store (main)", AccountType::Launcher, "main")
         },
         Sample {
             username: Some("NightOwl#2231"),
             email: Some("nightowl@example.com"),
             website: Some("https://launcher.example.com"),
-            publisher: Some("Example Publisher"),
+            platform: Some("builtin-pl-battlenet"),
+            profile: Some(SampleProfile {
+                game: "builtin-game-overwatch2",
+                gamertag: "NightOwl#2231",
+                rank: "Platinum 3",
+                season: Some("Season 14"),
+                region: Some("Europe"),
+            }),
             region: Some("Europe"),
             tags: &["pc", "competitive"],
             mfa: Some(MfaMethod::AuthenticatorApp),
@@ -180,7 +215,15 @@ fn samples() -> Vec<Sample> {
             username: Some("n1ghtowl"),
             email: Some("nightowl.ranked@example.com"),
             website: Some("https://arena.example.com"),
-            publisher: Some("Example Publisher"),
+            platform: Some("builtin-pl-riot"),
+            game: Some("builtin-game-valorant"),
+            profile: Some(SampleProfile {
+                game: "builtin-game-valorant",
+                gamertag: "NightOwl#EUW",
+                rank: "Diamond 2",
+                season: Some("Episode 9, Act 2"),
+                region: Some("EU"),
+            }),
             region: Some("EUW"),
             player_id: Some("NightOwl#EUW"),
             tags: &["ranked"],
@@ -193,7 +236,8 @@ fn samples() -> Vec<Sample> {
             username: Some("owl_alt_02"),
             email: Some("owl.alt@example.com"),
             website: Some("https://arena.example.com"),
-            publisher: Some("Example Publisher"),
+            platform: Some("builtin-pl-riot"),
+            game: Some("builtin-game-valorant"),
             region: Some("EUW"),
             tags: &["ranked"],
             strong_password: false,
@@ -206,6 +250,7 @@ fn samples() -> Vec<Sample> {
             username: Some("nightowl.tv"),
             email: Some("creator@example.com"),
             website: Some("https://chat.example.com"),
+            platform: Some("builtin-pl-discord"),
             tags: &["creator"],
             mfa: Some(MfaMethod::Totp),
             backup_codes: 6,
@@ -217,6 +262,7 @@ fn samples() -> Vec<Sample> {
             username: Some("nightowl_live"),
             email: Some("creator@example.com"),
             website: Some("https://stream.example.com"),
+            platform: Some("builtin-pl-twitch"),
             tags: &["creator"],
             identity: Some("Creator"),
             ..sample("Streaming channel", AccountType::Streaming, "creator")
@@ -244,6 +290,7 @@ fn samples() -> Vec<Sample> {
         Sample {
             username: Some("owl2014"),
             email: Some("old.owl@example.invalid"),
+            platform: Some("builtin-pl-epic"),
             status: AccountStatus::Dormant,
             strong_password: false,
             notes: Some("Not used since 2019. Consider closing it."),
@@ -337,6 +384,8 @@ pub fn seed(vault: &mut OpenVault, clock: &dyn Clock) -> Result<(), AppError> {
             },
             website_url: s.website.map(Into::into),
             login_url: None,
+            platform_id: s.platform.map(Into::into),
+            game_id: s.game.map(Into::into),
             publisher: s.publisher.map(Into::into),
             region: s.region.map(Into::into),
             player_id: s.player_id.map(Into::into),
@@ -347,6 +396,26 @@ pub fn seed(vault: &mut OpenVault, clock: &dyn Clock) -> Result<(), AppError> {
             custom_fields,
         };
         let account = accounts::create(vault, clock, &input)?;
+
+        if let Some(p) = &s.profile {
+            catalog::create_profile(
+                vault,
+                clock,
+                &account.id,
+                &GameProfileInput {
+                    game_id: p.game.into(),
+                    platform_id: s.platform.map(Into::into),
+                    gamertag: Some(p.gamertag.into()),
+                    player_id: None,
+                    region: p.region.map(Into::into),
+                    rank_tier: Some(p.rank.into()),
+                    current_season: p.season.map(Into::into),
+                    notes: None,
+                    linked_launcher_account_id: None,
+                    linked_console_account_id: None,
+                },
+            )?;
+        }
 
         if let Some(method) = s.mfa {
             let with_totp = matches!(method, MfaMethod::AuthenticatorApp | MfaMethod::Totp);

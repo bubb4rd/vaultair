@@ -6,6 +6,7 @@ import { PAGE_PATHS } from "@/app/nav";
 import { reloadWebview } from "@/lib/webview";
 import { axeViolations } from "@/test/axe";
 import { DEFAULT_SESSION_CONFIG, TEST_VAULT, renderApp, type RenderOptions } from "@/test/render";
+import { DORMANT_AFTER_DAYS, STALE_AFTER_DAYS, displayStatus } from "./labels";
 
 vi.mock("@/lib/webview", () => ({ reloadWebview: vi.fn() }));
 
@@ -25,6 +26,12 @@ const summary = (over: Partial<AccountSummary> = {}): AccountSummary => ({
   identityName: null,
   username: "nightowl",
   email: "nightowl@example.com",
+  platformId: null,
+  platformName: null,
+  platformIcon: null,
+  gameId: null,
+  gameName: null,
+  gameIcon: null,
   publisher: null,
   hasPassword: true,
   passwordStrength: 4,
@@ -35,6 +42,8 @@ const summary = (over: Partial<AccountSummary> = {}): AccountSummary => ({
   archivedAt: null,
   tags: ["pc"],
   updatedAt: "2026-09-20T10:00:00Z",
+  // Relative to now, so the account reads as Active whenever the tests run.
+  lastActivityAt: new Date().toISOString(),
   ...over,
 });
 
@@ -56,17 +65,28 @@ const DETAIL: AccountDetail = {
   passwordChangedAt: "2026-09-01T10:00:00Z",
   websiteUrl: null,
   loginUrl: "https://store.example.com/login",
+  catalogLoginUrl: null,
+  platformId: null,
+  platformName: null,
+  platformIcon: null,
+  gameId: null,
+  gameName: null,
+  gameIcon: null,
   publisher: null,
   region: null,
   playerId: null,
   displayName: null,
   notes: "Main library",
   hasSensitiveNotes: false,
+  notesSuggestions: { identifiers: false, credentials: false, backupCodes: false, securityAnswers: false },
   favorite: false,
   archivedAt: null,
   lastVerifiedAt: null,
+  lastUsedAt: null,
   createdAt: "2026-09-01T10:00:00Z",
   updatedAt: "2026-09-20T10:00:00Z",
+  // Relative to now, so the account reads as Active whenever the tests run.
+  lastActivityAt: new Date().toISOString(),
   tags: ["pc"],
   customFields: [],
   mfa: [
@@ -133,7 +153,10 @@ describe("account list", () => {
   it("the Archived page lists archived accounts only", async () => {
     const { calls } = await renderApp("/archived", withAccounts());
     expect(await screen.findByRole("heading", { name: "Nothing archived" })).toBeInTheDocument();
-    expect(calls).toContainEqual({ cmd: "account_list", args: { archived: true } });
+    expect(calls).toContainEqual({
+      cmd: "account_list",
+      args: { archived: true, filter: { platformId: null, gameId: null, publisher: null } },
+    });
   });
 
   it("a demo vault says so above its sample accounts", async () => {
@@ -398,5 +421,67 @@ describe("accessibility", () => {
     if (ready === "table") await screen.findByRole("table");
     else await screen.findByText(ready);
     expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe("status from activity", () => {
+  const now = new Date("2026-09-25T12:00:00Z");
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
+  const at = (days: number, over: Partial<AccountSummary> = {}) =>
+    displayStatus({ status: "active", archivedAt: null, lastActivityAt: daysAgo(days), ...over }, now);
+
+  it("turns an active account Stale, then Dormant, with no activity", () => {
+    expect(at(0)).toEqual({ label: "Active", badge: "secure", activity: "Active today" });
+    expect(at(3)).toMatchObject({ label: "Active", activity: "Last activity 3 days ago" });
+    expect(at(STALE_AFTER_DAYS - 1).label).toBe("Active");
+    expect(at(STALE_AFTER_DAYS)).toEqual({
+      label: "Stale",
+      badge: "attention",
+      activity: `No activity for ${String(STALE_AFTER_DAYS)} days`,
+    });
+    expect(at(DORMANT_AFTER_DAYS - 1).label).toBe("Stale");
+    expect(at(DORMANT_AFTER_DAYS)).toMatchObject({ label: "Dormant", badge: "dormant" });
+  });
+
+  it("keeps a status the user set, and an archived account's", () => {
+    expect(at(200, { status: "locked" })).toMatchObject({ label: "Locked", badge: "warning" });
+    expect(at(0, { status: "retired" }).label).toBe("Retired");
+    expect(at(200, { archivedAt: daysAgo(1) }).label).toBe("Active");
+  });
+});
+
+describe("quick copy in the account list", () => {
+  it("replaces the Updated column and copies without opening the account", async () => {
+    const user = userEvent.setup();
+    const { calls, router } = await renderApp(
+      "/accounts",
+      withAccounts({ clipboard_copy_secret: () => ({ clearAfterSecs: 30 }) }, [
+        summary(),
+        summary({ id: "a2", title: "Mail only", username: null, hasPassword: false }),
+        summary({ id: "a3", title: "Nothing", username: null, email: null, hasPassword: false }),
+      ]),
+    );
+    const table = await screen.findByRole("table", { name: "All Accounts" });
+    expect(within(table).queryByRole("columnheader", { name: "Updated" })).not.toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Quick copy" })).toBeInTheDocument();
+
+    await user.click(within(table).getByRole("button", { name: "Copy username for Game store (main)" }));
+    expect(calls).toContainEqual({ cmd: "clipboard_copy_plain", args: { text: "nightowl" } });
+    await user.click(within(table).getByRole("button", { name: "Copy password for Game store (main)" }));
+    await waitFor(() => {
+      expect(calls).toContainEqual({ cmd: "clipboard_copy_secret", args: { target: { kind: "accountPassword", id: "a1" } } });
+    });
+    expect(router.state.location.pathname).toBe("/accounts");
+
+    // No username: the email is offered. Nothing to copy: no buttons.
+    expect(within(table).getByRole("button", { name: "Copy email for Mail only" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "Copy password for Mail only" })).not.toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: /for Nothing$/ })).not.toBeInTheDocument();
+  });
+
+  it("shows the activity under the status", async () => {
+    await renderApp("/accounts", withAccounts({}, [summary()]));
+    const table = await screen.findByRole("table", { name: "All Accounts" });
+    expect(within(table).getByText("Active today")).toBeInTheDocument();
   });
 });

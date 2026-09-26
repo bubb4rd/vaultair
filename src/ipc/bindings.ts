@@ -73,8 +73,8 @@ export const commands = {
 	clipboardCancelClear: () => __TAURI_INVOKE<boolean>("clipboard_cancel_clear"),
 	/**  Clears our value from the clipboard now. Returns whether it cleared. */
 	clipboardClearNow: () => typedError<boolean, IpcError_Serialize>(__TAURI_INVOKE("clipboard_clear_now")),
-	/**  Active accounts, or archived ones (`archived: true`), by title. */
-	accountList: (archived: boolean) => typedError<AccountSummary[], IpcError_Serialize>(__TAURI_INVOKE("account_list", { archived })),
+	/**  Active accounts, or archived ones (`archived: true`), matching `filter`, by title. */
+	accountList: (archived: boolean, filter: AccountFilter) => typedError<AccountSummary[], IpcError_Serialize>(__TAURI_INVOKE("account_list", { archived, filter })),
 	accountGet: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_get", { id })),
 	accountCreate: (input: AccountInput) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_create", { input })),
 	/**  Saves the whole form. Secret fields say `unchanged`, `set` or `clear`. */
@@ -84,6 +84,11 @@ export const commands = {
 	accountSetFavorite: (id: string, favorite: boolean) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_set_favorite", { id, favorite })),
 	/**  "Mark verified": the user checked the account still works. */
 	accountMarkVerified: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_mark_verified", { id })),
+	/**
+	 *  Stops suggesting that details in the sensitive notes move to their own
+	 *  fields, until the notes change (ADR-0006).
+	 */
+	accountDismissNotesSuggestions: (id: string) => typedError<AccountDetail, IpcError_Serialize>(__TAURI_INVOKE("account_dismiss_notes_suggestions", { id })),
 	/**
 	 *  Permanently deletes an account. `confirm_title` must be its title, as
 	 *  typed by the user; anything else is `invalid_input` on `confirmTitle`.
@@ -149,6 +154,22 @@ export const commands = {
 	contactPointList: () => typedError<ContactPointView[], IpcError_Serialize>(__TAURI_INVOKE("contact_point_list")),
 	/**  The dashboard's numbers, for the whole vault or one identity. */
 	dashboardSummary: (identityId: string | null) => typedError<DashboardSummary, IpcError_Serialize>(__TAURI_INVOKE("dashboard_summary", { identityId })),
+	/**  Every platform, built-in and user-added, with how many accounts use each. */
+	platformList: () => typedError<PlatformView[], IpcError_Serialize>(__TAURI_INVOKE("platform_list")),
+	platformCreate: (input: PlatformInput) => typedError<PlatformView, IpcError_Serialize>(__TAURI_INVOKE("platform_create", { input })),
+	platformUpdate: (id: string, input: PlatformInput) => typedError<PlatformView, IpcError_Serialize>(__TAURI_INVOKE("platform_update", { id, input })),
+	/**
+	 *  Every game, built-in and user-added, with how many accounts and profiles
+	 *  use each.
+	 */
+	gameList: () => typedError<GameView[], IpcError_Serialize>(__TAURI_INVOKE("game_list")),
+	gameCreate: (input: GameInput) => typedError<GameView, IpcError_Serialize>(__TAURI_INVOKE("game_create", { input })),
+	gameUpdate: (id: string, input: GameInput) => typedError<GameView, IpcError_Serialize>(__TAURI_INVOKE("game_update", { id, input })),
+	/**  Game profiles on one account, or for one game or platform. */
+	gameProfileList: (filter: GameProfileFilter) => typedError<GameProfileView[], IpcError_Serialize>(__TAURI_INVOKE("game_profile_list", { filter })),
+	gameProfileCreate: (accountId: string, input: GameProfileInput) => typedError<GameProfileView, IpcError_Serialize>(__TAURI_INVOKE("game_profile_create", { accountId, input })),
+	gameProfileUpdate: (id: string, input: GameProfileInput) => typedError<GameProfileView, IpcError_Serialize>(__TAURI_INVOKE("game_profile_update", { id, input })),
+	gameProfileDelete: (id: string) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("game_profile_delete", { id })),
 };
 
 /** Events */
@@ -177,20 +198,50 @@ export type AccountDetail = {
 	passwordChangedAt: string | null,
 	websiteUrl: string | null,
 	loginUrl: string | null,
+	/**  The platform's catalog login page, offered when `login_url` is empty. */
+	catalogLoginUrl: string | null,
+	platformId: string | null,
+	platformName: string | null,
+	platformIcon: string | null,
+	gameId: string | null,
+	gameName: string | null,
+	gameIcon: string | null,
 	publisher: string | null,
 	region: string | null,
 	playerId: string | null,
 	displayName: string | null,
 	notes: string | null,
 	hasSensitiveNotes: boolean,
+	/**
+	 *  Account details the sensitive notes seem to hold, to suggest moving
+	 *  to their own fields (ADR-0006). Flags only, never the text.
+	 */
+	notesSuggestions: NotesSuggestions,
 	favorite: boolean,
 	archivedAt: string | null,
 	lastVerifiedAt: string | null,
+	/**  When the password was last revealed or copied from Vaultair. */
+	lastUsedAt: string | null,
 	createdAt: string,
 	updatedAt: string,
+	/**
+	 *  The latest of the last edit, "Mark verified" and the last use of the
+	 *  password from Vaultair. The UI turns it into Active, Stale or Dormant.
+	 */
+	lastActivityAt: string,
 	tags: string[],
 	customFields: CustomFieldView[],
 	mfa: MfaView[],
+};
+
+/**
+ *  Narrows the account list. Every set field must match; `publisher`
+ *  compares case-insensitively.
+ */
+export type AccountFilter = {
+	platformId: string | null,
+	gameId: string | null,
+	publisher: string | null,
 };
 
 /**  Everything the account form edits. Sent whole on create and update. */
@@ -211,6 +262,10 @@ export type AccountInput = {
 	recoveryPhone: string | null,
 	websiteUrl: string | null,
 	loginUrl: string | null,
+	/**  The catalog platform it's on (Steam, Battle.net...), if any. */
+	platformId: string | null,
+	/**  The catalog game it's for, if any. */
+	gameId: string | null,
 	publisher: string | null,
 	region: string | null,
 	playerId: string | null,
@@ -241,6 +296,14 @@ export type AccountSummary = {
 	identityName: string | null,
 	username: string | null,
 	email: string | null,
+	platformId: string | null,
+	platformName: string | null,
+	/**  The platform's bundled logo, if it has one. */
+	platformIcon: string | null,
+	gameId: string | null,
+	gameName: string | null,
+	/**  The game's bundled logo, if it has one. */
+	gameIcon: string | null,
 	publisher: string | null,
 	hasPassword: boolean,
 	/**  zxcvbn score 0–4 of the stored password, computed when it was saved. */
@@ -254,6 +317,11 @@ export type AccountSummary = {
 	archivedAt: string | null,
 	tags: string[],
 	updatedAt: string,
+	/**
+	 *  The latest of the last edit, "Mark verified" and the last use of the
+	 *  password from Vaultair. The UI turns it into Active, Stale or Dormant.
+	 */
+	lastActivityAt: string,
 };
 
 /**  What kind of login this is. */
@@ -379,6 +447,76 @@ export type FolderPurpose =
 "newVaultLocation" | 
 /**  Choose an existing vault's folder (the one containing `vault.vhdr`). */
 "existingVault";
+
+export type GameInput = {
+	name: string,
+	franchise: string | null,
+	publisher: string | null,
+};
+
+/**
+ *  Which game profiles to list. Every set field must match. Unless
+ *  `account_id` is set, profiles on archived accounts are left out.
+ */
+export type GameProfileFilter = {
+	accountId: string | null,
+	gameId: string | null,
+	platformId: string | null,
+};
+
+/**
+ *  A game profile as the form sends it: who you are in one game, on one
+ *  account.
+ */
+export type GameProfileInput = {
+	gameId: string,
+	platformId: string | null,
+	gamertag: string | null,
+	playerId: string | null,
+	region: string | null,
+	rankTier: string | null,
+	currentSeason: string | null,
+	notes: string | null,
+	/**  The launcher account this profile is reached through, if any. */
+	linkedLauncherAccountId: string | null,
+	/**  The console account this profile is played on, if any. */
+	linkedConsoleAccountId: string | null,
+};
+
+export type GameProfileView = {
+	id: string,
+	accountId: string,
+	accountTitle: string,
+	gameId: string,
+	gameName: string,
+	gameIcon: string | null,
+	platformId: string | null,
+	platformName: string | null,
+	gamertag: string | null,
+	playerId: string | null,
+	region: string | null,
+	rankTier: string | null,
+	currentSeason: string | null,
+	notes: string | null,
+	linkedLauncherAccountId: string | null,
+	linkedLauncherTitle: string | null,
+	linkedConsoleAccountId: string | null,
+	linkedConsoleTitle: string | null,
+	updatedAt: string,
+};
+
+export type GameView = {
+	id: string,
+	name: string,
+	franchise: string | null,
+	publisher: string | null,
+	icon: string | null,
+	isBuiltin: boolean,
+	/**  Active accounts for this game. */
+	accountCount: number,
+	/**  Game profiles for this game (on active accounts). */
+	profileCount: number,
+};
 
 /**
  *  A freshly generated value and how strong it is. The value is wiped from
@@ -576,6 +714,18 @@ export type MfaView = {
 	updatedAt: string,
 };
 
+/**  What the account page suggests. All false once dismissed. */
+export type NotesSuggestions = {
+	/**  Move to Email, Username or Recovery email: visible, but trackable. */
+	identifiers: boolean,
+	/**  Move to Password or a hidden custom field: still encrypted. */
+	credentials: boolean,
+	/**  Move to the MFA section's backup codes: still encrypted, and counted. */
+	backupCodes: boolean,
+	/**  Move to a hidden custom field: still encrypted, labelled on its own. */
+	securityAnswers: boolean,
+};
+
 /**  An account as the overview lists it. */
 export type OverviewAccount = {
 	id: string,
@@ -620,6 +770,31 @@ export type PasswordOptions = {
 export type PlatformGroup = {
 	platform: string | null,
 	accounts: OverviewAccount[],
+};
+
+export type PlatformInput = {
+	name: string,
+	kind: PlatformKind,
+	publisher: string | null,
+	defaultLoginUrl: string | null,
+};
+
+/**  What kind of service a platform is. Mirrors `platform.kind`. */
+export type PlatformKind = "launcher" | "console" | "publisher" | "social" | "streaming" | "email" | "website" | "app" | "other";
+
+export type PlatformView = {
+	id: string,
+	name: string,
+	kind: PlatformKind,
+	publisher: string | null,
+	/**  For built-ins, catalog-provided; the UI labels it as such. */
+	defaultLoginUrl: string | null,
+	icon: string | null,
+	isBuiltin: boolean,
+	/**  Active accounts on this platform. */
+	accountCount: number,
+	/**  Game profiles played on this platform (on active accounts). */
+	profileCount: number,
 };
 
 export type PurposeView = {
@@ -745,6 +920,8 @@ export type TotpCodeView = {
 export type UrlTarget = {
 	url: string,
 	host: string,
+	/**  The login page came from the platform catalog, not the account. */
+	fromCatalog: boolean,
 };
 
 /**  Non-secret facts about a vault, safe to show in the UI. */

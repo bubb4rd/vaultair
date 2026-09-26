@@ -6,7 +6,9 @@
 //! `open` here, so every envelope is bound to its exact cell.
 
 pub mod account;
+pub mod catalog;
 pub mod contact;
+pub mod game_profile;
 pub mod identity;
 pub mod mfa;
 pub mod purpose;

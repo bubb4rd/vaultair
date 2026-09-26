@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 8 (identities and contact points). Next: Phase 9, purpose labels. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 10 (games, platforms, catalog, game profiles). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 11, global search and list views. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -106,6 +106,19 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - Accounts group by platform, falling back to the publisher until Phase 10 catalogs platforms.
 - `dashboard_summary` arrives early, with only the counts accounts and identities can answer (accounts, main/alt, identities, missing MFA, favorites, recent) and an optional identity filter (`useIdentityFilter`, in memory, cleared by the lock reload). Phase 12 adds the health counts.
 - Identity names are unique, case-insensitively. Identity `icon` is not used yet; the avatar is initials on the identity's color.
+
+## Phase 10 notes
+
+- The built-in catalog (25 platforms, 19 games) is `crates/vaultair-core/catalog/default_catalog.json`. The V4 migration seeds it with `INSERT OR IGNORE` in the same transaction (`migrate.rs`, `CATALOG_SEEDS`), so an edited built-in or a user entry with the same name is kept. A future catalog update adds its version to `CATALOG_SEEDS`.
+- Logos come from [Simple Icons](https://simpleicons.org) (`simple-icons`, CC0, pinned). The marks remain their owners' trademarks and are used only to identify the service. `src/features/catalog/logos.ts` imports just the slugs the catalog names (a test checks the list covers the catalog), so the rest of the set isn't bundled, and nothing is fetched at runtime. Brands Simple Icons doesn't carry (Xbox, Nintendo, Microsoft, Blizzard games, Minecraft...) and user-added entries show initials instead. Logos too dark for the UI (under 3:1 against the card) are drawn in the text colour.
+- An account's mark: for a game account its game, otherwise its platform, preferring whichever has a logo; with neither, the initials of its publisher or title.
+- A platform's `default_login_url` is used by "Open login page" only when the account has no login page of its own, and the detail row and confirm dialog both say it came from the catalog.
+- The account list filters by platform, game (including accounts with a profile for that game) and publisher in Rust (`AccountFilter`); the text box still narrows the result in the page.
+- Game profiles have their own search rows (`entity_type = 'game_profile'`). Renaming a platform or game reindexes the accounts and profiles that name it; deleting an account removes its profiles' rows before the cascade.
+- Email providers (Gmail, Outlook.com, Proton Mail, iCloud Mail, Yahoo Mail, AOL Mail, Zoho Mail, Tuta, Fastmail, GMX, mail.com, Mail.ru, Yandex Mail, HEY, mailbox.org) are built-in platforms. An email account without a platform shows its address's provider (from the domain, `emailProvider` in `logos.ts`), and the form offers to set that platform. On a new account whose name, type and platform are still blank, typing a known provider's address fills them in (type Email, the provider's platform, its name and publisher) with an Undo; once the user has started the account, the address is treated as just its login. Purpose isn't inferred: a mailbox can be Main, Recovery or Creator, and the domain can't tell. Outlook, Yahoo, AOL, Fastmail and Yandex show initials: their owners had their marks removed from Simple Icons, so there's no freely licensed logo to bundle.
+- Sensitive notes that look like they hold an email, username, password, backup codes or a security answer get a suggestion to move them into their own field, with the security trade-off stated. See [ADR-0006](docs/adr/0006-sensitive-notes-suggestions.md). V5 adds the flag column and seeds the new email providers.
+- The account list has no Updated column. Its Status shows the activity instead: an active account turns **Stale** after 30 days without activity and **Dormant** after 90 (`STALE_AFTER_DAYS`, `DORMANT_AFTER_DAYS` in `labels.ts`). Activity is the latest of an edit, "Mark verified", and using the password from Vaultair (reveal or copy; V6 adds `account.last_used_at`). It's worked out for display only: the saved status never changes by itself, and a status the user set wins. Phase 12's dormant health rule should use the same rule. The freed column holds quick-copy buttons for the username (or email) and password.
+- Hiding catalog entries (the plan's data-model notes mention it) isn't done yet; unused entries sit behind a toggle on the Games and Platforms pages.
 
 ## Phase 17: Passkeys and login credentials (scoped)
 

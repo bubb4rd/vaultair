@@ -64,6 +64,8 @@ fn account(title: &str, identity_id: Option<&str>, email: Option<&str>) -> Accou
         recovery_phone: None,
         website_url: None,
         login_url: None,
+        platform_id: None,
+        game_id: None,
         publisher: None,
         region: None,
         player_id: None,

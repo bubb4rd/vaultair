@@ -6,7 +6,7 @@
 use tauri::State;
 use vaultair_core::clock::SystemClock;
 use vaultair_core::domain::account::{
-    AccountDetail, AccountInput, AccountSummary, AccountUrl, PurposeView, UrlTarget,
+    AccountDetail, AccountFilter, AccountInput, AccountSummary, AccountUrl, PurposeView, UrlTarget,
 };
 use vaultair_core::service::accounts;
 use vaultair_core::AppError;
@@ -14,14 +14,15 @@ use vaultair_core::AppError;
 use super::with_vault;
 use crate::state::{AppState, IpcResult};
 
-/// Active accounts, or archived ones (`archived: true`), by title.
+/// Active accounts, or archived ones (`archived: true`), matching `filter`, by title.
 #[tauri::command]
 #[specta::specta]
 pub async fn account_list(
     state: State<'_, AppState>,
     archived: bool,
+    filter: AccountFilter,
 ) -> IpcResult<Vec<AccountSummary>> {
-    with_vault(&state, move |v| accounts::list(v, archived)).await
+    with_vault(&state, move |v| accounts::list(v, archived, &filter)).await
 }
 
 #[tauri::command]
@@ -82,6 +83,17 @@ pub async fn account_set_favorite(
         accounts::set_favorite(v, &SystemClock, &id, favorite)
     })
     .await
+}
+
+/// Stops suggesting that details in the sensitive notes move to their own
+/// fields, until the notes change (ADR-0006).
+#[tauri::command]
+#[specta::specta]
+pub async fn account_dismiss_notes_suggestions(
+    state: State<'_, AppState>,
+    id: String,
+) -> IpcResult<AccountDetail> {
+    with_vault(&state, move |v| accounts::dismiss_notes_suggestions(v, &id)).await
 }
 
 /// "Mark verified": the user checked the account still works.

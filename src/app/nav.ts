@@ -81,20 +81,13 @@ export const NAV_GROUPS: NavGroup[] = [
         path: "/games",
         label: "Games",
         icon: GameControllerIcon,
-        empty: {
-          title: "No games yet",
-          description: "Games you track appear here with the accounts and in-game profiles linked to each one.",
-        },
+        keywords: ["game profiles", "gamertag", "rank"],
       },
       {
         path: "/platforms",
         label: "Platforms",
         icon: AppWindowIcon,
-        empty: {
-          title: "No platforms yet",
-          description:
-            "Launchers and services such as Steam, Battle.net or Riot appear here with the accounts on each.",
-        },
+        keywords: ["launchers", "catalog"],
       },
     ],
   },
@@ -153,8 +146,10 @@ export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), 
  * plain strings because these routes are built from `NAV_GROUPS` at runtime,
  * so the router can't list them in its typed path union.
  */
-export const PAGE_PATHS: { accounts: string; archived: string; identities: string } = {
+export const PAGE_PATHS: Record<"accounts" | "archived" | "identities" | "games" | "platforms", string> = {
   accounts: "/accounts",
   archived: "/archived",
   identities: "/identities",
+  games: "/games",
+  platforms: "/platforms",
 };

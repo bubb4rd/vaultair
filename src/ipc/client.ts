@@ -5,6 +5,16 @@
 import {
   commands,
   type AccountDetail,
+  type AccountFilter,
+  type GameInput,
+  type GameProfileFilter,
+  type GameProfileInput,
+  type GameProfileView,
+  type GameView,
+  type NotesSuggestions,
+  type PlatformInput,
+  type PlatformKind,
+  type PlatformView,
   type AccountInput,
   type AccountStatus,
   type AccountSummary,
@@ -61,6 +71,16 @@ import {
 
 export type {
   AccountDetail,
+  AccountFilter,
+  GameInput,
+  GameProfileFilter,
+  GameProfileInput,
+  GameProfileView,
+  GameView,
+  NotesSuggestions,
+  PlatformInput,
+  PlatformKind,
+  PlatformView,
   AccountInput,
   AccountStatus,
   AccountSummary,
@@ -264,8 +284,11 @@ export const generator = {
 };
 
 /** Accounts. Responses carry flags about secrets (`hasPassword`), never the secrets. */
+export const NO_ACCOUNT_FILTER: AccountFilter = { platformId: null, gameId: null, publisher: null };
+
 export const accounts = {
-  list: (archived: boolean): Promise<AccountSummary[]> => data(() => commands.accountList(archived)),
+  list: (archived: boolean, filter: AccountFilter = NO_ACCOUNT_FILTER): Promise<AccountSummary[]> =>
+    data(() => commands.accountList(archived, filter)),
   get: (id: string): Promise<AccountDetail> => data(() => commands.accountGet(id)),
   create: (input: AccountInput): Promise<AccountDetail> => data(() => commands.accountCreate(input)),
   update: (id: string, input: AccountInput): Promise<AccountDetail> => data(() => commands.accountUpdate(id, input)),
@@ -274,6 +297,9 @@ export const accounts = {
   setFavorite: (id: string, favorite: boolean): Promise<AccountDetail> =>
     data(() => commands.accountSetFavorite(id, favorite)),
   markVerified: (id: string): Promise<AccountDetail> => data(() => commands.accountMarkVerified(id)),
+  /** Keep the sensitive notes as they are: no suggestions until they change (ADR-0006). */
+  dismissNotesSuggestions: (id: string): Promise<AccountDetail> =>
+    data(() => commands.accountDismissNotesSuggestions(id)),
   /** `confirmTitle` is what the user typed; Rust checks it against the title. */
   delete: (id: string, confirmTitle: string): Promise<null> => data(() => commands.accountDelete(id, confirmTitle)),
   duplicateAsTemplate: (id: string): Promise<AccountDetail> => data(() => commands.accountDuplicateAsTemplate(id)),
@@ -315,6 +341,23 @@ export const dashboard = {
 export const catalog = {
   purposes: (): Promise<PurposeView[]> => data(() => commands.purposeList()),
   tags: (): Promise<string[]> => data(() => commands.tagList()),
+  platforms: (): Promise<PlatformView[]> => data(() => commands.platformList()),
+  createPlatform: (input: PlatformInput): Promise<PlatformView> => data(() => commands.platformCreate(input)),
+  updatePlatform: (id: string, input: PlatformInput): Promise<PlatformView> =>
+    data(() => commands.platformUpdate(id, input)),
+  games: (): Promise<GameView[]> => data(() => commands.gameList()),
+  createGame: (input: GameInput): Promise<GameView> => data(() => commands.gameCreate(input)),
+  updateGame: (id: string, input: GameInput): Promise<GameView> => data(() => commands.gameUpdate(id, input)),
+};
+
+/** Who you are in one game, on one account. */
+export const gameProfiles = {
+  list: (filter: GameProfileFilter): Promise<GameProfileView[]> => data(() => commands.gameProfileList(filter)),
+  create: (accountId: string, input: GameProfileInput): Promise<GameProfileView> =>
+    data(() => commands.gameProfileCreate(accountId, input)),
+  update: (id: string, input: GameProfileInput): Promise<GameProfileView> =>
+    data(() => commands.gameProfileUpdate(id, input)),
+  delete: (id: string): Promise<null> => data(() => commands.gameProfileDelete(id)),
 };
 
 /**

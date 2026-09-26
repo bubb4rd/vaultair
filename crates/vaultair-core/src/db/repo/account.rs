@@ -4,9 +4,11 @@
 use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::domain::account::{
-    AccountDetail, AccountStatus, AccountSummary, AccountType, CustomFieldType, CustomFieldView,
+    AccountDetail, AccountFilter, AccountStatus, AccountSummary, AccountType, CustomFieldType,
+    CustomFieldView,
 };
 use crate::domain::identity::ContactRole;
+use crate::domain::notes_hints::NotesSuggestions;
 
 /// The non-secret columns an account form edits, already validated.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +22,8 @@ pub struct AccountFields {
     pub email: Option<String>,
     pub website_url: Option<String>,
     pub login_url: Option<String>,
+    pub platform_id: Option<String>,
+    pub game_id: Option<String>,
     pub publisher: Option<String>,
     pub region: Option<String>,
     pub player_id: Option<String>,
@@ -31,8 +35,8 @@ pub fn insert(conn: &Connection, id: &str, f: &AccountFields, now: &str) -> rusq
     conn.execute(
         "INSERT INTO account (id, title, account_type, purpose_id, status, username, email,
             website_url, login_url, publisher, region, player_id, display_name, notes,
-            created_at, updated_at, identity_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16)",
+            created_at, updated_at, identity_id, platform_id, game_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?17, ?18)",
         params![
             id,
             f.title,
@@ -49,7 +53,9 @@ pub fn insert(conn: &Connection, id: &str, f: &AccountFields, now: &str) -> rusq
             f.display_name,
             f.notes,
             now,
-            f.identity_id
+            f.identity_id,
+            f.platform_id,
+            f.game_id
         ],
     )?;
     Ok(())
@@ -66,7 +72,7 @@ pub fn update_fields(
         "UPDATE account SET title = ?2, account_type = ?3, purpose_id = ?4, status = ?5,
             username = ?6, email = ?7, website_url = ?8, login_url = ?9, publisher = ?10,
             region = ?11, player_id = ?12, display_name = ?13, notes = ?14, updated_at = ?15,
-            identity_id = ?16
+            identity_id = ?16, platform_id = ?17, game_id = ?18
          WHERE id = ?1",
         params![
             id,
@@ -84,7 +90,9 @@ pub fn update_fields(
             f.display_name,
             f.notes,
             now,
-            f.identity_id
+            f.identity_id,
+            f.platform_id,
+            f.game_id
         ],
     )?;
     Ok(n == 1)
@@ -93,7 +101,8 @@ pub fn update_fields(
 pub fn fields(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountFields>> {
     conn.query_row(
         "SELECT title, account_type, purpose_id, status, username, email, website_url,
-                login_url, publisher, region, player_id, display_name, notes, identity_id
+                login_url, publisher, region, player_id, display_name, notes, identity_id,
+                platform_id, game_id
          FROM account WHERE id = ?1",
         [id],
         |r| {
@@ -112,6 +121,8 @@ pub fn fields(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountFie
                 display_name: r.get(11)?,
                 notes: r.get(12)?,
                 identity_id: r.get(13)?,
+                platform_id: r.get(14)?,
+                game_id: r.get(15)?,
             })
         },
     )
@@ -161,16 +172,28 @@ pub fn sensitive_notes(conn: &Connection, id: &str) -> rusqlite::Result<Option<O
     .optional()
 }
 
+/// Stores (or with `None`, removes) the sensitive-notes envelope with its
+/// `notes_hints` flag bits, which also clears an earlier dismissal.
 pub fn set_sensitive_notes(
     conn: &Connection,
     id: &str,
     enc: Option<&[u8]>,
+    hints: u8,
 ) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE account SET sensitive_notes_enc = ?2 WHERE id = ?1",
-        params![id, enc],
+        "UPDATE account SET sensitive_notes_enc = ?2, sensitive_notes_hints = ?3 WHERE id = ?1",
+        params![id, enc, hints],
     )?;
     Ok(())
+}
+
+/// Keeps the sensitive notes as they are: no more suggestions until they
+/// change. Not an edit, so `updated_at` stays.
+pub fn dismiss_notes_hints(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
+    Ok(conn.execute(
+        "UPDATE account SET sensitive_notes_hints = sensitive_notes_hints | ?2 WHERE id = ?1",
+        params![id, crate::domain::notes_hints::DISMISSED],
+    )? == 1)
 }
 
 pub fn title(conn: &Connection, id: &str) -> rusqlite::Result<Option<String>> {
@@ -180,13 +203,22 @@ pub fn title(conn: &Connection, id: &str) -> rusqlite::Result<Option<String>> {
     .optional()
 }
 
-pub fn url(conn: &Connection, id: &str, login: bool) -> rusqlite::Result<Option<Option<String>>> {
+/// The stored website or login URL. For the login URL, the second value is
+/// the platform's catalog login page. Outer `None`: no such account.
+#[allow(clippy::type_complexity)]
+pub fn url(
+    conn: &Connection,
+    id: &str,
+    login: bool,
+) -> rusqlite::Result<Option<(Option<String>, Option<String>)>> {
     let sql = if login {
-        "SELECT login_url FROM account WHERE id = ?1"
+        "SELECT a.login_url, pl.default_login_url FROM account a
+         LEFT JOIN platform pl ON pl.id = a.platform_id WHERE a.id = ?1"
     } else {
-        "SELECT website_url FROM account WHERE id = ?1"
+        "SELECT website_url, NULL FROM account WHERE id = ?1"
     };
-    conn.query_row(sql, [id], |r| r.get(0)).optional()
+    conn.query_row(sql, [id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .optional()
 }
 
 /// Bumps `updated_at` (after a change to tags, custom fields or MFA).
@@ -221,6 +253,15 @@ pub fn set_favorite(
     )? == 1)
 }
 
+/// The password was revealed or copied: the account is in use. Not an
+/// edit, so `updated_at` stays.
+pub fn set_used(conn: &Connection, id: &str, now: &str) -> rusqlite::Result<bool> {
+    Ok(conn.execute(
+        "UPDATE account SET last_used_at = ?2 WHERE id = ?1",
+        params![id, now],
+    )? == 1)
+}
+
 /// "Mark verified" is the user saying they checked the account still works;
 /// it isn't an edit either.
 pub fn set_verified(conn: &Connection, id: &str, now: &str) -> rusqlite::Result<bool> {
@@ -230,22 +271,11 @@ pub fn set_verified(conn: &Connection, id: &str, now: &str) -> rusqlite::Result<
     )? == 1)
 }
 
-/// Copies the platform and game links from one account to another (the
-/// duplicate-as-template flow; the identity is one of `AccountFields`).
-pub fn copy_links(conn: &Connection, from: &str, to: &str) -> rusqlite::Result<()> {
-    conn.execute(
-        "UPDATE account SET
-            platform_id = (SELECT platform_id FROM account WHERE id = ?1),
-            game_id = (SELECT game_id FROM account WHERE id = ?1)
-         WHERE id = ?2",
-        params![from, to],
-    )?;
-    Ok(())
-}
-
-/// Deletes the account; custom fields, tags links and MFA methods cascade.
+/// Deletes the account; custom fields, tag links, MFA methods and game
+/// profiles cascade (their search rows are removed here first).
 pub fn delete(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
     unindex(conn, id)?;
+    super::game_profile::unindex_for_account(conn, id)?;
     Ok(conn.execute("DELETE FROM account WHERE id = ?1", [id])? == 1)
 }
 
@@ -271,9 +301,13 @@ const SUMMARY_SELECT: &str = "
            a.favorite, a.favorited_at, a.archived_at,
            (SELECT group_concat(t.name, char(31)) FROM account_tag x JOIN tag t ON t.id = x.tag_id
              WHERE x.account_id = a.id),
-           a.updated_at
+           a.updated_at,
+           a.platform_id, pl.name, pl.icon, a.game_id, g.name, g.icon,
+           max(a.updated_at, COALESCE(a.last_verified_at, ''), COALESCE(a.last_used_at, ''))
     FROM account a JOIN purpose_label p ON p.id = a.purpose_id
-    LEFT JOIN identity i ON i.id = a.identity_id";
+    LEFT JOIN identity i ON i.id = a.identity_id
+    LEFT JOIN platform pl ON pl.id = a.platform_id
+    LEFT JOIN game g ON g.id = a.game_id";
 
 fn summary_row(r: &Row<'_>) -> rusqlite::Result<AccountSummary> {
     Ok(AccountSummary {
@@ -287,6 +321,12 @@ fn summary_row(r: &Row<'_>) -> rusqlite::Result<AccountSummary> {
         identity_name: r.get(7)?,
         username: r.get(8)?,
         email: r.get(9)?,
+        platform_id: r.get(20)?,
+        platform_name: r.get(21)?,
+        platform_icon: r.get(22)?,
+        game_id: r.get(23)?,
+        game_name: r.get(24)?,
+        game_icon: r.get(25)?,
         publisher: r.get(10)?,
         has_password: r.get(11)?,
         password_strength: r.get(12)?,
@@ -297,17 +337,36 @@ fn summary_row(r: &Row<'_>) -> rusqlite::Result<AccountSummary> {
         archived_at: r.get(17)?,
         tags: split_tags(r.get(18)?),
         updated_at: r.get(19)?,
+        last_activity_at: r.get(26)?,
     })
 }
 
-/// Active (`archived` false) or archived accounts, by title.
-pub fn summaries(conn: &Connection, archived: bool) -> rusqlite::Result<Vec<AccountSummary>> {
+/// Active (`archived` false) or archived accounts matching `filter`, by
+/// title. A game filter also matches accounts with a profile for that game.
+pub fn summaries(
+    conn: &Connection,
+    archived: bool,
+    filter: &AccountFilter,
+) -> rusqlite::Result<Vec<AccountSummary>> {
     let sql = format!(
         "{SUMMARY_SELECT} WHERE (a.archived_at IS NOT NULL) = ?1
+           AND (?2 IS NULL OR a.platform_id = ?2)
+           AND (?3 IS NULL OR a.game_id = ?3
+                OR EXISTS(SELECT 1 FROM game_profile gp
+                          WHERE gp.account_id = a.id AND gp.game_id = ?3))
+           AND (?4 IS NULL OR trim(a.publisher) = ?4 COLLATE NOCASE)
          ORDER BY a.title COLLATE NOCASE, a.id"
     );
     let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map([archived], summary_row)?;
+    let rows = stmt.query_map(
+        params![
+            archived,
+            filter.platform_id,
+            filter.game_id,
+            filter.publisher.as_deref().map(str::trim)
+        ],
+        summary_row,
+    )?;
     rows.collect()
 }
 
@@ -374,9 +433,15 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
                     a.email, a.password_enc IS NOT NULL, a.password_strength, a.password_changed_at,
                     a.website_url, a.login_url, a.publisher, a.region, a.player_id, a.display_name,
                     a.notes, a.sensitive_notes_enc IS NOT NULL, a.favorite, a.archived_at,
-                    a.last_verified_at, a.created_at, a.updated_at, a.identity_id, i.name
+                    a.last_verified_at, a.created_at, a.updated_at, a.identity_id, i.name,
+                    CASE WHEN a.login_url IS NULL THEN pl.default_login_url END,
+                    a.platform_id, pl.name, pl.icon, a.game_id, g.name, g.icon,
+                    a.sensitive_notes_hints, a.last_used_at,
+                    max(a.updated_at, COALESCE(a.last_verified_at, ''), COALESCE(a.last_used_at, ''))
              FROM account a JOIN purpose_label p ON p.id = a.purpose_id
              LEFT JOIN identity i ON i.id = a.identity_id
+             LEFT JOIN platform pl ON pl.id = a.platform_id
+             LEFT JOIN game g ON g.id = a.game_id
              WHERE a.id = ?1",
             [id],
             |r| {
@@ -398,15 +463,25 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
                     password_changed_at: r.get(10)?,
                     website_url: r.get(11)?,
                     login_url: r.get(12)?,
+                    catalog_login_url: r.get(26)?,
+                    platform_id: r.get(27)?,
+                    platform_name: r.get(28)?,
+                    platform_icon: r.get(29)?,
+                    game_id: r.get(30)?,
+                    game_name: r.get(31)?,
+                    game_icon: r.get(32)?,
                     publisher: r.get(13)?,
                     region: r.get(14)?,
                     player_id: r.get(15)?,
                     display_name: r.get(16)?,
                     notes: r.get(17)?,
                     has_sensitive_notes: r.get(18)?,
+                    notes_suggestions: NotesSuggestions::from_bits(r.get(33)?),
                     favorite: r.get(19)?,
                     archived_at: r.get(20)?,
                     last_verified_at: r.get(21)?,
+                    last_used_at: r.get(34)?,
+                    last_activity_at: r.get(35)?,
                     created_at: r.get(22)?,
                     updated_at: r.get(23)?,
                     tags: Vec::new(),

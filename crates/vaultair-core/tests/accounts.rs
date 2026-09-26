@@ -64,6 +64,8 @@ fn input(title: &str) -> AccountInput {
         recovery_phone: None,
         website_url: None,
         login_url: None,
+        platform_id: None,
+        game_id: None,
         publisher: None,
         region: None,
         player_id: None,
@@ -288,7 +290,9 @@ fn required_fields_and_urls_are_validated() {
         Some("customFields")
     );
     // Nothing half-made was left behind by any rejection.
-    assert!(accounts::list(&v, false).unwrap().is_empty());
+    assert!(accounts::list(&v, false, &Default::default())
+        .unwrap()
+        .is_empty());
 
     // An id from another account can't be smuggled into a custom field list.
     let a = accounts::create(
@@ -340,14 +344,24 @@ fn archive_favorite_verify_and_open_url() {
 
     let archived = accounts::set_archived(&mut v, &clock, &a.id, true).unwrap();
     assert!(archived.archived_at.is_some());
-    assert!(accounts::list(&v, false).unwrap().is_empty());
-    assert_eq!(accounts::list(&v, true).unwrap().len(), 1);
+    assert!(accounts::list(&v, false, &Default::default())
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        accounts::list(&v, true, &Default::default()).unwrap().len(),
+        1
+    );
     accounts::set_archived(&mut v, &clock, &a.id, false).unwrap();
-    assert_eq!(accounts::list(&v, false).unwrap().len(), 1);
+    assert_eq!(
+        accounts::list(&v, false, &Default::default())
+            .unwrap()
+            .len(),
+        1
+    );
 
     let starred = accounts::set_favorite(&mut v, &clock, &a.id, true).unwrap();
     assert!(starred.favorite);
-    let summary = &accounts::list(&v, false).unwrap()[0];
+    let summary = &accounts::list(&v, false, &Default::default()).unwrap()[0];
     assert!(summary.favorite && summary.favorited_at.is_some());
     assert!(
         !accounts::set_favorite(&mut v, &clock, &a.id, false)
@@ -425,10 +439,17 @@ fn delete_needs_the_title_and_cascades() {
         field_of(accounts::delete(&mut v, &a.id, "")),
         Some("confirmTitle")
     );
-    assert_eq!(accounts::list(&v, false).unwrap().len(), 1);
+    assert_eq!(
+        accounts::list(&v, false, &Default::default())
+            .unwrap()
+            .len(),
+        1
+    );
 
     accounts::delete(&mut v, &a.id, " Delete me ").unwrap();
-    assert!(accounts::list(&v, false).unwrap().is_empty());
+    assert!(accounts::list(&v, false, &Default::default())
+        .unwrap()
+        .is_empty());
     for sql in [
         "SELECT count(*) FROM account_custom_field WHERE account_id = ?1",
         "SELECT count(*) FROM account_tag WHERE account_id = ?1",
@@ -577,7 +598,7 @@ fn mfa_totp_backup_codes_and_recovery() {
     let m = &d.mfa[0];
     assert!(m.has_totp && m.has_recovery_instructions);
     assert_eq!((m.totp_digits, m.totp_period), (Some(6), Some(30)));
-    let summary = &accounts::list(&v, false).unwrap()[0];
+    let summary = &accounts::list(&v, false, &Default::default()).unwrap()[0];
     assert!(summary.mfa_enabled);
 
     // The ManualClock starts at the Unix epoch; advance to an RFC 6238 time.
@@ -602,7 +623,7 @@ fn mfa_totp_backup_codes_and_recovery() {
     assert_eq!(d.mfa[0].backup_codes_remaining, 2);
     assert!(d.mfa[0].backup_codes[1].used);
     assert_eq!(
-        accounts::list(&v, false).unwrap()[0].backup_codes_remaining,
+        accounts::list(&v, false, &Default::default()).unwrap()[0].backup_codes_remaining,
         2
     );
     let second = accounts::reveal(
@@ -636,7 +657,7 @@ fn mfa_totp_backup_codes_and_recovery() {
     )
     .unwrap();
     assert!(d.mfa[0].has_totp, "unchanged keeps the key");
-    assert!(!accounts::list(&v, false).unwrap()[0].mfa_enabled);
+    assert!(!accounts::list(&v, false, &Default::default()).unwrap()[0].mfa_enabled);
 
     let cleared = mfa::set_backup_codes(&mut v, &clock, &m.id, None).unwrap();
     assert!(cleared.mfa[0].backup_codes.is_empty());
@@ -768,8 +789,8 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
             serde_json::to_string(&dup),
             serde_json::to_string(&archived),
             serde_json::to_string(&accounts::get(&v, &a.id).unwrap()),
-            serde_json::to_string(&accounts::list(&v, false).unwrap()),
-            serde_json::to_string(&accounts::list(&v, true).unwrap()),
+            serde_json::to_string(&accounts::list(&v, false, &Default::default()).unwrap()),
+            serde_json::to_string(&accounts::list(&v, true, &Default::default()).unwrap()),
             serde_json::to_string(&accounts::tags(&v).unwrap()),
             serde_json::to_string(&accounts::purposes(&v).unwrap()),
             serde_json::to_string(&accounts::url_target(&v, &a.id, AccountUrl::Website).unwrap()),
@@ -858,8 +879,8 @@ fn demo_seed_is_browsable_and_uses_example_domains() {
     let mut v = new_vault(tmp.path(), &clock);
     vaultair_core::demo::seed(&mut v, &clock).unwrap();
 
-    let active = accounts::list(&v, false).unwrap();
-    let archived = accounts::list(&v, true).unwrap();
+    let active = accounts::list(&v, false, &Default::default()).unwrap();
+    let archived = accounts::list(&v, true, &Default::default()).unwrap();
     assert_eq!(active.len(), 9);
     assert_eq!(archived.len(), 1);
     assert!(active.iter().all(|a| a.has_password));
@@ -880,4 +901,83 @@ fn demo_seed_is_browsable_and_uses_example_domains() {
             );
         }
     }
+}
+
+/// ADR-0006: details found in sensitive notes become suggestion flags when
+/// the notes are saved. The flags carry nothing of the text; dismissing
+/// hides them until the notes change; clearing the notes clears them.
+#[test]
+fn sensitive_notes_suggest_moving_account_details() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut v = new_vault(dir.path(), &SystemClock);
+    let c = &SystemClock;
+    let mut a_in = input("Notes");
+    a_in.sensitive_notes = set(&format!(
+        "Email: {USER}@example.com\nPassword: {SECRET}\nBackup codes {SECRET}"
+    ));
+    let a = accounts::create(&mut v, c, &a_in).unwrap();
+    let s = a.notes_suggestions;
+    assert!(s.identifiers && s.credentials && s.backup_codes && !s.security_answers);
+    let json = serde_json::to_string(&a).unwrap();
+    assert!(!json.contains(SECRET) && !json.contains(USER));
+
+    let a = accounts::dismiss_notes_suggestions(&mut v, &a.id).unwrap();
+    assert!(!a.notes_suggestions.identifiers && !a.notes_suggestions.credentials);
+    // Editing something else keeps the dismissal ...
+    let mut unchanged = input("Notes (renamed)");
+    unchanged.sensitive_notes = SecretUpdate::Unchanged;
+    let a = accounts::update(&mut v, c, &a.id, &unchanged).unwrap();
+    assert!(!a.notes_suggestions.identifiers);
+    // ... changing the notes scans them again ...
+    let mut changed = input("Notes");
+    changed.sensitive_notes = set("Security question: first pet");
+    let a = accounts::update(&mut v, c, &a.id, &changed).unwrap();
+    assert!(a.notes_suggestions.security_answers && !a.notes_suggestions.identifiers);
+    // ... and clearing them clears the flags.
+    let mut cleared = input("Notes");
+    cleared.sensitive_notes = SecretUpdate::Clear;
+    let a = accounts::update(&mut v, c, &a.id, &cleared).unwrap();
+    assert!(!a.notes_suggestions.security_answers);
+    assert!(matches!(
+        accounts::dismiss_notes_suggestions(&mut v, "nope"),
+        Err(AppError::NotFound)
+    ));
+}
+
+/// Last activity is the latest of the last edit, "Mark verified" and the
+/// last use of the password from Vaultair; the list turns it into Active,
+/// Stale or Dormant. Starring or viewing doesn't count.
+#[test]
+fn last_activity_follows_edits_verification_and_password_use() {
+    let dir = tempfile::tempdir().unwrap();
+    let clock = ManualClock::default();
+    let mut v = new_vault(dir.path(), &clock);
+    let mut a_in = input("Activity");
+    a_in.password = set(SECRET);
+    let a = accounts::create(&mut v, &clock, &a_in).unwrap();
+    let created = a.last_activity_at.clone();
+    assert_eq!(created, a.updated_at);
+    assert_eq!(a.last_used_at, None);
+
+    let day = Duration::from_secs(86_400);
+    clock.advance(day);
+    let a = accounts::set_favorite(&mut v, &clock, &a.id, true).unwrap();
+    assert_eq!(a.last_activity_at, created, "starring isn't activity");
+
+    clock.advance(day);
+    let verified = accounts::mark_verified(&mut v, &clock, &a.id).unwrap();
+    assert!(verified.last_activity_at > created);
+    assert_eq!(
+        Some(&verified.last_activity_at),
+        verified.last_verified_at.as_ref()
+    );
+
+    clock.advance(day);
+    accounts::reveal(&v, &clock, &SecretRef::AccountPassword { id: a.id.clone() }).unwrap();
+    let used = accounts::get(&v, &a.id).unwrap();
+    assert!(used.last_activity_at > verified.last_activity_at);
+    assert_eq!(Some(&used.last_activity_at), used.last_used_at.as_ref());
+    assert_eq!(used.updated_at, a.updated_at, "using it isn't an edit");
+    let summary = &accounts::list(&v, false, &Default::default()).unwrap()[0];
+    assert_eq!(summary.last_activity_at, used.last_activity_at);
 }

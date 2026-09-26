@@ -155,6 +155,10 @@ pub struct AccountInput {
     pub recovery_phone: Option<String>,
     pub website_url: Option<String>,
     pub login_url: Option<String>,
+    /// The catalog platform it's on (Steam, Battle.net...), if any.
+    pub platform_id: Option<String>,
+    /// The catalog game it's for, if any.
+    pub game_id: Option<String>,
     pub publisher: Option<String>,
     pub region: Option<String>,
     pub player_id: Option<String>,
@@ -219,6 +223,17 @@ impl SecretRef {
     }
 }
 
+/// Narrows the account list. Every set field must match; `publisher`
+/// compares case-insensitively.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct AccountFilter {
+    pub platform_id: Option<String>,
+    pub game_id: Option<String>,
+    pub publisher: Option<String>,
+}
+
 /// Which stored URL "Open in browser" uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -259,6 +274,14 @@ pub struct AccountSummary {
     pub identity_name: Option<String>,
     pub username: Option<String>,
     pub email: Option<String>,
+    pub platform_id: Option<String>,
+    pub platform_name: Option<String>,
+    /// The platform's bundled logo, if it has one.
+    pub platform_icon: Option<String>,
+    pub game_id: Option<String>,
+    pub game_name: Option<String>,
+    /// The game's bundled logo, if it has one.
+    pub game_icon: Option<String>,
     pub publisher: Option<String>,
     pub has_password: bool,
     /// zxcvbn score 0–4 of the stored password, computed when it was saved.
@@ -272,6 +295,9 @@ pub struct AccountSummary {
     pub archived_at: Option<String>,
     pub tags: Vec<String>,
     pub updated_at: String,
+    /// The latest of the last edit, "Mark verified" and the last use of the
+    /// password from Vaultair. The UI turns it into Active, Stale or Dormant.
+    pub last_activity_at: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -336,17 +362,33 @@ pub struct AccountDetail {
     pub password_changed_at: Option<String>,
     pub website_url: Option<String>,
     pub login_url: Option<String>,
+    /// The platform's catalog login page, offered when `login_url` is empty.
+    pub catalog_login_url: Option<String>,
+    pub platform_id: Option<String>,
+    pub platform_name: Option<String>,
+    pub platform_icon: Option<String>,
+    pub game_id: Option<String>,
+    pub game_name: Option<String>,
+    pub game_icon: Option<String>,
     pub publisher: Option<String>,
     pub region: Option<String>,
     pub player_id: Option<String>,
     pub display_name: Option<String>,
     pub notes: Option<String>,
     pub has_sensitive_notes: bool,
+    /// Account details the sensitive notes seem to hold, to suggest moving
+    /// to their own fields (ADR-0006). Flags only, never the text.
+    pub notes_suggestions: crate::domain::notes_hints::NotesSuggestions,
     pub favorite: bool,
     pub archived_at: Option<String>,
     pub last_verified_at: Option<String>,
+    /// When the password was last revealed or copied from Vaultair.
+    pub last_used_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    /// The latest of the last edit, "Mark verified" and the last use of the
+    /// password from Vaultair. The UI turns it into Active, Stale or Dormant.
+    pub last_activity_at: String,
     pub tags: Vec<String>,
     pub custom_fields: Vec<CustomFieldView>,
     pub mfa: Vec<MfaView>,
@@ -405,6 +447,8 @@ impl Drop for TotpCodeView {
 pub struct UrlTarget {
     pub url: String,
     pub host: String,
+    /// The login page came from the platform catalog, not the account.
+    pub from_catalog: bool,
 }
 
 #[cfg(test)]

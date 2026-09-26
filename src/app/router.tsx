@@ -8,6 +8,7 @@ import {
 import { AccountDetailPage } from "@/features/accounts/AccountDetailPage";
 import { AccountForm } from "@/features/accounts/AccountForm";
 import { AccountsPage } from "@/features/accounts/AccountsPage";
+import { CatalogPage } from "@/features/catalog/CatalogPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { GeneratorPanel } from "@/features/generator/GeneratorPanel";
 import { IdentitiesPage } from "@/features/identities/IdentitiesPage";
@@ -26,6 +27,8 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   "/identities": IdentitiesPage,
   "/archived": () => <AccountsPage archived />,
   "/generator": GeneratorPanel,
+  "/games": () => <CatalogPage kind="game" />,
+  "/platforms": () => <CatalogPage kind="platform" />,
 };
 
 const pageRoutes = ALL_NAV_ITEMS.map((item) =>

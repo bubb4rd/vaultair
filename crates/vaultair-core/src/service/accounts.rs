@@ -16,12 +16,13 @@ use crate::crypto::fingerprint::password_fingerprint;
 use crate::crypto::keys::VaultKeys;
 use crate::crypto::password::strength;
 use crate::db::repo::account::{self as repo, AccountFields, CustomFieldRow};
-use crate::db::repo::{contact, identity, new_id, open_text, purpose, seal, tag};
+use crate::db::repo::{catalog, contact, identity, new_id, open_text, purpose, seal, tag};
 use crate::domain::account::{
-    AccountDetail, AccountInput, AccountStatus, AccountSummary, AccountUrl, CustomFieldInput,
-    CustomFieldType, PurposeView, SecretRef, SecretUpdate, UrlTarget,
+    AccountDetail, AccountFilter, AccountInput, AccountStatus, AccountSummary, AccountUrl,
+    CustomFieldInput, CustomFieldType, PurposeView, SecretRef, SecretUpdate, UrlTarget,
 };
 use crate::domain::identity::{ContactKind, ContactRole};
+use crate::domain::notes_hints;
 use crate::domain::validation::{
     self as v, MAX_NOTES_CHARS, MAX_SECRET_CHARS, MAX_SHORT_CHARS, MAX_TITLE_CHARS,
 };
@@ -53,9 +54,13 @@ pub fn tags(vault: &OpenVault) -> Result<Vec<String>, AppError> {
     Ok(tag::list(vault.conn())?)
 }
 
-/// Active accounts, or archived ones.
-pub fn list(vault: &OpenVault, archived: bool) -> Result<Vec<AccountSummary>, AppError> {
-    Ok(repo::summaries(vault.conn(), archived)?)
+/// Active accounts, or archived ones, matching `filter`.
+pub fn list(
+    vault: &OpenVault,
+    archived: bool,
+    filter: &AccountFilter,
+) -> Result<Vec<AccountSummary>, AppError> {
+    Ok(repo::summaries(vault.conn(), archived, filter)?)
 }
 
 pub fn get(vault: &OpenVault, id: &str) -> Result<AccountDetail, AppError> {
@@ -89,6 +94,20 @@ fn validate_fields(conn: &Connection, input: &AccountInput) -> Result<AccountFie
             Some(id.to_owned())
         }
     };
+    let platform_id = match input.platform_id.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(id) if catalog::platform_exists(conn, id)? => Some(id.to_owned()),
+        Some(_) => {
+            return Err(AppError::InvalidInput {
+                field: "platformId",
+            })
+        }
+    };
+    let game_id = match input.game_id.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(id) if catalog::game_exists(conn, id)? => Some(id.to_owned()),
+        Some(_) => return Err(AppError::InvalidInput { field: "gameId" }),
+    };
     Ok(AccountFields {
         title: v::required(&input.title, "title", MAX_TITLE_CHARS)?,
         account_type: input.account_type,
@@ -99,6 +118,8 @@ fn validate_fields(conn: &Connection, input: &AccountInput) -> Result<AccountFie
         email: v::optional_email(input.email.as_deref(), "email")?,
         website_url: v::optional_web_url(input.website_url.as_deref(), "websiteUrl")?,
         login_url: v::optional_web_url(input.login_url.as_deref(), "loginUrl")?,
+        platform_id,
+        game_id,
         publisher: v::optional(input.publisher.as_deref(), "publisher", MAX_SHORT_CHARS)?,
         region: v::optional(input.region.as_deref(), "region", MAX_SHORT_CHARS)?,
         player_id: v::optional(input.player_id.as_deref(), "playerId", MAX_SHORT_CHARS)?,
@@ -337,14 +358,15 @@ fn apply_sensitive_notes(
 ) -> Result<(), AppError> {
     match update {
         SecretUpdate::Unchanged => Ok(()),
-        SecretUpdate::Clear => Ok(repo::set_sensitive_notes(conn, id, None)?),
+        SecretUpdate::Clear => Ok(repo::set_sensitive_notes(conn, id, None, 0)?),
         SecretUpdate::Set { value } => {
             match v::optional_multiline(Some(value), "sensitiveNotes", MAX_NOTES_CHARS)? {
-                None => repo::set_sensitive_notes(conn, id, None)?,
+                None => repo::set_sensitive_notes(conn, id, None, 0)?,
                 Some(text) => {
                     let text = Zeroizing::new(text);
                     let enc = seal(keys, TABLE, NOTES_COL, id, text.as_bytes())?;
-                    repo::set_sensitive_notes(conn, id, Some(&enc))?;
+                    let hints = notes_hints::scan(&text);
+                    repo::set_sensitive_notes(conn, id, Some(&enc), hints)?;
                 }
             }
             Ok(())
@@ -453,6 +475,18 @@ pub fn mark_verified(
     get(vault, id)
 }
 
+/// Keeps the sensitive notes as they are: the account page stops suggesting
+/// moving details out of them until the notes change.
+pub fn dismiss_notes_suggestions(
+    vault: &mut OpenVault,
+    id: &str,
+) -> Result<AccountDetail, AppError> {
+    if !repo::dismiss_notes_hints(vault.conn(), id)? {
+        return Err(AppError::NotFound);
+    }
+    get(vault, id)
+}
+
 /// Permanently deletes an account. `confirm_title` must match its title:
 /// the UI makes the user type it, and the backend checks it, so a stray call
 /// can't delete anything.
@@ -509,7 +543,6 @@ pub fn duplicate_as_template(
         ..source
     };
     repo::insert(&tx, &new, &fields, &now)?;
-    repo::copy_links(&tx, id, &new)?;
     let labels: Vec<CustomFieldRow> = repo::custom_fields(&tx, id)?
         .into_iter()
         .map(|f| CustomFieldRow {
@@ -530,13 +563,22 @@ pub fn duplicate_as_template(
 
 /// The stored website or login URL, validated again (it could predate a
 /// stricter rule, or have been edited outside the app), with its host for
-/// the confirm dialog.
+/// the confirm dialog. With no login URL of its own, an account on a catalog
+/// platform uses the platform's login page, and says so.
 pub fn url_target(vault: &OpenVault, id: &str, which: AccountUrl) -> Result<UrlTarget, AppError> {
-    let stored = not_found(repo::url(vault.conn(), id, which == AccountUrl::Login)?)?;
-    let stored = stored.ok_or(AppError::NotFound)?;
+    let (own, catalog) = not_found(repo::url(vault.conn(), id, which == AccountUrl::Login)?)?;
+    let (stored, from_catalog) = match (own, catalog) {
+        (Some(url), _) => (url, false),
+        (None, Some(url)) => (url, true),
+        (None, None) => return Err(AppError::NotFound),
+    };
     let url = v::web_url(&stored, "url")?;
     let host = v::host_of(&url).ok_or(AppError::InvalidInput { field: "url" })?;
-    Ok(UrlTarget { url, host })
+    Ok(UrlTarget {
+        url,
+        host,
+        from_catalog,
+    })
 }
 
 // ---- Secret reads ------------------------------------------------------------
@@ -553,7 +595,10 @@ pub fn reveal(
     let value = match target {
         SecretRef::AccountPassword { id } => {
             let (enc, _) = not_found(repo::password(conn, id)?)?;
-            open_text(keys, TABLE, PASSWORD_COL, id, &not_found(enc)?)?
+            let value = open_text(keys, TABLE, PASSWORD_COL, id, &not_found(enc)?)?;
+            // Using the password counts as activity (Active, Stale, Dormant).
+            repo::set_used(conn, id, &clock.now_rfc3339())?;
+            value
         }
         SecretRef::SensitiveNotes { id } => {
             let enc = not_found(not_found(repo::sensitive_notes(conn, id)?)?)?;

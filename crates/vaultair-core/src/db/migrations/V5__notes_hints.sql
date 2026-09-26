@@ -1,0 +1,11 @@
+-- V5__notes_hints.sql: suggestions for account details kept in sensitive
+-- notes (ADR-0006), and more email providers in the catalog.
+--
+-- Flag bits from `domain::notes_hints::scan`, computed when the notes are
+-- saved (1 identifiers, 2 credentials, 4 backup codes, 8 security answers,
+-- 128 dismissed). Never the text itself. Notes saved before V5 read as 0
+-- until they're next saved: they're encrypted, so SQL can't scan them.
+--
+-- The migration runner seeds the catalog again after this script (see
+-- migrate.rs), adding the new built-in email providers.
+ALTER TABLE account ADD COLUMN sensitive_notes_hints INTEGER NOT NULL DEFAULT 0;
