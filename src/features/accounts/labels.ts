@@ -48,6 +48,41 @@ export const ACCOUNT_STATUSES: { value: AccountStatus; label: string; badge: Sta
 
 export const FORM_STATUSES = ACCOUNT_STATUSES.filter((s) => s.value !== "archived");
 
+/**
+ * Days without activity (an edit, "Mark verified", or using the password
+ * from Vaultair) before an active account shows as Stale, then Dormant.
+ * Vaultair can't see logins elsewhere, so shorter spans would mark nearly
+ * everything stale.
+ */
+export const STALE_AFTER_DAYS = 30;
+export const DORMANT_AFTER_DAYS = 90;
+
+/** Whole days from `iso` to `now` (0 for today or a future date). */
+export function daysSince(iso: string, now: Date = new Date()): number {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.floor((startOfDay(now) - startOfDay(d)) / 86_400_000));
+}
+
+/**
+ * The status an account shows. One the user set (locked, dormant, retired...)
+ * always wins; an active account turns Stale, then Dormant, with no activity.
+ * Archived accounts keep the status they had. `activity` is the second line:
+ * how long since anything happened.
+ */
+export function displayStatus(
+  account: { status: AccountStatus; lastActivityAt: string; archivedAt: string | null },
+  now: Date = new Date(),
+): { label: string; badge: Status; activity: string } {
+  const set = accountStatus(account.status);
+  const idle = daysSince(account.lastActivityAt, now);
+  const activity = idle === 0 ? "Active today" : `Last activity ${formatRelative(account.lastActivityAt, now).toLowerCase()}`;
+  if (account.status !== "active" || account.archivedAt) return { label: set.label, badge: set.badge, activity };
+  if (idle >= DORMANT_AFTER_DAYS) return { label: "Dormant", badge: "dormant", activity: `No activity for ${String(idle)} days` };
+  if (idle >= STALE_AFTER_DAYS) return { label: "Stale", badge: "attention", activity: `No activity for ${String(idle)} days` };
+  return { label: set.label, badge: set.badge, activity };
+}
+
 export function accountStatus(value: AccountStatus) {
   return ACCOUNT_STATUSES.find((s) => s.value === value) ?? { value, label: "Unknown", badge: "unknown" as Status };
 }

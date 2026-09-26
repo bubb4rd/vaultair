@@ -36,6 +36,7 @@ fn main() {
             "account_unarchive",
             "account_set_favorite",
             "account_mark_verified",
+            "account_dismiss_notes_suggestions",
             "account_delete",
             "account_duplicate_as_template",
             "account_url_target",
@@ -61,6 +62,16 @@ fn main() {
             "identity_assign_accounts",
             "contact_point_list",
             "dashboard_summary",
+            "platform_list",
+            "platform_create",
+            "platform_update",
+            "game_list",
+            "game_create",
+            "game_update",
+            "game_profile_list",
+            "game_profile_create",
+            "game_profile_update",
+            "game_profile_delete",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

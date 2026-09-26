@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-game-create"
+description = "Enables the game_create command without any pre-configured scope."
+commands.allow = ["game_create"]
+
+[[permission]]
+identifier = "deny-game-create"
+description = "Denies the game_create command without any pre-configured scope."
+commands.deny = ["game_create"]

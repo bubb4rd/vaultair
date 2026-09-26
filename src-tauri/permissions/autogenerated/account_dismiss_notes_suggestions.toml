@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-dismiss-notes-suggestions"
+description = "Enables the account_dismiss_notes_suggestions command without any pre-configured scope."
+commands.allow = ["account_dismiss_notes_suggestions"]
+
+[[permission]]
+identifier = "deny-account-dismiss-notes-suggestions"
+description = "Denies the account_dismiss_notes_suggestions command without any pre-configured scope."
+commands.deny = ["account_dismiss_notes_suggestions"]

@@ -1,5 +1,6 @@
 pub mod account;
 pub mod app;
+pub mod catalog;
 pub mod clipboard;
 pub mod generator;
 pub mod identity;

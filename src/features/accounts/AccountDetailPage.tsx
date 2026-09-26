@@ -8,6 +8,7 @@ import {
   CopySimpleIcon,
   DotsThreeIcon,
   KeyIcon,
+  LightbulbIcon,
   PencilSimpleIcon,
   SealCheckIcon,
   StarIcon,
@@ -25,13 +26,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AccountLogo } from "@/features/catalog/CatalogLogo";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
 import { accounts, toIpcError, type AccountDetail, type AccountUrl } from "@/ipc/client";
 import { DeleteConfirmDialog, OpenUrlDialog } from "./ConfirmDialogs";
+import { GameProfilesSection } from "./GameProfilesSection";
+import { suggestionLines } from "./notesHints";
 import { MfaSection } from "./MfaSection";
 import { CopyButton, FieldRow, SecretField } from "./SecretField";
-import { accountStatus, accountType, formatDate, passwordStrength } from "./labels";
+import { accountType, displayStatus, formatDate, passwordStrength } from "./labels";
 
 function Panel({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -56,15 +60,12 @@ function Meta({ label, children }: { label: string; children: ReactNode }) {
 /** Left column: what the account is, at a glance. */
 function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () => void }) {
   const type = accountType(account.accountType);
-  const status = accountStatus(account.status);
-  const Icon = type.icon;
-  const subtitle = [type.label, account.publisher].filter(Boolean).join(" · ");
+  const status = displayStatus(account);
+  const subtitle = [type.label, account.platformName ?? account.gameName ?? account.publisher].filter(Boolean).join(" · ");
   return (
     <aside aria-label="Account summary" className="flex flex-col gap-5">
       <div className="flex items-start gap-3">
-        <div className="grid size-11 shrink-0 place-items-center rounded-lg border border-border-strong bg-card text-muted-foreground">
-          <Icon aria-hidden="true" className="size-5" />
-        </div>
+        <AccountLogo account={account} size="lg" />
         <div className="min-w-0 pt-0.5">
           <p className="text-[15px] font-semibold break-words">{account.title}</p>
           <p className="text-[13px] text-muted-foreground">{subtitle}</p>
@@ -72,7 +73,10 @@ function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () =
       </div>
       <dl className="flex flex-col gap-4">
         <Meta label="Status">
-          <StatusBadge status={status.badge} label={status.label} />
+          <span className="flex flex-col items-start gap-1">
+            <StatusBadge status={status.badge} label={status.label} />
+            <span className="text-xs text-subtle-foreground">{status.activity}</span>
+          </span>
         </Meta>
         <Meta label="Identity">
           {account.identityId && account.identityName ? (
@@ -88,6 +92,8 @@ function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () =
           )}
         </Meta>
         <Meta label="Purpose">{account.purposeName}</Meta>
+        {account.platformName && <Meta label="Platform">{account.platformName}</Meta>}
+        {account.gameName && <Meta label="Game">{account.gameName}</Meta>}
         <Meta label="Tags">
           {account.tags.length === 0 ? (
             <span className="text-subtle-foreground">None</span>
@@ -119,7 +125,17 @@ function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () =
   );
 }
 
-function UrlRow({ label, url, onOpen }: { label: string; url: string | null; onOpen: () => void }) {
+function UrlRow({
+  label,
+  url,
+  note,
+  onOpen,
+}: {
+  label: string;
+  url: string | null;
+  note?: string | undefined;
+  onOpen: () => void;
+}) {
   return (
     <FieldRow
       label={label}
@@ -132,8 +148,62 @@ function UrlRow({ label, url, onOpen }: { label: string; url: string | null; onO
         )
       }
     >
-      {url && <span className="font-mono text-xs break-all">{url}</span>}
+      {url && (
+        <span className="flex flex-col gap-0.5">
+          <span className="font-mono text-xs break-all">{url}</span>
+          {note && <span className="text-xs text-subtle-foreground">{note}</span>}
+        </span>
+      )}
     </FieldRow>
+  );
+}
+
+/**
+ * Suggests moving account details out of the sensitive notes into their own
+ * fields (ADR-0006). The flags come from Rust, set when the notes were
+ * saved; nothing here reads the notes. Declining keeps them as they are.
+ */
+function NotesSuggestion({ account }: { account: AccountDetail }) {
+  const updated = useAccountUpdated();
+  const lines = suggestionLines(account.notesSuggestions);
+  if (!account.hasSensitiveNotes || lines.length === 0) return null;
+
+  function keep() {
+    accounts
+      .dismissNotesSuggestions(account.id)
+      .then(updated)
+      .catch((err: unknown) => {
+        toast.error("That didn't work", { description: toIpcError(err).message });
+      });
+  }
+
+  return (
+    <section
+      aria-labelledby="notes-suggestion-heading"
+      className="flex gap-3 rounded-lg border border-status-linked/40 bg-status-linked/8 px-4 py-3"
+    >
+      <LightbulbIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-status-linked" weight="bold" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <h2 id="notes-suggestion-heading" className="text-[13px] font-medium">
+          Your sensitive notes may hold details that have their own field
+        </h2>
+        <ul className="flex list-disc flex-col gap-1 pl-4 text-[13px] text-muted-foreground">
+          {lines.map((l) => (
+            <li key={l.key}>{l.text}</li>
+          ))}
+        </ul>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" size="xs">
+            <Link to="/accounts/$accountId/edit" params={{ accountId: account.id }}>
+              Edit account
+            </Link>
+          </Button>
+          <Button type="button" variant="ghost" size="xs" onClick={keep}>
+            Keep in notes
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -346,7 +416,12 @@ function Detail({ account }: { account: AccountDetail }) {
               <FieldRow label="Recovery phone">{account.recoveryPhone}</FieldRow>
               <UrlRow
                 label="Login page"
-                url={account.loginUrl}
+                url={account.loginUrl ?? account.catalogLoginUrl}
+                note={
+                  account.loginUrl
+                    ? undefined
+                    : `From the ${account.platformName ?? "platform"} catalog entry, not saved on this account.`
+                }
                 onOpen={() => {
                   setOpening("login");
                 }}
@@ -363,6 +438,8 @@ function Detail({ account }: { account: AccountDetail }) {
             <MfaSection account={account} />
 
             <Security account={account} />
+
+            <GameProfilesSection account={account} />
 
             {hasGameDetails && (
               <Panel id="game-heading" title="Game details">
@@ -410,6 +487,8 @@ function Detail({ account }: { account: AccountDetail }) {
                 <FieldRow label="Sensitive notes" />
               )}
             </Panel>
+
+            <NotesSuggestion account={account} />
           </div>
         </div>
       </div>

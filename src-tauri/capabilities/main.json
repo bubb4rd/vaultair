@@ -45,6 +45,7 @@
     "allow-account-unarchive",
     "allow-account-set-favorite",
     "allow-account-mark-verified",
+    "allow-account-dismiss-notes-suggestions",
     "allow-account-delete",
     "allow-account-duplicate-as-template",
     "allow-account-url-target",
@@ -69,6 +70,16 @@
     "allow-identity-delete",
     "allow-identity-assign-accounts",
     "allow-contact-point-list",
-    "allow-dashboard-summary"
+    "allow-dashboard-summary",
+    "allow-platform-list",
+    "allow-platform-create",
+    "allow-platform-update",
+    "allow-game-list",
+    "allow-game-create",
+    "allow-game-update",
+    "allow-game-profile-list",
+    "allow-game-profile-create",
+    "allow-game-profile-update",
+    "allow-game-profile-delete"
   ]
 }

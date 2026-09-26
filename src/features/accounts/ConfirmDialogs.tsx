@@ -175,6 +175,12 @@ export function OpenUrlDialog({
           <div className="flex flex-col gap-1 rounded-md border border-border-strong bg-background/40 px-3 py-2.5">
             <span className="text-[15px] font-semibold text-foreground">{target.host}</span>
             <span className="font-mono text-xs break-all text-muted-foreground">{target.url}</span>
+            {target.fromCatalog && (
+              <span className="pt-1 text-xs text-subtle-foreground">
+                Catalog-provided: this address comes from Vaultair's platform list, not from this account. Check it
+                before you sign in, or save your own login page on the account.
+              </span>
+            )}
           </div>
         )}
         {error && <p className="text-[13px] text-status-risk">{error}</p>}

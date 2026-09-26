@@ -6,7 +6,9 @@ import {
   useAccount,
   useAccountUpdated,
   useContactPoints,
+  useGames,
   useIdentityRefs,
+  usePlatforms,
   usePurposes,
   useTags,
 } from "@/app/queries";
@@ -16,6 +18,7 @@ import { PasswordInput } from "@/components/common/PasswordInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, Textarea } from "@/components/ui/textarea";
+import { emailProvider } from "@/features/catalog/logos";
 import { GeneratorPopover } from "@/features/generator/GeneratorPopover";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
@@ -31,6 +34,7 @@ import {
 } from "@/ipc/client";
 import { CustomFieldsEditor, draftsFrom, toInputs, type CustomFieldDraft } from "./CustomFieldsEditor";
 import { ACCOUNT_TYPES, FORM_STATUSES } from "./labels";
+import { scanNotes, suggestionLines } from "./notesHints";
 import { freshSecret, toUpdate, type SecretEdit } from "./secretEdit";
 
 interface FormState {
@@ -45,6 +49,8 @@ interface FormState {
   recoveryPhone: string;
   websiteUrl: string;
   loginUrl: string;
+  platformId: string;
+  gameId: string;
   publisher: string;
   region: string;
   playerId: string;
@@ -62,6 +68,8 @@ const MESSAGES: Record<string, string> = {
   title: "Enter a name for this account.",
   purposeId: "Choose a purpose.",
   identityId: "That identity no longer exists. Choose another one.",
+  platformId: "That platform no longer exists. Choose another one.",
+  gameId: "That game no longer exists. Choose another one.",
   email: "Enter an email address like name@example.com.",
   recoveryEmail: "Enter an email address like name@example.com.",
   recoveryPhone: "Keep the phone reference on one line.",
@@ -87,6 +95,8 @@ function blank(purposeId: string, identityId: string): FormState {
     recoveryPhone: "",
     websiteUrl: "",
     loginUrl: "",
+    platformId: "",
+    gameId: "",
     publisher: "",
     region: "",
     playerId: "",
@@ -112,6 +122,8 @@ function fromDetail(d: AccountDetail): FormState {
     recoveryPhone: d.recoveryPhone ?? "",
     websiteUrl: d.websiteUrl ?? "",
     loginUrl: d.loginUrl ?? "",
+    platformId: d.platformId ?? "",
+    gameId: d.gameId ?? "",
     publisher: d.publisher ?? "",
     region: d.region ?? "",
     playerId: d.playerId ?? "",
@@ -125,6 +137,14 @@ function fromDetail(d: AccountDetail): FormState {
 }
 
 const opt = (s: string) => (s.trim() === "" ? null : s);
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
 
 function toInput(f: FormState): AccountInput {
   return {
@@ -140,6 +160,8 @@ function toInput(f: FormState): AccountInput {
     recoveryPhone: opt(f.recoveryPhone),
     websiteUrl: opt(f.websiteUrl),
     loginUrl: opt(f.loginUrl),
+    platformId: opt(f.platformId),
+    gameId: opt(f.gameId),
     publisher: opt(f.publisher),
     region: opt(f.region),
     playerId: opt(f.playerId),
@@ -176,10 +198,10 @@ function TextField({
   label: string;
   value: string;
   error?: string | undefined;
-  help?: string;
+  help?: string | undefined;
   onChange: (v: string) => void;
   type?: string;
-  placeholder?: string;
+  placeholder?: string | undefined;
   required?: boolean;
   inputMode?: "email" | "url" | "text";
   list?: string;
@@ -343,13 +365,37 @@ export function TagsInput({
   );
 }
 
+/** While typing: account details that may belong in their own field (ADR-0006). */
+function NotesHint({ text }: { text: string }) {
+  const lines = suggestionLines(scanNotes(text));
+  if (lines.length === 0) return null;
+  return (
+    <div className="rounded-md border border-status-linked/40 bg-status-linked/8 px-3 py-2 text-[13px] text-muted-foreground">
+      <p className="font-medium text-foreground">Some of this may belong in its own field</p>
+      <ul className="mt-1 flex list-disc flex-col gap-1 pl-4">
+        {lines.map((l) => (
+          <li key={l.key}>{l.text}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Form({ initial, existing }: { initial: FormState; existing: AccountDetail | null }) {
   const navigate = useNavigate();
   const purposes = usePurposes();
   const identityRefs = useIdentityRefs();
   const contacts = useContactPoints();
+  const platforms = usePlatforms();
+  const games = useGames();
   const updated = useAccountUpdated();
   const [form, setForm] = useState(initial);
+  const platform = platforms.data?.find((p) => p.id === form.platformId);
+  const game = games.data?.find((g) => g.id === form.gameId);
+  const catalogLogin = platform?.defaultLoginUrl ? hostOf(platform.defaultLoginUrl) : null;
+  // An email account without a platform: offer the provider its address is at.
+  const provider = form.accountType === "email" && !form.platformId ? emailProvider(form.email) : null;
+  const providerPlatform = provider ? platforms.data?.find((p) => p.id === provider.platformId) : undefined;
   // An archived identity isn't offered for new picks, but an account that
   // already has one keeps showing it.
   const identityOptions = [...(identityRefs.data ?? [])];
@@ -362,9 +408,59 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
   const [saving, setSaving] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Fields the user set themselves: inferring from the email never overwrites them.
+  const [touched, setTouched] = useState<ReadonlySet<keyof FormState>>(() => new Set());
+  // What the email filled in, and what those fields held before, for Undo.
+  const [inferred, setInferred] = useState<{ summary: string; previous: Partial<FormState> } | null>(null);
+
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: undefined }));
+    setTouched((t) => (t.has(key) ? t : new Set(t).add(key)));
+  }
+
+  /**
+   * A new account whose first detail is a Gmail, Outlook, Yahoo... address
+   * is most likely that mailbox, so the email fills in the type, platform,
+   * name and publisher. Only while those are still blank and untouched: on
+   * a Steam account the email is just its login, and once there's a name
+   * the "Set the platform" suggestion below is offered instead.
+   */
+  function changeEmail(value: string) {
+    set("email", value);
+    if (existing || inferred) return;
+    const match = emailProvider(value);
+    const entry = match ? platforms.data?.find((p) => p.id === match.platformId) : undefined;
+    const untouched = !touched.has("accountType") && !touched.has("platformId") && !touched.has("title");
+    if (!entry || !untouched || form.title.trim() !== "" || form.platformId) return;
+    const fill: Partial<FormState> = { accountType: "email", platformId: entry.id, title: entry.name };
+    if (form.publisher.trim() === "" && entry.publisher) fill.publisher = entry.publisher;
+    const previous: Partial<FormState> = {
+      accountType: form.accountType,
+      platformId: form.platformId,
+      title: form.title,
+      ...(fill.publisher ? { publisher: form.publisher } : {}),
+    };
+    setForm((f) => ({ ...f, ...fill }));
+    setInferred({
+      summary: [
+        "type Email",
+        `platform ${entry.name}`,
+        `name “${entry.name}”`,
+        fill.publisher ? `publisher ${fill.publisher}` : null,
+      ]
+        .filter(Boolean)
+        .join(", "),
+      previous,
+    });
+  }
+
+  function undoInference() {
+    if (!inferred) return;
+    setForm((f) => ({ ...f, ...inferred.previous }));
+    // Undone on purpose: don't infer again from the next keystroke.
+    setTouched((t) => new Set([...t, "accountType", "platformId"]));
+    setInferred(null);
   }
 
   function focusField(field: string) {
@@ -494,7 +590,87 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                   ))}
                 </NativeSelect>
               </Field>
+              <Field
+                id="acct-platformId"
+                label="Platform"
+                error={errors.platformId}
+                help="Where you sign in: a launcher, console network or service."
+              >
+                <NativeSelect
+                  id="acct-platformId"
+                  value={form.platformId}
+                  aria-invalid={errors.platformId ? true : undefined}
+                  aria-describedby={describedBy("acct-platformId", {
+                    help: true,
+                    error: Boolean(errors.platformId),
+                  })}
+                  onChange={(e) => {
+                    set("platformId", e.target.value);
+                  }}
+                >
+                  <option value="">No platform</option>
+                  {(platforms.data ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <Field
+                id="acct-gameId"
+                label="Game"
+                error={errors.gameId}
+                help="For an account that belongs to one game."
+              >
+                <NativeSelect
+                  id="acct-gameId"
+                  value={form.gameId}
+                  aria-invalid={errors.gameId ? true : undefined}
+                  aria-describedby={describedBy("acct-gameId", { help: true, error: Boolean(errors.gameId) })}
+                  onChange={(e) => {
+                    set("gameId", e.target.value);
+                  }}
+                >
+                  <option value="">No game</option>
+                  {(games.data ?? []).map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
             </div>
+            <p className="text-xs text-subtle-foreground">
+              Missing one?{" "}
+              <Link
+                to={PAGE_PATHS.platforms}
+                className="rounded-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                Add a platform
+              </Link>{" "}
+              or{" "}
+              <Link
+                to={PAGE_PATHS.games}
+                className="rounded-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              >
+                a game
+              </Link>
+              .
+            </p>
+            {providerPlatform && (
+              <p className="text-xs text-muted-foreground">
+                That's a {providerPlatform.name} address.{" "}
+                <button
+                  type="button"
+                  className="rounded-sm text-foreground underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+                  onClick={() => {
+                    set("platformId", providerPlatform.id);
+                  }}
+                >
+                  Set the platform to {providerPlatform.name}
+                </button>
+              </p>
+            )}
           </Section>
 
           <Section title="Sign-in" description="The password is encrypted separately and stays hidden until you ask for it.">
@@ -516,11 +692,21 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                 list="acct-email-suggestions"
                 value={form.email}
                 error={errors.email}
-                onChange={(v) => {
-                  set("email", v);
-                }}
+                onChange={changeEmail}
               />
             </div>
+            {inferred && (
+              <p role="status" className="text-xs text-muted-foreground">
+                Filled in from the address: {inferred.summary}.{" "}
+                <button
+                  type="button"
+                  className="rounded-sm text-foreground underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
+                  onClick={undoInference}
+                >
+                  Undo
+                </button>
+              </p>
+            )}
             <div className="flex flex-col gap-2">
               <label htmlFor="acct-password" className="text-[13px] font-medium text-foreground">
                 Password
@@ -596,6 +782,11 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                 label="Login page"
                 inputMode="url"
                 placeholder="https://"
+                help={
+                  catalogLogin && !form.loginUrl.trim()
+                    ? `Empty uses ${platform?.name ?? "the platform"}'s catalog login page (${catalogLogin}).`
+                    : undefined
+                }
                 value={form.loginUrl}
                 error={errors.loginUrl}
                 onChange={(v) => {
@@ -652,6 +843,7 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
               <TextField
                 id="acct-publisher"
                 label="Publisher"
+                placeholder={game?.publisher ?? platform?.publisher ?? undefined}
                 value={form.publisher}
                 error={errors.publisher}
                 onChange={(v) => {
@@ -748,6 +940,7 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
               <p id="acct-sensitiveNotes-help" className="text-[13px] text-muted-foreground">
                 Encrypted and hidden like the password, and never included in search.
               </p>
+              {form.sensitiveNotes.mode === "set" && <NotesHint text={form.sensitiveNotes.value} />}
               {errors.sensitiveNotes && <FieldError>{errors.sensitiveNotes}</FieldError>}
             </div>
           </Section>

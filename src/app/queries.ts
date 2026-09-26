@@ -4,11 +4,15 @@ import {
   catalog,
   contactPoints,
   dashboard,
+  gameProfiles,
   identities,
+  NO_ACCOUNT_FILTER,
   recentVaults,
   session,
   vault,
   type AccountDetail,
+  type AccountFilter,
+  type GameProfileFilter,
   type IdentityDetail,
   type VaultInfo,
 } from "@/ipc/client";
@@ -21,7 +25,8 @@ export const queryKeys = {
   vaultStatus: ["vault", "status"] as const,
   recentVaults: ["recentVaults"] as const,
   accounts: ["accounts"] as const,
-  accountList: (archived: boolean) => ["accounts", "list", archived ? "archived" : "active"] as const,
+  accountList: (archived: boolean, filter: AccountFilter = NO_ACCOUNT_FILTER) =>
+    ["accounts", "list", archived ? "archived" : "active", filter] as const,
   account: (id: string) => ["accounts", "detail", id] as const,
   sessionConfig: ["session", "config"] as const,
   purposes: ["purposes"] as const,
@@ -34,6 +39,11 @@ export const queryKeys = {
   contactPoints: ["contactPoints"] as const,
   dashboard: ["dashboard"] as const,
   dashboardSummary: (identityId: string | null) => ["dashboard", "summary", identityId ?? "all"] as const,
+  catalog: ["catalog"] as const,
+  platforms: ["catalog", "platforms"] as const,
+  games: ["catalog", "games"] as const,
+  gameProfiles: ["gameProfiles"] as const,
+  gameProfileList: (filter: GameProfileFilter) => ["gameProfiles", filter] as const,
 };
 
 /**
@@ -68,9 +78,9 @@ export function useSessionConfig() {
   return useQuery({ queryKey: queryKeys.sessionConfig, queryFn: session.config });
 }
 
-/** Active accounts, or archived ones. */
-export function useAccounts(archived = false) {
-  return useQuery({ queryKey: queryKeys.accountList(archived), queryFn: () => accounts.list(archived) });
+/** Active accounts, or archived ones, optionally narrowed by platform, game or publisher. */
+export function useAccounts(archived = false, filter: AccountFilter = NO_ACCOUNT_FILTER) {
+  return useQuery({ queryKey: queryKeys.accountList(archived, filter), queryFn: () => accounts.list(archived, filter) });
 }
 
 export function useAccount(id: string, enabled = true) {
@@ -103,6 +113,20 @@ export function useIdentityOverview(id: string) {
   return useQuery({ queryKey: queryKeys.identityOverview(id), queryFn: () => identities.overview(id) });
 }
 
+/** Every platform, with how many accounts and profiles use each. */
+export function usePlatforms() {
+  return useQuery({ queryKey: queryKeys.platforms, queryFn: catalog.platforms });
+}
+
+/** Every game, with how many accounts and profiles use each. */
+export function useGames() {
+  return useQuery({ queryKey: queryKeys.games, queryFn: catalog.games });
+}
+
+export function useGameProfiles(filter: GameProfileFilter) {
+  return useQuery({ queryKey: queryKeys.gameProfileList(filter), queryFn: () => gameProfiles.list(filter) });
+}
+
 export function useContactPoints() {
   return useQuery({ queryKey: queryKeys.contactPoints, queryFn: contactPoints.list });
 }
@@ -126,6 +150,8 @@ function invalidateDerived(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.contactPoints });
   void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
   void queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.gameProfiles });
 }
 
 /**
@@ -171,6 +197,19 @@ export function useIdentitiesChanged() {
       queryClient.removeQueries({ queryKey: queryKeys.identity(removedId) });
       queryClient.removeQueries({ queryKey: queryKeys.identityOverview(removedId) });
     }
+    invalidateDerived(queryClient);
+    void queryClient.invalidateQueries({ queryKey: ["accounts", "detail"] });
+  };
+}
+
+/**
+ * After a catalog write (a platform or game added or edited) or a game
+ * profile change: everything that names or counts catalog entries refetches,
+ * account details included.
+ */
+export function useCatalogChanged() {
+  const queryClient = useQueryClient();
+  return () => {
     invalidateDerived(queryClient);
     void queryClient.invalidateQueries({ queryKey: ["accounts", "detail"] });
   };
