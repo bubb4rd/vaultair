@@ -1,10 +1,8 @@
-/** The Vaultair mark: a dial ring with a center point. Simple geometry, matches the app icon. */
+/** The Vaultair mark: a chevron aimed toward the lower right. */
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
-      <rect width="24" height="24" rx="6" fill="var(--foreground)" />
-      <circle cx="12" cy="12" r="6.25" fill="none" stroke="var(--background)" strokeWidth="1.75" />
-      <circle cx="12" cy="12" r="1.6" fill="var(--background)" />
+    <svg viewBox="0 0 128 128" aria-hidden="true" className={className}>
+      <path fill="currentColor" d="M43 0H68L125 111L117 122L0 68V38L80 73Z" />
     </svg>
   );
 }
