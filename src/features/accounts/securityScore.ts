@@ -111,6 +111,29 @@ function backupChip(facts: SecurityFacts): SecurityChip {
   return { key: "backup", status: "attention", label: "None saved", ...folded };
 }
 
+/** Facts for one account. `issues` is null while health checks are still loading. */
+export function accountSecurityFacts(
+  account: {
+    id: string;
+    archivedAt: string | null;
+    passwordStrength: number | null;
+    passwordChangedAt: string | null;
+    mfa: readonly { enabled: boolean; backupCodesRemaining: number }[];
+  },
+  issues: HealthIssue[] | null,
+): SecurityFacts {
+  const enabled = account.mfa.filter((method) => method.enabled);
+  return {
+    archived: account.archivedAt !== null,
+    passwordStrength: account.passwordStrength,
+    passwordChangedAt: account.passwordChangedAt,
+    mfaEnabled: enabled.length,
+    mfaRecorded: account.mfa.length,
+    backupCodesRemaining: enabled.reduce((count, method) => count + method.backupCodesRemaining, 0),
+    issues: issues?.filter((issue) => issue.accountId === account.id) ?? null,
+  };
+}
+
 /**
  * Composite of password strength, MFA, backup codes, and reuse.
  * Deductions that a health issue only restates are applied once.

@@ -37,7 +37,7 @@ import { MfaSection } from "./MfaSection";
 import { CopyButton, FieldRow, SecretField } from "./SecretField";
 import { SecurityDial } from "./SecurityDial";
 import { accountType, displayStatus, formatDate } from "./labels";
-import { securityScore } from "./securityScore";
+import { accountSecurityFacts, securityScore } from "./securityScore";
 
 function Panel({
   id,
@@ -221,17 +221,8 @@ function NotesSuggestion({ account }: { account: AccountDetail }) {
 
 function Security({ account }: { account: AccountDetail }) {
   const archived = account.archivedAt !== null;
-  const enabled = account.mfa.filter((m) => m.enabled);
   const issues = useHealthIssues(null, null, !archived);
-  const result = securityScore({
-    archived,
-    passwordStrength: account.passwordStrength,
-    passwordChangedAt: account.passwordChangedAt,
-    mfaEnabled: enabled.length,
-    mfaRecorded: account.mfa.length,
-    backupCodesRemaining: enabled.reduce((n, m) => n + m.backupCodesRemaining, 0),
-    issues: Array.isArray(issues.data) ? issues.data.filter((issue) => issue.accountId === account.id) : null,
-  });
+  const result = securityScore(accountSecurityFacts(account, Array.isArray(issues.data) ? issues.data : null));
   return (
     <Panel id="security-heading" title="Security" plain>
       <SecurityDial result={result} />

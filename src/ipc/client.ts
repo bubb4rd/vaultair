@@ -63,6 +63,8 @@ import {
   type TotpCodeView,
   type UrlTarget,
   type AppInfo,
+  type CaptureLevel,
+  type CaptureMode,
   type ClipboardCopy,
   type CloudProvider,
   type CreateVaultRequest,
@@ -142,6 +144,8 @@ export type {
   TotpCodeView,
   UrlTarget,
   AppInfo,
+  CaptureLevel,
+  CaptureMode,
   ClipboardCopy,
   CloudProvider,
   CreateVaultRequest,
@@ -285,8 +289,11 @@ export const session = {
   /** Activity ping for the idle lock. Resolves false if the vault is locked. */
   touch: (): Promise<boolean> => call(() => commands.sessionTouch()),
   config: (): Promise<SessionConfig> => call(() => commands.sessionConfigGet()),
-  setCaptureProtection: (enabled: boolean): Promise<SessionConfig> =>
-    call(() => commands.captureProtectionSet(enabled)),
+  /** Saves the policy and applies its steady state (Always hides; Off and Custom show). */
+  setCapturePolicy: (mode: CaptureMode, level: CaptureLevel): Promise<SessionConfig> =>
+    call(() => commands.capturePolicySet(mode, level)),
+  /** Hides or shows the window. Ignored unless the saved mode is Custom. */
+  applyCapture: (enabled: boolean): Promise<SessionConfig> => call(() => commands.captureApply(enabled)),
   /** Why the vault last locked, once; null after that. */
   takeLockNotice: (): Promise<LockNotice | null> => call(() => commands.sessionTakeLockNotice()),
 };

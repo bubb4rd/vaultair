@@ -56,10 +56,15 @@ export const commands = {
 	/**  Current lock, clipboard and capture settings. */
 	sessionConfigGet: () => __TAURI_INVOKE<SessionConfig>("session_config_get"),
 	/**
-	 *  Turns screen-capture protection on or off, now and on future launches
-	 *  (the lock screen included). Returns the updated settings.
+	 *  Saves the capture policy and applies its steady state now: Always hides
+	 *  the window, Off and Custom show it until an account qualifies.
 	 */
-	captureProtectionSet: (enabled: boolean) => __TAURI_INVOKE<SessionConfig>("capture_protection_set", { enabled }),
+	capturePolicySet: (mode: CaptureMode, level: CaptureLevel) => __TAURI_INVOKE<SessionConfig>("capture_policy_set", { mode, level }),
+	/**
+	 *  Hides or shows the window for the account on screen. Ignored unless the
+	 *  saved mode is Custom, so navigation cannot override Always or Off.
+	 */
+	captureApply: (enabled: boolean) => __TAURI_INVOKE<SessionConfig>("capture_apply", { enabled }),
 	/**
 	 *  Why the vault last locked (button or Ctrl+L, idle, Windows lock, sleep),
 	 *  so the lock screen can say so. Returns it once, then `None`.
@@ -426,6 +431,27 @@ export type BulkResult = {
 	/**  Accounts the action applied to. */
 	changed: number,
 };
+
+/**
+ *  The weakest account rating that still hides the window in [`CaptureMode::Custom`].
+ *  Secure accounts are never hidden.
+ */
+export type CaptureLevel = 
+/**  Score under 40. */
+"risk" | 
+/**  Score under 70: warning and high risk. */
+"warning" | 
+/**  Score under 90: needs attention, warning and high risk. */
+"attention";
+
+/**  When the window is hidden from screenshots, streaming and screen sharing. */
+export type CaptureMode = 
+/**  Hidden on every screen, including the lock screen. The default. */
+"always" | 
+/**  Visible on every screen, including the lock screen. */
+"off" | 
+/**  Visible until an account at or below [`CaptureLevel`] is open. */
+"custom";
 
 /**
  *  A pending clipboard clear finished (timer, "Clear now", or lock). The UI
@@ -1044,7 +1070,11 @@ export type SessionConfig = {
 	clipboardClearSecs: number,
 	/**  Revealed secrets hide again after this long. */
 	revealHideSecs: number,
-	/**  Hide the window from screenshots, streaming and screen sharing. */
+	/**  Saved policy: always on, off, or custom per account rating. */
+	captureMode: CaptureMode,
+	/**  Rating at or below which Custom mode hides the window. */
+	captureLevel: CaptureLevel,
+	/**  Whether the window is hidden from capture right now. */
 	captureProtection: boolean,
 };
 

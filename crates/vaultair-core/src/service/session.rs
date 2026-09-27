@@ -15,6 +15,7 @@ use secrecy::SecretString;
 use serde::Serialize;
 
 use crate::clock::{Clock, SystemClock};
+use crate::config::{CaptureLevel, CaptureMode};
 use crate::vault::{self, CreateOptions, IntegrityReport, OpenVault, VaultError, VaultInfo};
 
 /// Lock and clipboard behaviour. The defaults are ADR-0004 decision 11.
@@ -34,7 +35,11 @@ pub struct SessionConfig {
     pub clipboard_clear_secs: u32,
     /// Revealed secrets hide again after this long.
     pub reveal_hide_secs: u32,
-    /// Hide the window from screenshots, streaming and screen sharing.
+    /// Saved policy: always on, off, or custom per account rating.
+    pub capture_mode: CaptureMode,
+    /// Rating at or below which Custom mode hides the window.
+    pub capture_level: CaptureLevel,
+    /// Whether the window is hidden from capture right now.
     pub capture_protection: bool,
 }
 
@@ -47,6 +52,8 @@ impl Default for SessionConfig {
             lock_on_minimize: false,
             clipboard_clear_secs: 30,
             reveal_hide_secs: 20,
+            capture_mode: CaptureMode::Always,
+            capture_level: CaptureLevel::Risk,
             capture_protection: true,
         }
     }

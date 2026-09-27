@@ -41,15 +41,20 @@ impl AppState {
             emit(&handle, ClipboardCleared);
         });
 
-        let session_config = SessionConfig {
-            capture_protection: config.capture_protection(),
-            ..dev_overrides(SessionConfig::default())
-        };
+        let capture_mode = config.capture_mode();
+        let session_config = dev_overrides(SessionConfig {
+            capture_mode,
+            capture_level: config.capture_level(),
+            capture_protection: capture_mode.hides_at_rest(),
+            ..SessionConfig::default()
+        });
         let handle = app.clone();
+        let capture_for_lock = platform.capture.clone();
         let locker = Arc::new(Locker::new(
             session.clone(),
             clipboard.clone(),
             session_config,
+            move |enabled| apply_capture_protection(capture_for_lock.as_ref(), enabled),
             move || emit(&handle, VaultLocked),
         ));
 

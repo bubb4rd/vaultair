@@ -2,7 +2,7 @@
 //!
 //! Holds only what the app needs *before* a vault is unlocked: the
 //! recent-vaults list (folder paths plus when each was last opened) and the
-//! screen-capture protection switch, which must apply to the lock screen too.
+//! screen-capture policy, which must apply to the lock screen too.
 //! Never vault contents, names from inside a vault, or anything secret. See
 //! docs/local-data-storage.md.
 
@@ -25,20 +25,63 @@ pub fn default_app_dir() -> Option<PathBuf> {
     std::env::var_os("LOCALAPPDATA").map(|base| Path::new(&base).join("Vaultair"))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// When the window is hidden from screenshots, streaming and screen sharing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub enum CaptureMode {
+    /// Hidden on every screen, including the lock screen. The default.
+    #[default]
+    Always,
+    /// Visible on every screen, including the lock screen.
+    Off,
+    /// Visible until an account at or below [`CaptureLevel`] is open.
+    Custom,
+}
+
+impl CaptureMode {
+    /// Hidden at launch and whenever no qualifying account is open.
+    /// Custom starts visible; the UI hides the window per account.
+    pub fn hides_at_rest(self) -> bool {
+        matches!(self, Self::Always)
+    }
+}
+
+/// The weakest account rating that still hides the window in [`CaptureMode::Custom`].
+/// Secure accounts are never hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub enum CaptureLevel {
+    /// Score under 40.
+    #[default]
+    Risk,
+    /// Score under 70: warning and high risk.
+    Warning,
+    /// Score under 90: needs attention, warning and high risk.
+    Attention,
+}
+
+/// The window state `capture_apply` may set. Always and Off ignore `requested`.
+pub fn applied_capture(mode: CaptureMode, current: bool, requested: bool) -> bool {
+    if mode == CaptureMode::Custom {
+        requested
+    } else {
+        current
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub version: u32,
     #[serde(default)]
     pub recent_vaults: Vec<RecentVaultEntry>,
-    /// Hide the window from capture. On unless the user turns it off
-    /// (ADR-0004 decision 6), including for configs written before it existed.
-    #[serde(default = "default_true")]
-    pub capture_protection: bool,
-}
-
-fn default_true() -> bool {
-    true
+    /// Saved policy. On (Always) unless the user changes it, including for
+    /// configs written before capture protection existed (ADR-0004 decision 6).
+    pub capture_mode: CaptureMode,
+    /// Used when `capture_mode` is Custom. Remembered either way.
+    pub capture_level: CaptureLevel,
 }
 
 impl Default for AppConfig {
@@ -46,7 +89,8 @@ impl Default for AppConfig {
         Self {
             version: CONFIG_VERSION,
             recent_vaults: Vec::new(),
-            capture_protection: true,
+            capture_mode: CaptureMode::Always,
+            capture_level: CaptureLevel::Risk,
         }
     }
 }
@@ -144,12 +188,19 @@ impl ConfigStore {
         self.update(|c| c.recent_vaults.retain(|r| !same_path(&r.path, path)));
     }
 
-    pub fn capture_protection(&self) -> bool {
-        self.guard().capture_protection
+    pub fn capture_mode(&self) -> CaptureMode {
+        self.guard().capture_mode
     }
 
-    pub fn set_capture_protection(&self, enabled: bool) {
-        self.update(|c| c.capture_protection = enabled);
+    pub fn capture_level(&self) -> CaptureLevel {
+        self.guard().capture_level
+    }
+
+    pub fn set_capture_policy(&self, mode: CaptureMode, level: CaptureLevel) {
+        self.update(|c| {
+            c.capture_mode = mode;
+            c.capture_level = level;
+        });
     }
 
     pub fn recent_vaults(&self) -> Vec<RecentVault> {
@@ -178,12 +229,49 @@ impl ConfigStore {
     }
 }
 
+/// On-disk shape. Accepts the current fields and the boolean written before
+/// capture mode existed (`captureProtection`: true → Always, false → Off).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredConfig {
+    version: u32,
+    #[serde(default)]
+    recent_vaults: Vec<RecentVaultEntry>,
+    #[serde(default)]
+    capture_protection: Option<bool>,
+    #[serde(default)]
+    capture_mode: Option<CaptureMode>,
+    #[serde(default)]
+    capture_level: Option<CaptureLevel>,
+}
+
+fn policy_from_stored(
+    mode: Option<CaptureMode>,
+    level: Option<CaptureLevel>,
+    legacy_enabled: Option<bool>,
+) -> (CaptureMode, CaptureLevel) {
+    let capture_mode = mode.unwrap_or(match legacy_enabled {
+        Some(false) => CaptureMode::Off,
+        _ => CaptureMode::Always,
+    });
+    (capture_mode, level.unwrap_or_default())
+}
+
 fn read_config(path: &Path) -> AppConfig {
     let Ok(bytes) = std::fs::read(path) else {
         return AppConfig::default();
     };
-    match serde_json::from_slice::<AppConfig>(&bytes) {
-        Ok(c) if c.version <= CONFIG_VERSION => c,
+    match serde_json::from_slice::<StoredConfig>(&bytes) {
+        Ok(c) if c.version <= CONFIG_VERSION => {
+            let (capture_mode, capture_level) =
+                policy_from_stored(c.capture_mode, c.capture_level, c.capture_protection);
+            AppConfig {
+                version: c.version,
+                recent_vaults: c.recent_vaults,
+                capture_mode,
+                capture_level,
+            }
+        }
         Ok(_) => {
             tracing::warn!("app config is from a newer version; using defaults");
             AppConfig::default()
@@ -296,18 +384,52 @@ mod tests {
             serde_json::json!({
                 "version": 1,
                 "recentVaults": [{ "path": r"C:\V\Main", "lastOpenedAt": "2026-01-01T00:00:00Z" }],
-                "captureProtection": true
+                "captureMode": "always",
+                "captureLevel": "risk"
             })
         );
     }
 
     #[test]
-    fn capture_protection_defaults_on_and_persists() {
+    fn capture_policy_defaults_on_and_persists() {
         let (dir, store) = store();
-        assert!(store.capture_protection());
-        store.set_capture_protection(false);
+        assert_eq!(store.capture_mode(), CaptureMode::Always);
+        assert!(store.capture_mode().hides_at_rest());
+        store.set_capture_policy(CaptureMode::Custom, CaptureLevel::Warning);
         let reloaded = ConfigStore::load(Some(dir.path().to_path_buf()));
-        assert!(!reloaded.capture_protection());
+        assert_eq!(reloaded.capture_mode(), CaptureMode::Custom);
+        assert_eq!(reloaded.capture_level(), CaptureLevel::Warning);
+        assert!(!reloaded.capture_mode().hides_at_rest());
+    }
+
+    #[test]
+    fn legacy_capture_boolean_migrates() {
+        let dir = tempfile::tempdir().unwrap();
+        let load = |json: &str| {
+            std::fs::write(dir.path().join(CONFIG_FILE), json).unwrap();
+            ConfigStore::load(Some(dir.path().to_path_buf()))
+        };
+        assert_eq!(
+            load(r#"{"version":1,"recentVaults":[],"captureProtection":true}"#).capture_mode(),
+            CaptureMode::Always
+        );
+        assert_eq!(
+            load(r#"{"version":1,"recentVaults":[],"captureProtection":false}"#).capture_mode(),
+            CaptureMode::Off
+        );
+        let both = load(
+            r#"{"version":1,"recentVaults":[],"captureProtection":false,"captureMode":"custom","captureLevel":"attention"}"#,
+        );
+        assert_eq!(both.capture_mode(), CaptureMode::Custom);
+        assert_eq!(both.capture_level(), CaptureLevel::Attention);
+    }
+
+    #[test]
+    fn capture_apply_only_changes_custom_mode() {
+        assert!(applied_capture(CaptureMode::Custom, false, true));
+        assert!(!applied_capture(CaptureMode::Custom, true, false));
+        assert!(applied_capture(CaptureMode::Always, true, false));
+        assert!(!applied_capture(CaptureMode::Off, false, true));
     }
 
     #[test]
@@ -318,7 +440,9 @@ mod tests {
             br#"{"version": 1, "recentVaults": []}"#,
         )
         .unwrap();
-        assert!(ConfigStore::load(Some(dir.path().to_path_buf())).capture_protection());
+        let store = ConfigStore::load(Some(dir.path().to_path_buf()));
+        assert_eq!(store.capture_mode(), CaptureMode::Always);
+        assert_eq!(store.capture_level(), CaptureLevel::Risk);
     }
 
     #[test]
