@@ -25,6 +25,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::session::session_touch,
             commands::session::session_config_get,
             commands::session::capture_policy_set,
+            commands::session::hide_emails_set,
             commands::session::capture_apply,
             commands::session::session_take_lock_notice,
             commands::clipboard::clipboard_copy_plain,

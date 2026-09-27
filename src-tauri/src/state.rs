@@ -46,6 +46,7 @@ impl AppState {
             capture_mode,
             capture_level: config.capture_level(),
             capture_protection: capture_mode.hides_at_rest(),
+            hide_emails: config.hide_emails(),
             ..SessionConfig::default()
         });
         let handle = app.clone();

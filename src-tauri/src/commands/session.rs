@@ -44,6 +44,15 @@ pub fn capture_policy_set(
     })
 }
 
+/// Saves whether account emails stay masked until shown.
+#[tauri::command]
+#[specta::specta]
+pub fn hide_emails_set(state: State<'_, AppState>, enabled: bool) -> SessionConfig {
+    state.config.set_hide_emails(enabled);
+    tracing::info!(enabled, "hide emails changed");
+    state.locker.update_config(|c| c.hide_emails = enabled)
+}
+
 /// Hides or shows the window for the account on screen. Ignored unless the
 /// saved mode is Custom, so navigation cannot override Always or Off.
 #[tauri::command]

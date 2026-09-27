@@ -42,6 +42,23 @@ describe("screenshot protection settings", () => {
     expect(calls).toContainEqual({ cmd: "capture_policy_set", args: { mode: "off", level: "warning" } });
   });
 
+  it("saves hiding emails on the account page", async () => {
+    const user = userEvent.setup();
+    const { calls } = await renderApp("/settings", {
+      handlers: {
+        hide_emails_set: (args) => ({ ...DEFAULT_SESSION_CONFIG, hideEmails: Boolean(args.enabled) }),
+      },
+    });
+
+    const toggle = await screen.findByRole("switch", { name: "Hide email addresses" });
+    expect(toggle).not.toBeChecked();
+    expect(toggle).toHaveAccessibleDescription(/masked until you show them/);
+
+    await user.click(toggle);
+    expect(calls).toContainEqual({ cmd: "hide_emails_set", args: { enabled: true } });
+    expect(toggle).toBeChecked();
+  });
+
   it("has no axe violations", async () => {
     const { container } = await renderApp("/settings");
     await screen.findByLabelText("Screenshot protection");

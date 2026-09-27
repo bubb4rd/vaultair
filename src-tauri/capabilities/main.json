@@ -33,6 +33,7 @@
     "allow-session-touch",
     "allow-session-config-get",
     "allow-capture-policy-set",
+    "allow-hide-emails-set",
     "allow-capture-apply",
     "allow-session-take-lock-notice",
     "allow-clipboard-copy-plain",

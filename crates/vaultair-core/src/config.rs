@@ -1,10 +1,10 @@
 //! App config: `%LOCALAPPDATA%\Vaultair\config.json`.
 //!
 //! Holds only what the app needs *before* a vault is unlocked: the
-//! recent-vaults list (folder paths plus when each was last opened) and the
-//! screen-capture policy, which must apply to the lock screen too.
-//! Never vault contents, names from inside a vault, or anything secret. See
-//! docs/local-data-storage.md.
+//! recent-vaults list (folder paths plus when each was last opened), the
+//! screen-capture policy (it must apply to the lock screen too), and whether
+//! account emails are masked on screen. Never vault contents, names from
+//! inside a vault, or anything secret. See docs/local-data-storage.md.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
@@ -82,6 +82,8 @@ pub struct AppConfig {
     pub capture_mode: CaptureMode,
     /// Used when `capture_mode` is Custom. Remembered either way.
     pub capture_level: CaptureLevel,
+    /// Mask email and recovery email on an account until the user shows them.
+    pub hide_emails: bool,
 }
 
 impl Default for AppConfig {
@@ -91,6 +93,7 @@ impl Default for AppConfig {
             recent_vaults: Vec::new(),
             capture_mode: CaptureMode::Always,
             capture_level: CaptureLevel::Risk,
+            hide_emails: false,
         }
     }
 }
@@ -203,6 +206,14 @@ impl ConfigStore {
         });
     }
 
+    pub fn hide_emails(&self) -> bool {
+        self.guard().hide_emails
+    }
+
+    pub fn set_hide_emails(&self, enabled: bool) {
+        self.update(|c| c.hide_emails = enabled);
+    }
+
     pub fn recent_vaults(&self) -> Vec<RecentVault> {
         self.guard()
             .recent_vaults
@@ -243,6 +254,8 @@ struct StoredConfig {
     capture_mode: Option<CaptureMode>,
     #[serde(default)]
     capture_level: Option<CaptureLevel>,
+    #[serde(default)]
+    hide_emails: bool,
 }
 
 fn policy_from_stored(
@@ -270,6 +283,7 @@ fn read_config(path: &Path) -> AppConfig {
                 recent_vaults: c.recent_vaults,
                 capture_mode,
                 capture_level,
+                hide_emails: c.hide_emails,
             }
         }
         Ok(_) => {
@@ -385,7 +399,8 @@ mod tests {
                 "version": 1,
                 "recentVaults": [{ "path": r"C:\V\Main", "lastOpenedAt": "2026-01-01T00:00:00Z" }],
                 "captureMode": "always",
-                "captureLevel": "risk"
+                "captureLevel": "risk",
+                "hideEmails": false
             })
         );
     }
@@ -443,6 +458,26 @@ mod tests {
         let store = ConfigStore::load(Some(dir.path().to_path_buf()));
         assert_eq!(store.capture_mode(), CaptureMode::Always);
         assert_eq!(store.capture_level(), CaptureLevel::Risk);
+    }
+
+    #[test]
+    fn hide_emails_defaults_off_and_persists() {
+        let (dir, store) = store();
+        assert!(!store.hide_emails());
+        store.set_hide_emails(true);
+        let reloaded = ConfigStore::load(Some(dir.path().to_path_buf()));
+        assert!(reloaded.hide_emails());
+    }
+
+    #[test]
+    fn configs_from_before_hide_emails_leave_it_off() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            br#"{"version": 1, "recentVaults": [], "captureMode": "always", "captureLevel": "risk"}"#,
+        )
+        .unwrap();
+        assert!(!ConfigStore::load(Some(dir.path().to_path_buf())).hide_emails());
     }
 
     #[test]

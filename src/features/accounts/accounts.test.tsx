@@ -219,6 +219,40 @@ describe("account list", () => {
 });
 
 describe("account detail", () => {
+  it("shows the email when hiding is off", async () => {
+    await renderApp("/accounts/a1", withAccounts());
+    expect(await screen.findByText("nightowl@example.com")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show email" })).not.toBeInTheDocument();
+  });
+
+  it("masks email and recovery email until shown, then hides them again", async () => {
+    const user = userEvent.setup();
+    await renderApp(
+      "/accounts/a1",
+      withAccounts({
+        session_config_get: () => ({ ...DEFAULT_SESSION_CONFIG, hideEmails: true, revealHideSecs: 1 }),
+        account_get: () => ({ ...DETAIL, recoveryEmail: "recover@example.com" }),
+      }),
+    );
+    expect(await screen.findByRole("button", { name: "Show email" })).toBeInTheDocument();
+    expect(screen.queryByText("nightowl@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByText("recover@example.com")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show email" }));
+    expect(await screen.findByText("nightowl@example.com")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show recovery email" }));
+    expect(screen.getByText("recover@example.com")).toBeInTheDocument();
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText("nightowl@example.com")).not.toBeInTheDocument();
+        expect(screen.queryByText("recover@example.com")).not.toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+  });
+
+
   it("keeps the password hidden, reveals it on request and hides it again", async () => {
     const user = userEvent.setup();
     const { calls } = await renderApp(

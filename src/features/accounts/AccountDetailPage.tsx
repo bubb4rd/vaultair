@@ -14,7 +14,7 @@ import {
   StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues } from "@/app/queries";
+import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues, useSessionConfig } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,21 @@ import { DeleteConfirmDialog, OpenUrlDialog } from "./ConfirmDialogs";
 import { GameProfilesSection } from "./GameProfilesSection";
 import { suggestionLines } from "./notesHints";
 import { MfaSection } from "./MfaSection";
-import { CopyButton, FieldRow, SecretField } from "./SecretField";
+import { ConcealedField, CopyButton, FieldRow, SecretField } from "./SecretField";
 import { SecurityDial } from "./SecurityDial";
 import { accountType, displayStatus, formatDate } from "./labels";
 import { accountSecurityFacts, securityScore } from "./securityScore";
+
+/** Email and recovery email. Masked when the privacy setting is on. */
+function EmailField({ label, value }: { label: string; value: string | null }) {
+  const hide = useSessionConfig().data?.hideEmails ?? false;
+  if (hide && value) return <ConcealedField label={label} value={value} />;
+  return (
+    <FieldRow label={label} actions={value ? <CopyButton text={value} label={label} /> : undefined}>
+      {value}
+    </FieldRow>
+  );
+}
 
 function Panel({
   id,
@@ -386,20 +397,13 @@ function Detail({ account }: { account: AccountDetail }) {
               <FieldRow label="Username" actions={account.username && <CopyButton text={account.username} label="Username" />}>
                 {account.username}
               </FieldRow>
-              <FieldRow label="Email" actions={account.email && <CopyButton text={account.email} label="Email" />}>
-                {account.email}
-              </FieldRow>
+              <EmailField label="Email" value={account.email} />
               {account.hasPassword ? (
                 <SecretField label="Password" target={{ kind: "accountPassword", id: account.id }} />
               ) : (
                 <FieldRow label="Password" />
               )}
-              <FieldRow
-                label="Recovery email"
-                actions={account.recoveryEmail && <CopyButton text={account.recoveryEmail} label="Recovery email" />}
-              >
-                {account.recoveryEmail}
-              </FieldRow>
+              <EmailField label="Recovery email" value={account.recoveryEmail} />
               <FieldRow label="Recovery phone">{account.recoveryPhone}</FieldRow>
               <UrlRow
                 label="Login page"

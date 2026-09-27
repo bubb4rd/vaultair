@@ -35,6 +35,8 @@ pub struct SessionConfig {
     pub clipboard_clear_secs: u32,
     /// Revealed secrets hide again after this long.
     pub reveal_hide_secs: u32,
+    /// Mask email and recovery email on an account until the user shows them.
+    pub hide_emails: bool,
     /// Saved policy: always on, off, or custom per account rating.
     pub capture_mode: CaptureMode,
     /// Rating at or below which Custom mode hides the window.
@@ -52,6 +54,7 @@ impl Default for SessionConfig {
             lock_on_minimize: false,
             clipboard_clear_secs: 30,
             reveal_hide_secs: 20,
+            hide_emails: false,
             capture_mode: CaptureMode::Always,
             capture_level: CaptureLevel::Risk,
             capture_protection: true,

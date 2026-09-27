@@ -74,6 +74,60 @@ export function FieldRow({
   );
 }
 
+/**
+ * An email the page already has, masked until shown.
+ * Same reveal timer as a secret; copy still uses the known text.
+ */
+export function ConcealedField({ label, value }: { label: string; value: string }) {
+  const config = useSessionConfig();
+  const hideAfter = config.data?.revealHideSecs ?? DEFAULT_REVEAL_SECS;
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (secondsLeft === null) return;
+    const t = setTimeout(() => {
+      setSecondsLeft((n) => (n === null || n <= 1 ? null : n - 1));
+    }, 1000);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [secondsLeft]);
+
+  const shown = secondsLeft !== null;
+  return (
+    <FieldRow
+      label={label}
+      actions={
+        <>
+          <IconAction
+            label={shown ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+            pressed={shown}
+            onClick={() => {
+              setSecondsLeft(shown ? null : hideAfter);
+            }}
+          >
+            {shown ? <EyeSlashIcon aria-hidden="true" /> : <EyeIcon aria-hidden="true" />}
+          </IconAction>
+          <CopyButton text={value} label={label} />
+        </>
+      }
+    >
+      <span className="flex flex-col gap-1">
+        <span
+          className={cn("font-mono tracking-wide break-all", !shown && "text-muted-foreground select-none")}
+        >
+          {shown ? value : MASK}
+        </span>
+        {shown && (
+          <span className="text-xs text-subtle-foreground" aria-hidden="true">
+            Hides in {secondsLeft}s
+          </span>
+        )}
+      </span>
+    </FieldRow>
+  );
+}
+
 /** Copies text the page already shows (a username, an email). */
 export function CopyButton({ text, label }: { text: string; label: string }) {
   return (

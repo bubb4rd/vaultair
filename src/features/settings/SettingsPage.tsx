@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys, useSessionConfig } from "@/app/queries";
 import { Field, describedBy, fieldIds } from "@/components/common/Field";
+import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/ui/textarea";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
@@ -34,7 +35,9 @@ function PrivacySettings() {
   const queryClient = useQueryClient();
   const saved = useSessionConfig().data;
   const [draft, setDraft] = useState<{ mode: CaptureMode; level: CaptureLevel } | null>(null);
+  const [hideDraft, setHideDraft] = useState<boolean | null>(null);
   const ticket = useRef(0);
+  const hideTicket = useRef(0);
 
   function save(nextMode: CaptureMode, nextLevel: CaptureLevel) {
     const mine = ++ticket.current;
@@ -53,9 +56,27 @@ function PrivacySettings() {
       });
   }
 
+  function saveHideEmails(enabled: boolean) {
+    const mine = ++hideTicket.current;
+    setHideDraft(enabled);
+    session
+      .setHideEmails(enabled)
+      .then((next) => {
+        if (mine !== hideTicket.current) return;
+        queryClient.setQueryData<SessionConfig>(queryKeys.sessionConfig, next);
+        setHideDraft(null);
+      })
+      .catch(() => {
+        if (mine !== hideTicket.current) return;
+        setHideDraft(null);
+        toast.error("Couldn't save email privacy");
+      });
+  }
+
   if (!saved) return null;
   const mode = draft?.mode ?? saved.captureMode;
   const level = draft?.level ?? saved.captureLevel;
+  const hideEmails = hideDraft ?? saved.hideEmails;
 
   const helpId = fieldIds("capture-mode").help;
   return (
@@ -96,6 +117,23 @@ function PrivacySettings() {
           ))}
         </NativeSelect>
       </Field>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <label htmlFor="hide-emails" className="text-[13px] font-medium">
+            Hide email addresses
+          </label>
+          <p id="hide-emails-help" className="text-[13px] text-muted-foreground">
+            On an account, email and recovery email stay masked until you show them, then hide again like a password.
+          </p>
+        </div>
+        <Switch
+          id="hide-emails"
+          className="mt-0.5"
+          checked={hideEmails}
+          aria-describedby="hide-emails-help"
+          onCheckedChange={saveHideEmails}
+        />
+      </div>
     </section>
   );
 }

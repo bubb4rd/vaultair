@@ -60,6 +60,8 @@ export const commands = {
 	 *  the window, Off and Custom show it until an account qualifies.
 	 */
 	capturePolicySet: (mode: CaptureMode, level: CaptureLevel) => __TAURI_INVOKE<SessionConfig>("capture_policy_set", { mode, level }),
+	/**  Saves whether account emails stay masked until shown. */
+	hideEmailsSet: (enabled: boolean) => __TAURI_INVOKE<SessionConfig>("hide_emails_set", { enabled }),
 	/**
 	 *  Hides or shows the window for the account on screen. Ignored unless the
 	 *  saved mode is Custom, so navigation cannot override Always or Off.
@@ -1070,6 +1072,8 @@ export type SessionConfig = {
 	clipboardClearSecs: number,
 	/**  Revealed secrets hide again after this long. */
 	revealHideSecs: number,
+	/**  Mask email and recovery email on an account until the user shows them. */
+	hideEmails: boolean,
 	/**  Saved policy: always on, off, or custom per account rating. */
 	captureMode: CaptureMode,
 	/**  Rating at or below which Custom mode hides the window. */

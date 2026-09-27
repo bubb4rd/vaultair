@@ -292,6 +292,8 @@ export const session = {
   /** Saves the policy and applies its steady state (Always hides; Off and Custom show). */
   setCapturePolicy: (mode: CaptureMode, level: CaptureLevel): Promise<SessionConfig> =>
     call(() => commands.capturePolicySet(mode, level)),
+  /** Saves whether account emails stay masked until shown. */
+  setHideEmails: (enabled: boolean): Promise<SessionConfig> => call(() => commands.hideEmailsSet(enabled)),
   /** Hides or shows the window. Ignored unless the saved mode is Custom. */
   applyCapture: (enabled: boolean): Promise<SessionConfig> => call(() => commands.captureApply(enabled)),
   /** Why the vault last locked, once; null after that. */

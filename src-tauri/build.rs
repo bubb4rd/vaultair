@@ -24,6 +24,7 @@ fn main() {
             "session_touch",
             "session_config_get",
             "capture_policy_set",
+            "hide_emails_set",
             "capture_apply",
             "session_take_lock_notice",
             "clipboard_copy_plain",
