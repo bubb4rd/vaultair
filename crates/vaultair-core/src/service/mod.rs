@@ -3,6 +3,7 @@
 pub mod accounts;
 pub mod catalog;
 pub mod dashboard;
+pub mod graph;
 pub mod health;
 pub mod identities;
 pub mod mfa;

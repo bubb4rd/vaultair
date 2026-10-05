@@ -1,6 +1,6 @@
 # Vaultair design system
 
-> **Status:** Phase 4. Updated in Phase 13 (graph). Tokens live in `src/styles/globals.css`; this file records why they are what they are.
+> **Status:** Phase 13 (relationship map). Tokens live in `src/styles/globals.css`; this file records why they are what they are.
 
 ## Design read
 
@@ -139,3 +139,14 @@ Radix dialogs (the command palette) inject a scroll-lock `<style>` tag, which th
 - **Errors**: an impossible exclusion replaces the value with the error (icon + text), marks the field invalid, and disables Copy, so a stale value can't be copied.
 - **Popover** (`GeneratorPopover`, 340 px, overlay radius 12 px): mode, value with a regenerate icon, strength, length or words, then Copy and "Use password". Other options come from the page's last settings.
 - **New primitives**: `Switch` (brand when on), `Slider` (brand range, 2 px focus ring with offset), `Popover`, and `SegmentedGroup` (a Radix radio group styled like the default tabs list, arrow keys move the selection).
+
+## Relationship map (Phase 13)
+
+**Design read** (design-taste-frontend): an in-app relationship graph for a desktop security utility, trust-first and restrained; extends this system with no new look. Dials unchanged (4 / 3 / 5). Taste's scope excludes dense product UI, so it set the node language only. The one inspo search for graph views returned a single marketing page, so no reference was taken from it.
+
+- **Page**: the header holds the focus picker (one native select, grouped by Identities, Accounts, Emails, Recovery methods, Platforms and Games) and a Map / List segmented control. The map fills the page; a one-row legend sits under it, so it never covers the drawing.
+- **Nodes** are the same card everywhere: 224 by 52 px, card surface, strong hairline border, 8 px radius. Left, a 32 px mark: an identity's initials on its colour, a platform's, game's or account's logo (or initials), or a Phosphor icon on a muted tile for an email, phone or MFA method. Right, the label in 13 px medium and under it the kind in 12 px muted text, with an account's purpose ("Account, Main"). The kind is always written; the mark and colour are decoration. The focus has the brand border and says "the focus" to screen readers.
+- **Lines** are 1.5 px in the control-edge grey, and every one carries its relationship as an 11 px label just before the node it runs into. Dash pattern groups them: solid for assigned and sign-in, dashed for recovery, dash-dot in the brand blue for a linked account, dotted for platform, game and MFA. Pattern and label carry the meaning; the blue is the existing "linked" status colour and is never the only cue. Several lines into one node arrive one under another, so labels don't stack on top of each other. No arrowheads: the label names the relationship from either end.
+- **Layout**: left to right from the focus, one column per step of the tree. Nothing animates and nothing is dragged. The drawing opens fitted to the window, pans by scrolling or dragging the background, and zooms with three buttons at the bottom right (zoom in, zoom out, fit).
+- **List view**: one card, the tree as nested lists with a hairline rail per level. Each row is the relationship (12 px, tertiary), a 24 px mark, the name (a link, or a button for records that only refocus the map), the kind, and a "Focus" button on identities and accounts. Links the nesting can't show sit under the row in 12 px muted text, as "Recovery email: address".
+- **Keyboard**: every node is a button on the map and a link or button in the list, in reading order. The list is the default when the system asks for reduced motion and for maps over 80 nodes.

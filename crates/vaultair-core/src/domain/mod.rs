@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod catalog;
+pub mod graph;
 pub mod health;
 pub mod identity;
 pub mod mfa;

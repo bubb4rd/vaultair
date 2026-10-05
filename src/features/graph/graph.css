@@ -1,0 +1,33 @@
+/*
+ * Relationship map lines. They are told apart by dash pattern and a written
+ * label; the one blue line is the "linked" status colour, never the only cue.
+ */
+.map-edge,
+.map-legend-line {
+  fill: none;
+  stroke: var(--input);
+  stroke-width: 1.5;
+}
+
+.map-edge-uses {
+  stroke-linecap: round;
+}
+
+.map-edge-linked {
+  stroke: var(--brand);
+}
+
+.map-edge-label {
+  position: absolute;
+  max-width: 150px;
+  overflow: hidden;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}

@@ -5,6 +5,7 @@ import {
   contactPoints,
   dashboard,
   gameProfiles,
+  graph,
   health,
   identities,
   EMPTY_FILTER,
@@ -17,6 +18,7 @@ import {
   type AccountFilter,
   type AccountSort,
   type GameProfileFilter,
+  type GraphFocus,
   type HealthRule,
   type IdentityDetail,
   type VaultInfo,
@@ -48,6 +50,8 @@ export const queryKeys = {
   healthSummary: (identityId: string | null) => ["health", "summary", identityId ?? "all"] as const,
   healthIssues: (identityId: string | null, rule: HealthRule | null) =>
     ["health", "issues", identityId ?? "all", rule ?? "all"] as const,
+  graph: ["graph"] as const,
+  graphQuery: (focus: GraphFocus) => ["graph", focus.kind, focus.id] as const,
   catalog: ["catalog"] as const,
   platforms: ["catalog", "platforms"] as const,
   games: ["catalog", "games"] as const,
@@ -181,6 +185,16 @@ export function useHealthIssues(identityId: string | null, rule: HealthRule | nu
   });
 }
 
+/** The relationship map around `focus`; null waits for one. The last map stays up while the next loads. */
+export function useGraph(focus: GraphFocus | null) {
+  return useQuery({
+    queryKey: focus ? queryKeys.graphQuery(focus) : queryKeys.graph,
+    queryFn: () => (focus ? graph.query(focus) : null),
+    enabled: focus !== null,
+    placeholderData: keepPreviousData,
+  });
+}
+
 /**
  * Everything derived from accounts and identities together: account and
  * identity lists, identity overviews (counts, shared emails), contact points
@@ -193,6 +207,7 @@ function invalidateDerived(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.contactPoints });
   void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
   void queryClient.invalidateQueries({ queryKey: queryKeys.health });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.graph });
   void queryClient.invalidateQueries({ queryKey: queryKeys.tags });
   void queryClient.invalidateQueries({ queryKey: queryKeys.catalog });
   void queryClient.invalidateQueries({ queryKey: queryKeys.gameProfiles });

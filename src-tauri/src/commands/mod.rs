@@ -3,6 +3,7 @@ pub mod app;
 pub mod catalog;
 pub mod clipboard;
 pub mod generator;
+pub mod graph;
 pub mod health;
 pub mod identity;
 pub mod mfa;

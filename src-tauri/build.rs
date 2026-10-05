@@ -66,6 +66,7 @@ fn main() {
             "dashboard_summary",
             "health_summary",
             "health_issues",
+            "graph_query",
             "platform_list",
             "platform_create",
             "platform_update",

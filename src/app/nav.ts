@@ -98,11 +98,7 @@ export const NAV_GROUPS: NavGroup[] = [
         path: "/map",
         label: "Relationship Map",
         icon: GraphIcon,
-        empty: {
-          title: "Nothing to map yet",
-          description:
-            "Links between identities, accounts, emails and recovery methods are drawn here as you add them.",
-        },
+        keywords: ["graph", "connections", "linked accounts", "recovery"],
       },
       {
         path: "/health",
