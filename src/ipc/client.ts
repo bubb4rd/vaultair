@@ -34,6 +34,13 @@ import {
   type ContactRole,
   type DashboardSummary,
   type Dependent,
+  type EdgeKind,
+  type FocusKind,
+  type Graph,
+  type GraphEdge,
+  type GraphFocus,
+  type GraphNode,
+  type NodeKind,
   type HealthFix,
   type HealthIssue,
   type HealthRule,
@@ -115,6 +122,13 @@ export type {
   ContactRole,
   DashboardSummary,
   Dependent,
+  EdgeKind,
+  FocusKind,
+  Graph,
+  GraphEdge,
+  GraphFocus,
+  GraphNode,
+  NodeKind,
   HealthFix,
   HealthIssue,
   HealthRule,
@@ -424,6 +438,12 @@ export const health = {
   /** `rule` null is every check. */
   issues: (identityId: string | null, rule: HealthRule | null): Promise<HealthIssue[]> =>
     data(() => commands.healthIssues(identityId, rule)),
+};
+
+/** The relationship map. Nodes and edges name records and links, never secrets. */
+export const graph = {
+  /** The focus and what is within two steps of it, up to 300 nodes. */
+  query: (focus: GraphFocus): Promise<Graph> => data(() => commands.graphQuery(focus, null, null)),
 };
 
 export const catalog = {

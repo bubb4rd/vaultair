@@ -183,6 +183,12 @@ export const commands = {
 	healthSummary: (identityId: string | null) => typedError<HealthSummary, IpcError_Serialize>(__TAURI_INVOKE("health_summary", { identityId })),
 	/**  Issues, highest severity first. `rule` keeps one check. */
 	healthIssues: (identityId: string | null, rule: "weak" | "reused" | "missing_mfa" | "missing_recovery_codes" | "dormant" | null) => typedError<HealthIssue[], IpcError_Serialize>(__TAURI_INVOKE("health_issues", { identityId, rule })),
+	/**
+	 *  The focus and what is within `depth` steps of it, at most `limit` nodes.
+	 *  Null `depth` or `limit` is the most allowed (2 steps, 300 nodes); more
+	 *  than that is `invalid_input`. An unknown focus is `not_found`.
+	 */
+	graphQuery: (focus: GraphFocus, depth: number | null, limit: number | null) => typedError<Graph, IpcError_Serialize>(__TAURI_INVOKE("graph_query", { focus, depth, limit })),
 	/**  Every platform, built-in and user-added, with how many accounts use each. */
 	platformList: () => typedError<PlatformView[], IpcError_Serialize>(__TAURI_INVOKE("platform_list")),
 	platformCreate: (input: PlatformInput) => typedError<PlatformView, IpcError_Serialize>(__TAURI_INVOKE("platform_create", { input })),
@@ -554,8 +560,18 @@ export type Dependent = {
 	role: ContactRole,
 };
 
+/**
+ *  How two nodes relate. Edges run from what is depended on to what
+ *  depends on it: identity, then contact, then account, then what the
+ *  account uses.
+ */
+export type EdgeKind = "owns" | "primary_email" | "recovery_email" | "phone" | "login_email" | "recovery_phone" | "linked_launcher" | "linked_console" | "on_platform" | "plays" | "mfa";
+
 /**  Stable, machine-readable error codes. The frontend switches on these. */
 export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy";
+
+/**  What the map can be centred on. A contact is an email or a phone. */
+export type FocusKind = "identity" | "account" | "contact" | "platform" | "game";
 
 export type FolderPurpose = 
 /**  Choose where a new vault's folder goes. */
@@ -643,6 +659,54 @@ export type Generated = {
 	entropyBits: number | null,
 	/**  zxcvbn score, 0 (trivial) to 4 (very strong). */
 	score: number,
+};
+
+/**  A focus and everything within `depth` steps of it, capped at `limit` nodes. */
+export type Graph = {
+	/**  The focus node's id. */
+	focus: string,
+	/**  Nearest first, then by kind and label. */
+	nodes: GraphNode[],
+	/**  Every relationship between two of `nodes`. */
+	edges: GraphEdge[],
+	/**  More was in reach than `limit` allowed. Narrow the focus to see it. */
+	truncated: boolean,
+};
+
+export type GraphEdge = {
+	id: string,
+	source: string,
+	target: string,
+	kind: EdgeKind,
+};
+
+/**  The record the map is drawn around. */
+export type GraphFocus = {
+	kind: FocusKind,
+	id: string,
+};
+
+export type GraphNode = {
+	/**  `<kind>:<id>`, unique in the graph. */
+	id: string,
+	kind: NodeKind,
+	/**
+	 *  The record a click opens: the identity, the account (for an account
+	 *  and for its MFA method), or the contact, platform or game to refocus on.
+	 */
+	recordId: string,
+	label: string,
+	/**  An account's purpose name. */
+	detail: string | null,
+	/**  A catalog icon slug: the platform's or game's own, or an account's mark. */
+	icon: string | null,
+	color: IdentityColor | null,
+	/**  Steps from the focus (0 is the focus). */
+	depth: number,
+	/**  The node this one hangs under in the tree view; `None` for the focus. */
+	parent: string | null,
+	/**  How it relates to `parent`. */
+	parentEdge: EdgeKind | null,
 };
 
 /**  Where "Fix" goes. The account id is on the issue; this is only the screen. */
@@ -878,6 +942,12 @@ export type MfaView = {
 	notes: string | null,
 	updatedAt: string,
 };
+
+/**
+ *  What a node stands for. A recovery method is a phone (a recovery
+ *  email is an email node with a recovery edge).
+ */
+export type NodeKind = "identity" | "email" | "recovery_method" | "account" | "platform" | "game" | "mfa_method";
 
 /**  What the account page suggests. All false once dismissed. */
 export type NotesSuggestions = {

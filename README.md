@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 12 (health checks). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 13, the relationship map. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 13 (relationship map). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 14, encrypted backup. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -145,6 +145,19 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - **Fix** opens the account form for a weak or reused password, the account's MFA section for missing MFA or missing codes, and the account page for a dormant account.
 - The dashboard's health counts and "Needs attention" list (five issues, highest severity first) come from the same rules as Security Health. Both pages share the session identity filter.
 
+## Phase 13 notes
+
+- **One command**, `graph_query({ focus, depth, limit })`. The focus is an identity, an account, a contact (an email or a phone), a platform or a game. Rust returns what is within 2 steps, at most 300 nodes, with `truncated` set when more was in reach. A deeper or larger request is `invalid_input`. An unknown focus, or an archived account, is `not_found`.
+- **Nodes**: identity, email, recovery method (a phone), account, platform, game and MFA method (only methods that are turned on). Archived accounts are left out, with anything only they connect to. A node carries an id, a label, an icon slug, an identity colour and an account's purpose name. The builder (`crates/vaultair-core/src/graph/builder.rs`) selects no `*_enc` column, fingerprint or strength score, and `tests/graph.rs` plants `CANARY7F3A` in a password, sensitive notes, a secret custom field, recovery instructions and backup codes and checks it never reaches the graph.
+- **Edges are derived, not entered**: assigned (identity to account), primary email, recovery email and phone (identity to contact, matched by value, since several identities can name one address), sign-in email, recovery email and recovery phone (contact to account), platform, game (the account's own, or a game profile's), MFA, and linked launcher or console (from a game profile's links). The `platform_connection` table from V1 is still unused: nothing writes it, so the map doesn't read it yet.
+- **The tree** is worked out in Rust (`parent` and `parentEdge` on each node), so the map and the list can't disagree. Each node hangs under its best link to a node one step nearer. Two exceptions make it read like the spec's example: an account that is only "assigned" moves under the email it signs in with, and a linked account moves under its launcher or console.
+- **Two views of the same data.** The map is laid out left to right by dagre from the tree, focus at the left. The list nests the same tree, writes the relationship before each record, and lists links the nesting can't show under the record they lead to. An "assigned" link is left out of both when the nesting already says it (identity, its email, the account). The list is the default under reduced motion or above 80 nodes (`LIST_DEFAULT_ABOVE`).
+- **Clicking** an identity, account or MFA method opens it (an MFA method opens its account's MFA section). An email, phone, platform or game has no page of its own, so clicking it moves the map onto it. The list also has a "Focus" button on identities and accounts.
+- **No graph library draws the map.** The plan named `@xyflow/react`. It depends on `d3-color`, which assigns to a prototype's `constructor` as it loads, and `freezePrototype: true` makes that throw, so the app would not start (the mocked frontend tests passed; the live run caught it). The canvas is our own (`GraphCanvas.tsx`): positioned buttons over an SVG, native scrolling to pan, drag on the background, and zoom buttons. `@dagrejs/dagre` loads fine under the frozen prototype. Check any future library that pulls in d3 the same way, in the real webview.
+- **Hidden emails**: with the privacy setting on, email nodes and the focus picker read "Hidden email 1", "Hidden email 2" and so on (numbered in contact order, so they stay the same between views).
+- Driven in the real webview (2026-10-05, demo vault): the map for an identity, an email, an account and a platform, the list, and a node click opening its account, with no console errors.
+- Not done in Phase 13: a "show on map" link from the account and identity pages (the focus picker and Ctrl+K reach the map), and thinning dense maps. A shared email at 2 steps touches most of the demo vault, so that map is busy; the list or a narrower focus is the calmer view.
+
 
 ## Phase 17: Passkeys and login credentials (scoped)
 
@@ -208,4 +221,5 @@ Cut B is a header change. Today's reader requires exactly one `password` slot an
 
 ## Third-party content
 
+- The relationship map's layout uses [dagre](https://github.com/dagrejs/dagre) (`@dagrejs/dagre`, MIT, pinned).
 - Passphrases use the [EFF large wordlist](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) by the Electronic Frontier Foundation, licensed [CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/). It's embedded unmodified at `crates/vaultair-core/src/generator/eff_large_wordlist.txt`.

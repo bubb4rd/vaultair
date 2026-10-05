@@ -75,6 +75,7 @@
     "allow-dashboard-summary",
     "allow-health-summary",
     "allow-health-issues",
+    "allow-graph-query",
     "allow-platform-list",
     "allow-platform-create",
     "allow-platform-update",

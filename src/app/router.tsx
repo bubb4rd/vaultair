@@ -11,6 +11,7 @@ import { AccountsPage } from "@/features/accounts/AccountsPage";
 import { CatalogPage } from "@/features/catalog/CatalogPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { GeneratorPanel } from "@/features/generator/GeneratorPanel";
+import { RelationshipMap } from "@/features/graph/RelationshipMap";
 import { HealthPage } from "@/features/health/HealthPage";
 import { IdentitiesPage } from "@/features/identities/IdentitiesPage";
 import { IdentityDetailPage } from "@/features/identities/IdentityDetailPage";
@@ -30,6 +31,7 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   "/archived": () => <AccountsPage archived />,
   "/generator": GeneratorPanel,
   "/health": HealthPage,
+  "/map": RelationshipMap,
   "/settings": SettingsPage,
   "/games": () => <CatalogPage kind="game" />,
   "/platforms": () => <CatalogPage kind="platform" />,

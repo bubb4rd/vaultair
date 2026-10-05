@@ -137,7 +137,7 @@ vaultair/
 - React 19, TS strict (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`), Vite, Tailwind v4, shadcn/ui (Radix).
 - TanStack Router (or React Router), TanStack Query for IPC caching (cleared on lock), Zustand for UI-only state, react-hook-form + zod.
 - TanStack Table + TanStack Virtual, cmdk for the command palette, sonner for toasts, lucide-react icons.
-- `@xyflow/react` + dagre for the graph, and `motion` used sparingly with `prefers-reduced-motion` respected.
+- dagre for the graph layout, drawn by our own canvas (`@xyflow/react` was planned, but its d3 dependencies don't load under `freezePrototype`; see the README's Phase 13 notes), and `motion` used sparingly with `prefers-reduced-motion` respected.
 - Rust stays the source of truth for validation. Zod is for UX only.
 
 ---

@@ -70,6 +70,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::identity::dashboard_summary,
             commands::health::health_summary,
             commands::health::health_issues,
+            commands::graph::graph_query,
             commands::catalog::platform_list,
             commands::catalog::platform_create,
             commands::catalog::platform_update,
