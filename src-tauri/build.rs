@@ -86,6 +86,12 @@ fn main() {
             "saved_view_create",
             "saved_view_update",
             "saved_view_delete",
+            "backup_status",
+            "backup_set_destination",
+            "backup_create",
+            "backup_verify",
+            "backup_pick_file",
+            "backup_restore_to",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

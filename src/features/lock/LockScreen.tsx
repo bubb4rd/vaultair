@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FolderOpenIcon, LockSimpleIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
+import {
+  ClockCounterClockwiseIcon,
+  FolderOpenIcon,
+  LockSimpleIcon,
+  PlusIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { queryKeys, useRecentVaults } from "@/app/queries";
 import { describedBy, Field, FieldError } from "@/components/common/Field";
 import { PasswordInput } from "@/components/common/PasswordInput";
@@ -8,6 +14,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { recentVaults, toIpcError, vault, type RecentVault, type VaultInfo } from "@/ipc/client";
 import { cn } from "@/lib/utils";
+import { RestoreDialog } from "@/features/backup/RestoreDialog";
 import { BrandMark } from "@/features/shell/BrandMark";
 import { DragBar } from "@/features/shell/DragBar";
 import { toast } from "@/features/toast/toast";
@@ -34,6 +41,7 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
   const [pending, setPending] = useState(false);
   const [failures, setFailures] = useState(0);
   const [waitSeconds, setWaitSeconds] = useState(0);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const waiting = waitSeconds > 0;
@@ -248,7 +256,19 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
               <PlusIcon aria-hidden="true" />
               Create a new vault
             </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRestoreOpen(true);
+              }}
+            >
+              <ClockCounterClockwiseIcon aria-hidden="true" />
+              Restore a backup
+            </Button>
           </div>
+          <RestoreDialog lockScreen open={restoreOpen} onOpenChange={setRestoreOpen} onRestored={select} />
         </div>
       </main>
     </div>

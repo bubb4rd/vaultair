@@ -4,6 +4,7 @@
 //! reach around it.
 #![forbid(unsafe_code)]
 
+pub mod backup;
 pub mod clock;
 pub mod config;
 pub mod crypto;

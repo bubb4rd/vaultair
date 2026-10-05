@@ -4,6 +4,7 @@ import { queryKeys, useSessionConfig } from "@/app/queries";
 import { Field, describedBy, fieldIds } from "@/components/common/Field";
 import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/ui/textarea";
+import { BackupSettings } from "@/features/backup/BackupSettings";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
 import { appInfo, session, type AppInfo, type CaptureLevel, type CaptureMode, type SessionConfig } from "@/ipc/client";
@@ -145,6 +146,7 @@ export function SettingsPage() {
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-10">
         <div className="flex max-w-xl flex-col gap-10">
           <PrivacySettings />
+          <BackupSettings />
           <AppVersion />
           {import.meta.env.DEV && <DevPanel />}
         </div>

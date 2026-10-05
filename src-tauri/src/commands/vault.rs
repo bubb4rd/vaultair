@@ -22,7 +22,7 @@ use crate::state::{ipc_err, AppState, IpcResult};
 
 /// Runs slow work (Argon2, SQLCipher, modal dialogs) off the async runtime's
 /// worker threads.
-async fn blocking<T: Send + 'static>(
+pub(super) async fn blocking<T: Send + 'static>(
     f: impl FnOnce() -> Result<T, VaultError> + Send + 'static,
 ) -> IpcResult<T> {
     tauri::async_runtime::spawn_blocking(f)
@@ -33,7 +33,7 @@ async fn blocking<T: Send + 'static>(
 
 /// A folder path from the webview: must be absolute. Rust re-validates every
 /// path it's handed, including ones its own folder picker returned.
-fn absolute_dir(path: &str) -> Result<PathBuf, VaultError> {
+pub(super) fn absolute_dir(path: &str) -> Result<PathBuf, VaultError> {
     let p = PathBuf::from(path);
     if p.is_absolute() {
         Ok(p)
@@ -42,7 +42,7 @@ fn absolute_dir(path: &str) -> Result<PathBuf, VaultError> {
     }
 }
 
-fn parent_or_default(location: Option<String>) -> Result<PathBuf, VaultError> {
+pub(super) fn parent_or_default(location: Option<String>) -> Result<PathBuf, VaultError> {
     match location {
         Some(l) => absolute_dir(&l),
         None => default_vaults_dir().ok_or(VaultError::InvalidLocation),
@@ -209,6 +209,10 @@ pub enum FolderPurpose {
     NewVaultLocation,
     /// Choose an existing vault's folder (the one containing `vault.vhdr`).
     ExistingVault,
+    /// Choose the folder backups are written to.
+    BackupDestination,
+    /// Choose where a restored vault's folder goes.
+    RestoreLocation,
 }
 
 /// Shows the system folder picker. Returns `None` if cancelled. For
@@ -220,11 +224,17 @@ pub async fn vault_pick_folder(
     purpose: FolderPurpose,
 ) -> IpcResult<Option<String>> {
     let owner = owner_handle(&window);
-    let initial = default_vaults_dir();
+    // Backups belong somewhere other than beside the vaults.
+    let initial = match purpose {
+        FolderPurpose::BackupDestination => None,
+        _ => default_vaults_dir(),
+    };
     blocking(move || {
         let title = match purpose {
             FolderPurpose::NewVaultLocation => "Choose where to keep your vault",
             FolderPurpose::ExistingVault => "Choose a vault folder",
+            FolderPurpose::BackupDestination => "Choose where to keep backups",
+            FolderPurpose::RestoreLocation => "Choose where to put the restored vault",
         };
         let Some(dir) = pick_folder(owner, title, initial.as_deref())? else {
             return Ok(None);
@@ -238,12 +248,12 @@ pub async fn vault_pick_folder(
 }
 
 #[cfg(windows)]
-fn owner_handle(window: &WebviewWindow) -> isize {
+pub(super) fn owner_handle(window: &WebviewWindow) -> isize {
     window.hwnd().map_or(0, |h| h.0 as isize)
 }
 
 #[cfg(not(windows))]
-fn owner_handle(_window: &WebviewWindow) -> isize {
+pub(super) fn owner_handle(_window: &WebviewWindow) -> isize {
     0
 }
 

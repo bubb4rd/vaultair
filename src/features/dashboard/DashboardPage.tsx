@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge, type Status } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { accountType, formatRelative } from "@/features/accounts/labels";
+import { BackupReminder } from "@/features/backup/BackupReminder";
 import { IdentityChip } from "@/features/identities/IdentityAvatar";
 import { FixLink } from "@/features/health/FixLink";
 import { ruleLabel, severityStatus } from "@/features/health/labels";
@@ -177,6 +178,7 @@ export function DashboardPage() {
     } else {
       body = (
         <div className="flex max-w-6xl flex-col gap-6">
+          <BackupReminder />
           {filtered && (
             <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
               Showing <IdentityChip name={filtered.name} color={filtered.color} />

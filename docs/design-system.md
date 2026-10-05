@@ -123,7 +123,7 @@ Plain and specific. Say what will appear and how it gets there. No hype verbs, n
 
 **No-recovery acknowledgement**: styled as a danger on purpose, as the one irreversible fact in setup. The panel uses a High-risk border and 8% tint, a bold red "There is no way to recover a forgotten master password" line with a shield-warning icon, the statement in foreground text, and a red checkbox. It reads as a warning without relying on color: the icon and wording carry it too.
 
-**Copy**: plain and honest. Nothing claims a feature that isn't built: backups are "coming in a later version", demo vaults say sample data arrives later, the lockout says "Try again in 5 s". The source texts are `docs/privacy-statement-draft.md` and `docs/forgot-master-password.md`.
+**Copy**: plain and honest. Nothing claims a feature that isn't built: demo vaults say sample data arrives later, the lockout says "Try again in 5 s". The source texts are `docs/privacy-statement-draft.md` and `docs/forgot-master-password.md`.
 
 ## Known issue
 

@@ -87,6 +87,12 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::search::saved_view_create,
             commands::search::saved_view_update,
             commands::search::saved_view_delete,
+            commands::backup::backup_status,
+            commands::backup::backup_set_destination,
+            commands::backup::backup_create,
+            commands::backup::backup_verify,
+            commands::backup::backup_pick_file,
+            commands::backup::backup_restore_to,
         ])
         .events(collect_events![
             events::VaultLocked,

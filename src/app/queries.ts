@@ -1,6 +1,7 @@
 import { QueryClient, keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   accounts,
+  backup,
   catalog,
   contactPoints,
   dashboard,
@@ -58,6 +59,7 @@ export const queryKeys = {
   gameProfiles: ["gameProfiles"] as const,
   gameProfileList: (filter: GameProfileFilter) => ["gameProfiles", filter] as const,
   savedViews: ["savedViews"] as const,
+  backupStatus: ["backup", "status"] as const,
 };
 
 /**
@@ -90,6 +92,11 @@ export function useRecentVaults() {
 /** Lock, clipboard and reveal timings (reveal auto-hide uses it). */
 export function useSessionConfig() {
   return useQuery({ queryKey: queryKeys.sessionConfig, queryFn: session.config });
+}
+
+/** Where backups go and how the last one went. Refetched after each backup. */
+export function useBackupStatus() {
+  return useQuery({ queryKey: queryKeys.backupStatus, queryFn: backup.status });
 }
 
 /** Every active account, or every archived one, by title. */

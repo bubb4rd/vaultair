@@ -158,6 +158,27 @@ pub fn pick_folder(
     title: &str,
     initial: Option<&std::path::Path>,
 ) -> Result<Option<std::path::PathBuf>, PlatformError> {
+    pick(owner, title, initial, None)
+}
+
+/// The same dialog for one existing file. `file_type` is a label and a
+/// pattern, such as `("Vaultair backups", "*.vaultair-backup")`.
+pub fn pick_file(
+    owner: isize,
+    title: &str,
+    initial: Option<&std::path::Path>,
+    file_type: (&str, &str),
+) -> Result<Option<std::path::PathBuf>, PlatformError> {
+    pick(owner, title, initial, Some(file_type))
+}
+
+/// Folders when `file_type` is `None`, otherwise files of that type.
+fn pick(
+    owner: isize,
+    title: &str,
+    initial: Option<&std::path::Path>,
+    file_type: Option<(&str, &str)>,
+) -> Result<Option<std::path::PathBuf>, PlatformError> {
     use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
     use windows::core::{HSTRING, PCWSTR};
@@ -166,10 +187,11 @@ pub fn pick_folder(
         CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER,
         COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
     };
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
     use windows::Win32::UI::Shell::{
         FileOpenDialog, IFileOpenDialog, IShellItem, SHCreateItemFromParsingName,
-        FOS_FORCEFILESYSTEM, FOS_NOCHANGEDIR, FOS_PATHMUSTEXIST, FOS_PICKFOLDERS,
-        SIGDN_FILESYSPATH,
+        FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, FOS_NOCHANGEDIR, FOS_PATHMUSTEXIST,
+        FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
     };
 
     /// Balances a successful `CoInitializeEx` on this thread.
@@ -193,15 +215,24 @@ pub fn pick_folder(
         let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)
             .map_err(os("FileOpenDialog"))?;
         let options = dialog.GetOptions().map_err(os("GetOptions"))?;
+        let what = if file_type.is_some() {
+            FOS_FILEMUSTEXIST
+        } else {
+            FOS_PICKFOLDERS
+        };
         dialog
-            .SetOptions(
-                options
-                    | FOS_PICKFOLDERS
-                    | FOS_FORCEFILESYSTEM
-                    | FOS_PATHMUSTEXIST
-                    | FOS_NOCHANGEDIR,
-            )
+            .SetOptions(options | what | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST | FOS_NOCHANGEDIR)
             .map_err(os("SetOptions"))?;
+        if let Some((label, pattern)) = file_type {
+            // Both strings outlive the call, which copies them.
+            let (label, pattern) = (HSTRING::from(label), HSTRING::from(pattern));
+            dialog
+                .SetFileTypes(&[COMDLG_FILTERSPEC {
+                    pszName: PCWSTR(label.as_ptr()),
+                    pszSpec: PCWSTR(pattern.as_ptr()),
+                }])
+                .map_err(os("SetFileTypes"))?;
+        }
         dialog
             .SetTitle(&HSTRING::from(title))
             .map_err(os("SetTitle"))?;

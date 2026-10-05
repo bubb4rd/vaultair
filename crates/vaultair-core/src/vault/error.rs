@@ -39,6 +39,14 @@ pub enum VaultError {
     InvalidLocation,
     #[error("the vault is locked")]
     Locked,
+    /// Not a backup file, or one that fails its MAC or integrity checks.
+    #[error("the file is not a valid backup")]
+    InvalidBackup,
+    #[error("the backup belongs to a different vault")]
+    BackupOtherVault,
+    /// The backup folder is missing or can't be written to.
+    #[error("the backup destination is not usable")]
+    BackupDestination,
     #[error("file system error ({0:?})")]
     Io(std::io::ErrorKind),
     #[error("crypto error: {0}")]
@@ -85,6 +93,9 @@ impl From<VaultError> for AppError {
             VaultError::InvalidName => Self::InvalidInput { field: "name" },
             VaultError::InvalidLocation => Self::InvalidInput { field: "location" },
             VaultError::Locked => Self::VaultLocked,
+            VaultError::InvalidBackup => Self::InvalidBackup,
+            VaultError::BackupOtherVault => Self::BackupOtherVault,
+            VaultError::BackupDestination => Self::BackupDestination,
             VaultError::Io(_) => Self::Internal {
                 context: "file system",
             },

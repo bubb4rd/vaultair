@@ -23,7 +23,7 @@ The optional checklist at the end of onboarding suggests the following. Vaultair
 3. Don't use it for anything else.
 4. Type it a few times over the first week so it sticks.
 
-Plan for backups too. Encrypted backups arrive in Phase 14. A backup opens with the master password it was made with, so keep that password as well.
+Plan for backups too (Settings > Backups; see [`backup-restore.md`](backup-restore.md)). A backup opens with the master password it was made with, so keep that password as well. A backup does not get you back in if you forget the password.
 
 ## If you have already forgotten it
 

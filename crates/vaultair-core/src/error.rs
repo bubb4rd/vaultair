@@ -25,6 +25,9 @@ pub enum ErrorCode {
     VaultTooNew,
     VaultCorrupted,
     ClipboardBusy,
+    InvalidBackup,
+    BackupOtherVault,
+    BackupDestination,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -58,6 +61,13 @@ pub enum AppError {
     /// Another app kept the clipboard open through every retry.
     #[error("the clipboard is busy")]
     ClipboardBusy,
+    /// Not a backup file, or one that was changed or damaged.
+    #[error("not a valid backup")]
+    InvalidBackup,
+    #[error("backup of a different vault")]
+    BackupOtherVault,
+    #[error("backup folder is not usable")]
+    BackupDestination,
 }
 
 impl AppError {
@@ -75,6 +85,9 @@ impl AppError {
             Self::VaultTooNew => ErrorCode::VaultTooNew,
             Self::VaultCorrupted => ErrorCode::VaultCorrupted,
             Self::ClipboardBusy => ErrorCode::ClipboardBusy,
+            Self::InvalidBackup => ErrorCode::InvalidBackup,
+            Self::BackupOtherVault => ErrorCode::BackupOtherVault,
+            Self::BackupDestination => ErrorCode::BackupDestination,
         }
     }
 
@@ -97,6 +110,13 @@ impl AppError {
             }
             Self::VaultCorrupted => "This vault appears to be damaged. Restore it from a backup.",
             Self::ClipboardBusy => "Another app is using the clipboard. Try again.",
+            Self::InvalidBackup => "That file isn't a Vaultair backup, or it has been damaged.",
+            Self::BackupOtherVault => {
+                "That backup belongs to a different vault. Restore it to check it."
+            }
+            Self::BackupDestination => {
+                "Vaultair couldn't write to the backup folder. Check that it exists and the drive is connected."
+            }
         }
     }
 
@@ -174,6 +194,9 @@ mod tests {
             AppError::VaultTooNew,
             AppError::VaultCorrupted,
             AppError::ClipboardBusy,
+            AppError::InvalidBackup,
+            AppError::BackupOtherVault,
+            AppError::BackupDestination,
         ] {
             let json = serde_json::to_value(&err).unwrap();
             let keys: Vec<_> = json.as_object().unwrap().keys().cloned().collect();

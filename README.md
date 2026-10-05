@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 13 (relationship map). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 14, encrypted backup. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 14 (encrypted backup). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 15, settings. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -18,6 +18,7 @@ A local-first, encrypted Windows workspace for people who manage several gaming 
 | [`docs/local-data-storage.md`](docs/local-data-storage.md) | Every file Vaultair writes |
 | [`docs/privacy-statement-draft.md`](docs/privacy-statement-draft.md) | Privacy promises; source for onboarding and settings copy |
 | [`docs/forgot-master-password.md`](docs/forgot-master-password.md) | Why there is no recovery, and what to do instead |
+| [`docs/backup-restore.md`](docs/backup-restore.md) | Making, checking and restoring encrypted backups |
 | [`docs/threat-model.md`](docs/threat-model.md) | What Vaultair does and does not protect against (draft) |
 | [`docs/adr/`](docs/adr) | Architecture decision records |
 
@@ -158,6 +159,17 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - Driven in the real webview (2026-10-05, demo vault): the map for an identity, an email, an account and a platform, the list, and a node click opening its account, with no console errors.
 - Not done in Phase 13: a "show on map" link from the account and identity pages (the focus picker and Ctrl+K reach the map), and thinning dense maps. A shared email at 2 steps touches most of the demo vault, so that map is busy; the list or a narrower focus is the calmer view.
 
+## Phase 14 notes
+
+- **A backup** is one `<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup` file (UTC): the vault's header, its SQLCipher database as it is on disk, and an HMAC-SHA256 over the whole file keyed from the vault's own key (`crates/vaultair-core/src/backup/`, format in `docs/vault-format.md` §11, guide in `docs/backup-restore.md`). No plaintext is written anywhere, and `tests/backup.rs` checks the canaries are absent from the file.
+- **Not the online backup API.** The plan called for it, but SQLCipher refuses it on encrypted databases. The database file is copied byte for byte under a read transaction instead, which keeps every page and its HMAC as they are.
+- **Back up now** writes to a `.tmp`, renames, then reads the file back (MAC, then every database page) before reporting success. A backup that doesn't read back is deleted. An existing backup is never overwritten.
+- **Check a backup** works for the open vault's own backups. Another vault's backup can only be checked by restoring it, because the MAC key comes from that vault's key.
+- **Restore** is on the lock screen and in Settings. It always makes a new vault folder (new or empty, like create), takes the master password the backup was made with, runs every check before the header is written, and leaves nothing behind on failure. The restored vault is named after its folder and added to the recent vaults. It keeps the original's vault id.
+- **Settings > Backups** holds the backup folder (refused inside the vault's own folder, warned about in a cloud-synced one), the last successful backup and whether the latest attempt failed. These live in `vault_settings`, so they travel with the vault. "Backup due" shows there and on the dashboard with no backup or one 30 days old (`REMINDER_AFTER_DAYS`); never for a demo vault.
+- New error codes: `invalid_backup`, `backup_other_vault`, `backup_destination`. `vaultair-platform` gains `pick_file` beside `pick_folder`.
+- The checked copy of a backup's database goes to `%LOCALAPPDATA%\Vaultair\tmp\` (still encrypted) and is deleted afterwards (`docs/local-data-storage.md`).
+- Not done in Phase 14: scheduled backups, the automatic backup before a schema migration (plan §2.4, needed once migrations ship to released vaults), and the full Backup tab layout, which arrives with the rest of Settings in Phase 15. The UI is tested against mocked IPC; the system file picker and a real backup and restore have not been driven in the running app yet.
 
 ## Phase 17: Passkeys and login credentials (scoped)
 

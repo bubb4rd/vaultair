@@ -94,6 +94,12 @@
     "allow-saved-view-list",
     "allow-saved-view-create",
     "allow-saved-view-update",
-    "allow-saved-view-delete"
+    "allow-saved-view-delete",
+    "allow-backup-status",
+    "allow-backup-set-destination",
+    "allow-backup-create",
+    "allow-backup-verify",
+    "allow-backup-pick-file",
+    "allow-backup-restore-to"
   ]
 }
