@@ -3,6 +3,7 @@ import { Outlet } from "@tanstack/react-router";
 import { onClipboardClearedByRust } from "@/features/clipboard/copy";
 import { lockVault } from "@/features/lock/lockVault";
 import { onClipboardCleared } from "@/ipc/events";
+import { CaptureGuard } from "@/features/settings/CaptureGuard";
 import { ActivityTracker } from "./ActivityTracker";
 import { CommandPalette } from "./CommandPalette";
 import { Sidebar } from "./Sidebar";
@@ -54,6 +55,7 @@ export function AppLayout() {
       </main>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ActivityTracker />
+      <CaptureGuard />
     </div>
   );
 }

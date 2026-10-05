@@ -24,6 +24,9 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   lockOnMinimize: false,
   clipboardClearSecs: 30,
   revealHideSecs: 20,
+  hideEmails: false,
+  captureMode: "always",
+  captureLevel: "risk",
   captureProtection: true,
 };
 

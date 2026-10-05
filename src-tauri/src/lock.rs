@@ -79,6 +79,8 @@ pub struct Locker {
     clipboard: Arc<ClipboardService>,
     config: Mutex<SessionConfig>,
     notice: Mutex<Option<LockNotice>>,
+    /// Sets window capture affinity. Used to return to the steady policy on lock.
+    apply_capture: Box<dyn Fn(bool) + Send + Sync>,
     /// Tells the UI (emits `vault://locked`).
     on_locked: Box<dyn Fn() + Send + Sync>,
 }
@@ -94,6 +96,7 @@ impl Locker {
         session: Arc<SessionManager>,
         clipboard: Arc<ClipboardService>,
         config: SessionConfig,
+        apply_capture: impl Fn(bool) + Send + Sync + 'static,
         on_locked: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         session.set_idle_lock(config.idle_lock());
@@ -102,6 +105,7 @@ impl Locker {
             clipboard,
             config: Mutex::new(config),
             notice: Mutex::default(),
+            apply_capture: Box::new(apply_capture),
             on_locked: Box::new(on_locked),
         }
     }
@@ -133,6 +137,7 @@ impl Locker {
 
     fn after_lock(&self, was_open: bool, reason: LockReason) {
         self.clipboard.clear_now();
+        self.restore_capture_steady();
         if was_open {
             tracing::info!(?reason, "vault locked");
             *self
@@ -146,6 +151,18 @@ impl Locker {
         if (was_open && reason != LockReason::Exit) || reason == LockReason::Manual {
             (self.on_locked)();
         }
+    }
+
+    /// Custom mode may have hidden the window for an open account. Lock
+    /// leaves that account, so the window returns to the saved steady state
+    /// (visible, unless the policy is Always).
+    fn restore_capture_steady(&self) {
+        let steady = self.config().capture_mode.hides_at_rest();
+        if self.config().capture_protection == steady {
+            return;
+        }
+        (self.apply_capture)(steady);
+        self.update_config(|c| c.capture_protection = steady);
     }
 
     pub fn lock_if_idle(&self) -> bool {
@@ -256,6 +273,7 @@ mod tests {
             session.clone(),
             clipboard.clone(),
             SessionConfig::default(),
+            |_| {},
             move || {
                 count.fetch_add(1, Ordering::SeqCst);
             },

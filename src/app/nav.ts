@@ -129,10 +129,6 @@ export const SETTINGS_ITEM: NavItem = {
   path: "/settings",
   label: "Settings",
   icon: GearSixIcon,
-  empty: {
-    title: "Settings arrive with your vault",
-    description: "Lock timeout, clipboard clearing, privacy and backup options will live here.",
-  },
 };
 
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ITEM];

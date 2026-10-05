@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-capture-policy-set"
+description = "Enables the capture_policy_set command without any pre-configured scope."
+commands.allow = ["capture_policy_set"]
+
+[[permission]]
+identifier = "deny-capture-policy-set"
+description = "Denies the capture_policy_set command without any pre-configured scope."
+commands.deny = ["capture_policy_set"]

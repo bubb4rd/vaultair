@@ -20,9 +20,8 @@ function previewToasts() {
 }
 
 /**
- * Debug builds only (`import.meta.env.DEV`), stripped from release. Lets the
- * Phase 5 clipboard and capture features be tried before the account screens
- * (Phase 7) and Settings (Phase 15) exist.
+ * Debug builds only (`import.meta.env.DEV`), stripped from release. Tries the
+ * clipboard flow and notifications from Settings.
  */
 export function DevPanel() {
   const [config, setConfig] = useState<SessionConfig | null>(null);
@@ -53,37 +52,14 @@ export function DevPanel() {
         <p className="mt-3 font-mono text-xs text-subtle-foreground">
           idle lock {duration(config.idleLockSecs)} · clipboard {config.clipboardClearSecs}s · lock on Win+L{" "}
           {config.lockOnSessionLock ? "on" : "off"} · sleep {config.lockOnSleep ? "on" : "off"} · minimize{" "}
-          {config.lockOnMinimize ? "on" : "off"}
+          {config.lockOnMinimize ? "on" : "off"} · capture {config.captureMode} · window{" "}
+          {config.captureProtection ? "hidden" : "visible"}
         </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void copyToClipboard(SAMPLE_COPY_TEXT, "Sample value")}>
           Copy sample value
         </Button>
-        {config && (
-          <Button
-            variant="outline"
-            size="sm"
-            aria-pressed={config.captureProtection}
-            onClick={() => {
-              session
-                .setCaptureProtection(!config.captureProtection)
-                .then((next) => {
-                  setConfig(next);
-                  toast.success(`Capture protection ${next.captureProtection ? "on" : "off"}`, {
-                    description: next.captureProtection
-                      ? "Screenshots and screen sharing can't see this window."
-                      : "Screenshots and screen sharing can see this window.",
-                  });
-                })
-                .catch(() => {
-                  toast.error("Couldn't change capture protection");
-                });
-            }}
-          >
-            Capture protection: {config.captureProtection ? "on" : "off"}
-          </Button>
-        )}
         <Button variant="outline" size="sm" onClick={previewToasts}>
           Preview notifications
         </Button>

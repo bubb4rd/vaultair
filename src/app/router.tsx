@@ -15,6 +15,7 @@ import { HealthPage } from "@/features/health/HealthPage";
 import { IdentitiesPage } from "@/features/identities/IdentitiesPage";
 import { IdentityDetailPage } from "@/features/identities/IdentityDetailPage";
 import { IdentityForm } from "@/features/identities/IdentityForm";
+import { SettingsPage } from "@/features/settings/SettingsPage";
 import { AppLayout } from "@/features/shell/AppLayout";
 import { RoutePage } from "@/features/shell/RoutePage";
 import { ALL_NAV_ITEMS } from "./nav";
@@ -29,6 +30,7 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   "/archived": () => <AccountsPage archived />,
   "/generator": GeneratorPanel,
   "/health": HealthPage,
+  "/settings": SettingsPage,
   "/games": () => <CatalogPage kind="game" />,
   "/platforms": () => <CatalogPage kind="platform" />,
 };

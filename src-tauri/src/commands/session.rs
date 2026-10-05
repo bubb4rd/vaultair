@@ -2,6 +2,7 @@
 //! settings, and screen-capture protection.
 
 use tauri::State;
+use vaultair_core::config::{applied_capture, CaptureLevel, CaptureMode};
 use vaultair_core::service::session::SessionConfig;
 
 use crate::lock::LockNotice;
@@ -23,17 +24,51 @@ pub fn session_config_get(state: State<'_, AppState>) -> SessionConfig {
     state.locker.config()
 }
 
-/// Turns screen-capture protection on or off, now and on future launches
-/// (the lock screen included). Returns the updated settings.
+/// Saves the capture policy and applies its steady state now: Always hides
+/// the window, Off and Custom show it until an account qualifies.
 #[tauri::command]
 #[specta::specta]
-pub fn capture_protection_set(state: State<'_, AppState>, enabled: bool) -> SessionConfig {
-    state.config.set_capture_protection(enabled);
+pub fn capture_policy_set(
+    state: State<'_, AppState>,
+    mode: CaptureMode,
+    level: CaptureLevel,
+) -> SessionConfig {
+    state.config.set_capture_policy(mode, level);
+    let enabled = mode.hides_at_rest();
     apply_capture_protection(state.capture.as_ref(), enabled);
-    tracing::info!(enabled, "capture protection changed");
-    state
-        .locker
-        .update_config(|c| c.capture_protection = enabled)
+    tracing::info!(?mode, ?level, enabled, "capture policy changed");
+    state.locker.update_config(|c| {
+        c.capture_mode = mode;
+        c.capture_level = level;
+        c.capture_protection = enabled;
+    })
+}
+
+/// Saves whether account emails stay masked until shown.
+#[tauri::command]
+#[specta::specta]
+pub fn hide_emails_set(state: State<'_, AppState>, enabled: bool) -> SessionConfig {
+    state.config.set_hide_emails(enabled);
+    tracing::info!(enabled, "hide emails changed");
+    state.locker.update_config(|c| c.hide_emails = enabled)
+}
+
+/// Hides or shows the window for the account on screen. Ignored unless the
+/// saved mode is Custom, so navigation cannot override Always or Off.
+#[tauri::command]
+#[specta::specta]
+pub fn capture_apply(state: State<'_, AppState>, enabled: bool) -> SessionConfig {
+    let current = state.locker.config();
+    let next = applied_capture(current.capture_mode, current.capture_protection, enabled);
+    if next == current.capture_protection {
+        return current;
+    }
+    apply_capture_protection(state.capture.as_ref(), next);
+    tracing::info!(
+        enabled = next,
+        "capture protection applied for the open account"
+    );
+    state.locker.update_config(|c| c.capture_protection = next)
 }
 
 /// Why the vault last locked (button or Ctrl+L, idle, Windows lock, sleep),

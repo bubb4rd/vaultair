@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-emails-set"
+description = "Enables the hide_emails_set command without any pre-configured scope."
+commands.allow = ["hide_emails_set"]
+
+[[permission]]
+identifier = "deny-hide-emails-set"
+description = "Denies the hide_emails_set command without any pre-configured scope."
+commands.deny = ["hide_emails_set"]

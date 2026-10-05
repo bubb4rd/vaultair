@@ -14,7 +14,7 @@ import {
   StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues } from "@/app/queries";
+import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues, useSessionConfig } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AccountLogo } from "@/features/catalog/CatalogLogo";
-import { FixLink } from "@/features/health/FixLink";
-import { ruleLabel, severityStatus } from "@/features/health/labels";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
 import { accounts, toIpcError, type AccountDetail, type AccountUrl } from "@/ipc/client";
@@ -36,16 +34,39 @@ import { DeleteConfirmDialog, OpenUrlDialog } from "./ConfirmDialogs";
 import { GameProfilesSection } from "./GameProfilesSection";
 import { suggestionLines } from "./notesHints";
 import { MfaSection } from "./MfaSection";
-import { CopyButton, FieldRow, SecretField } from "./SecretField";
-import { accountType, displayStatus, formatDate, passwordStrength } from "./labels";
+import { ConcealedField, CopyButton, FieldRow, SecretField } from "./SecretField";
+import { SecurityDial } from "./SecurityDial";
+import { accountType, displayStatus, formatDate } from "./labels";
+import { accountSecurityFacts, securityScore } from "./securityScore";
 
-function Panel({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+/** Email and recovery email. Masked when the privacy setting is on. */
+function EmailField({ label, value }: { label: string; value: string | null }) {
+  const hide = useSessionConfig().data?.hideEmails ?? false;
+  if (hide && value) return <ConcealedField label={label} value={value} />;
+  return (
+    <FieldRow label={label} actions={value ? <CopyButton text={value} label={label} /> : undefined}>
+      {value}
+    </FieldRow>
+  );
+}
+
+function Panel({
+  id,
+  title,
+  children,
+  plain = false,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+  plain?: boolean;
+}) {
   return (
     <section aria-labelledby={id} className="rounded-lg border border-border bg-card px-4 pt-3 pb-2">
       <h2 id={id} className="pb-1 text-[13px] font-semibold">
         {title}
       </h2>
-      <dl className="divide-y divide-border">{children}</dl>
+      {plain ? <div className="py-2">{children}</div> : <dl className="divide-y divide-border">{children}</dl>}
     </section>
   );
 }
@@ -210,51 +231,12 @@ function NotesSuggestion({ account }: { account: AccountDetail }) {
 }
 
 function Security({ account }: { account: AccountDetail }) {
-  const strength = account.passwordStrength === null ? null : passwordStrength(account.passwordStrength);
-  const enabled = account.mfa.filter((m) => m.enabled);
-  const codes = enabled.reduce((n, m) => n + m.backupCodesRemaining, 0);
-  const issues = useHealthIssues(null, null, account.archivedAt === null);
-  const mine = account.archivedAt ? [] : (issues.data ?? []).filter((issue) => issue.accountId === account.id);
+  const archived = account.archivedAt !== null;
+  const issues = useHealthIssues(null, null, !archived);
+  const result = securityScore(accountSecurityFacts(account, Array.isArray(issues.data) ? issues.data : null));
   return (
-    <Panel id="security-heading" title="Security">
-      <FieldRow label="Password">
-        {strength ? (
-          <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={strength.status} label={strength.label} />
-            {account.passwordChangedAt && (
-              <span className="text-xs text-subtle-foreground">Changed {formatDate(account.passwordChangedAt)}</span>
-            )}
-          </span>
-        ) : (
-          <StatusBadge status="unknown" label="No password saved" />
-        )}
-      </FieldRow>
-      <FieldRow label="MFA">
-        {enabled.length > 0 ? (
-          <StatusBadge status="secure" label="On" />
-        ) : (
-          <StatusBadge status="warning" label={account.mfa.length > 0 ? "Turned off" : "Not recorded"} />
-        )}
-      </FieldRow>
-      <FieldRow label="Backup codes">
-        {enabled.length === 0 ? null : codes > 0 ? (
-          `${String(codes)} left`
-        ) : (
-          <StatusBadge status="attention" label="None saved" />
-        )}
-      </FieldRow>
-      {mine.map((issue) => (
-        <FieldRow
-          key={issue.rule}
-          label={ruleLabel(issue.rule)}
-          actions={issue.fix === "account" ? undefined : <FixLink issue={issue} />}
-        >
-          <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={severityStatus(issue.severity)} />
-            <span>{issue.reason}</span>
-          </span>
-        </FieldRow>
-      ))}
+    <Panel id="security-heading" title="Security" plain>
+      <SecurityDial result={result} />
     </Panel>
   );
 }
@@ -415,20 +397,13 @@ function Detail({ account }: { account: AccountDetail }) {
               <FieldRow label="Username" actions={account.username && <CopyButton text={account.username} label="Username" />}>
                 {account.username}
               </FieldRow>
-              <FieldRow label="Email" actions={account.email && <CopyButton text={account.email} label="Email" />}>
-                {account.email}
-              </FieldRow>
+              <EmailField label="Email" value={account.email} />
               {account.hasPassword ? (
                 <SecretField label="Password" target={{ kind: "accountPassword", id: account.id }} />
               ) : (
                 <FieldRow label="Password" />
               )}
-              <FieldRow
-                label="Recovery email"
-                actions={account.recoveryEmail && <CopyButton text={account.recoveryEmail} label="Recovery email" />}
-              >
-                {account.recoveryEmail}
-              </FieldRow>
+              <EmailField label="Recovery email" value={account.recoveryEmail} />
               <FieldRow label="Recovery phone">{account.recoveryPhone}</FieldRow>
               <UrlRow
                 label="Login page"
