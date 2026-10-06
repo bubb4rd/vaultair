@@ -76,6 +76,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::health::health_summary,
             commands::health::health_issues,
             commands::graph::graph_query,
+            commands::graph::graph_overview,
+            commands::graph::graph_prospect_set_dismissed,
             commands::catalog::platform_list,
             commands::catalog::platform_create,
             commands::catalog::platform_update,

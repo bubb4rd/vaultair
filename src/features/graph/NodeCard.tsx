@@ -1,5 +1,6 @@
-import { EnvelopeSimpleIcon, LockKeyIcon, PhoneIcon } from "@phosphor-icons/react";
+import { EnvelopeSimpleIcon, LockKeyIcon, PhoneIcon, PlusIcon } from "@phosphor-icons/react";
 import { CatalogLogo } from "@/features/catalog/CatalogLogo";
+import { emailProvider } from "@/features/catalog/logos";
 import { IdentityAvatar } from "@/features/identities/IdentityAvatar";
 import type { GraphFocus, GraphNode } from "@/ipc/client";
 import { cn } from "@/lib/utils";
@@ -12,7 +13,9 @@ const TILE = {
 
 /**
  * What a node is, at a glance: an identity's initials, a platform's, game's
- * or account's logo, or an icon for an email, phone or MFA method.
+ * or account's logo, or an icon for an email, phone or MFA method. A
+ * prospective account gets its provider's logo, dimmed, when the address
+ * shows it, and a plus otherwise.
  * Decorative: the label and kind are always written next to it.
  */
 export function NodeMark({ node, label, size = "sm" }: { node: GraphNode; label: string; size?: keyof typeof TILE }) {
@@ -23,6 +26,26 @@ export function NodeMark({ node, label, size = "sm" }: { node: GraphNode; label:
     case "platform":
     case "game":
       return <CatalogLogo icon={node.icon} name={label} size={size} />;
+    case "prospective_account": {
+      // The label on screen, not the stored address: a hidden email is not a
+      // domain, so it does not give its provider away. The mark is that
+      // platform's, looked up by catalog id. `emailProvider` has no icon slug.
+      const provider = emailProvider(label);
+      if (provider) {
+        return <CatalogLogo id={provider.platformId} icon={null} name={label} size={size} className="opacity-60" />;
+      }
+      return (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "grid shrink-0 place-items-center border border-dashed border-input text-muted-foreground",
+            TILE[size],
+          )}
+        >
+          <PlusIcon />
+        </span>
+      );
+    }
     case "email":
     case "recovery_method":
     case "mfa_method": {
@@ -44,13 +67,19 @@ export function nodeCaption(node: GraphNode): string {
   return node.detail ? `${kindLabel(node.kind)}, ${node.detail}` : kindLabel(node.kind);
 }
 
-/** A node on the canvas: mark, label and kind on a card. The focus gets the accent edge and says so. */
+/**
+ * A node on the canvas: mark, label and kind on a card. The focus gets the
+ * accent edge and says so. A prospective account is outlined in dashes: it
+ * isn't in the vault.
+ */
 export function NodeCard({ node, label, focus }: { node: GraphNode; label: string; focus: boolean }) {
+  const prospect = node.kind === "prospective_account";
   return (
     <span
       className={cn(
-        "flex h-[52px] w-[224px] items-center gap-2.5 rounded-lg border bg-card px-2.5 text-left",
-        focus ? "border-brand" : "border-border-strong",
+        "flex h-[52px] w-[224px] items-center gap-2.5 rounded-lg border px-2.5 text-left",
+        prospect ? "border-dashed border-input bg-background" : "bg-card",
+        !prospect && (focus ? "border-brand" : "border-border-strong"),
       )}
     >
       <NodeMark node={node} label={label} />
@@ -65,11 +94,16 @@ export function NodeCard({ node, label, focus }: { node: GraphNode; label: strin
   );
 }
 
-/** Nodes with their own page open it. The rest (emails, phones, platforms, games) recentre the map. */
+/**
+ * Nodes with their own page open it. Emails, phones, platforms and games
+ * recentre the map. A prospective account has neither: it offers to be
+ * added, edited first or discarded.
+ */
 export type NodeTarget =
   | { type: "identity"; identityId: string }
   | { type: "account"; accountId: string; hash?: string }
-  | { type: "focus"; focus: GraphFocus };
+  | { type: "focus"; focus: GraphFocus }
+  | { type: "prospect"; contactId: string };
 
 export function nodeTarget(node: GraphNode): NodeTarget {
   switch (node.kind) {
@@ -79,6 +113,8 @@ export function nodeTarget(node: GraphNode): NodeTarget {
       return { type: "account", accountId: node.recordId };
     case "mfa_method":
       return { type: "account", accountId: node.recordId, hash: "mfa-heading" };
+    case "prospective_account":
+      return { type: "prospect", contactId: node.recordId };
     case "email":
     case "recovery_method":
       return { type: "focus", focus: { kind: "contact", id: node.recordId } };
@@ -89,7 +125,7 @@ export function nodeTarget(node: GraphNode): NodeTarget {
   }
 }
 
-/** The focus that centres the map on this node, if it can be one. An MFA method can't. */
+/** The focus that centres the map on this node, if it can be one. An MFA method and a prospective account can't. */
 export function focusOf(node: GraphNode): GraphFocus | null {
   switch (node.kind) {
     case "identity":

@@ -31,9 +31,13 @@ import {
   type AccountInput,
   type AccountStatus,
   type AccountType,
+  type ContactPointView,
+  type IdentityRef,
+  type PlatformView,
 } from "@/ipc/client";
 import { CustomFieldsEditor, draftsFrom, toInputs, type CustomFieldDraft } from "./CustomFieldsEditor";
 import { ACCOUNT_TYPES, FORM_STATUSES } from "./labels";
+import { mailboxFields } from "./mailbox";
 import { scanNotes, suggestionLines } from "./notesHints";
 import { freshSecret, toUpdate, type SecretEdit } from "./secretEdit";
 
@@ -968,8 +972,43 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
   );
 }
 
-/** New account (`accountId` undefined) or edit an existing one. */
-export function AccountForm({ accountId, identityId }: { accountId?: string; identityId?: string }) {
+/**
+ * A new account for the mailbox behind an email: an email account signing in
+ * with the address, named and placed by its provider, under the identity
+ * that names the address as its own.
+ */
+function forMailbox(
+  start: FormState,
+  mailbox: ContactPointView,
+  platforms: PlatformView[],
+  identities: IdentityRef[],
+): FormState {
+  const fields = mailboxFields(mailbox.value, platforms);
+  const owner = identities.some((r) => r.id === mailbox.identityId) ? (mailbox.identityId ?? "") : "";
+  return {
+    ...start,
+    accountType: "email",
+    email: mailbox.value,
+    title: fields.title,
+    platformId: fields.platformId ?? "",
+    publisher: fields.publisher ?? "",
+    identityId: start.identityId || owner,
+  };
+}
+
+/**
+ * New account (`accountId` undefined) or edit an existing one. `mailboxId`
+ * is an email's contact point: a new account then starts as that mailbox.
+ */
+export function AccountForm({
+  accountId,
+  identityId,
+  mailboxId,
+}: {
+  accountId?: string;
+  identityId?: string;
+  mailboxId?: string;
+}) {
   const purposes = usePurposes();
   // Loaded before the form renders, so the identity select never flashes the
   // current identity as archived while the list is still on its way.
@@ -977,6 +1016,12 @@ export function AccountForm({ accountId, identityId }: { accountId?: string; ide
   const existing = useAccount(accountId ?? "", accountId !== undefined);
   const editing = accountId !== undefined;
   const title = editing ? "Edit account" : "New account";
+  // The form keeps its first values, so a mailbox's details have to be in before it renders.
+  const contacts = useContactPoints();
+  const platforms = usePlatforms();
+  const fromMailbox = !editing && mailboxId !== undefined;
+  const mailbox = fromMailbox ? contacts.data?.find((c) => c.id === mailboxId && c.kind === "email") : undefined;
+  const waiting = fromMailbox && (contacts.isPending || platforms.isPending);
 
   let body: ReactNode = null;
   if (editing && existing.isError) {
@@ -985,9 +1030,15 @@ export function AccountForm({ accountId, identityId }: { accountId?: string; ide
         <EmptyState icon={KeyIcon} title="Account not found" description="It may have been deleted." />
       </div>
     );
-  } else if (purposes.data && !identityRefs.isPending && (!editing || existing.data)) {
+  } else if (purposes.data && !identityRefs.isPending && !waiting && (!editing || existing.data)) {
     const firstVisible = purposes.data.find((p) => !p.isHidden)?.id ?? "";
-    const initial = editing && existing.data ? fromDetail(existing.data) : blank(firstVisible, identityId ?? "");
+    const start = blank(firstVisible, identityId ?? "");
+    const initial =
+      editing && existing.data
+        ? fromDetail(existing.data)
+        : mailbox
+          ? forMailbox(start, mailbox, platforms.data ?? [], identityRefs.data ?? [])
+          : start;
     body = <Form key={accountId ?? "new"} initial={initial} existing={editing ? (existing.data ?? null) : null} />;
   }
 

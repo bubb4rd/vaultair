@@ -72,6 +72,8 @@ fn main() {
             "health_summary",
             "health_issues",
             "graph_query",
+            "graph_overview",
+            "graph_prospect_set_dismissed",
             "platform_list",
             "platform_create",
             "platform_update",

@@ -149,6 +149,36 @@ describe("mapGraph", () => {
     expect(line?.family).toBe("sign_in");
   });
 
+  it("hangs a prospective account under its email, on its own kind of line", () => {
+    const graph = specGraph();
+    graph.nodes.push(node("prospective_account", "c1", "primary@example.com", 2, "email:c1", "prospective"));
+    graph.edges.push(edge("email:c1", "prospective", "prospective_account:c1"));
+    const mapped = mapGraph(graph);
+    const line = mapped.edges.find((e) => e.target === "prospective_account:c1");
+    expect(line).toMatchObject({ source: "email:c1", label: "Mailbox", family: "suggested" });
+    const email = mapped.tree?.children.find((c) => c.node.id === "email:c1");
+    expect(email?.children.map((c) => c.node.id)).toContain("prospective_account:c1");
+  });
+
+  it("maps the whole vault as one tree per root, with no focus", () => {
+    const graph = specGraph();
+    graph.focus = null;
+    graph.nodes.push(
+      node("email", "c9", "stray@example.com", 0),
+      node("account", "a9", "Forum", 1, "email:c9", "login_email"),
+    );
+    graph.edges.push(edge("email:c9", "login_email", "account:a9"));
+    const mapped = mapGraph(graph);
+    expect(mapped.roots.map((r) => r.node.id)).toEqual(["identity:i1", "email:c9"]);
+    expect(mapped.roots.map(treeSize).reduce((a, b) => a + b, 0)).toBe(graph.nodes.length);
+    expect(mapped.nodes.some((n) => n.focus)).toBe(false);
+    expect(mapped.roots.every((r) => !r.focus && r.edge === null)).toBe(true);
+    // The trees are stacked, each root in the first column.
+    const [first, second] = ["identity:i1", "email:c9"].map((id) => mapped.nodes.find((n) => n.node.id === id));
+    expect(first?.x).toBe(second?.x);
+    expect(first?.y).not.toBe(second?.y);
+  });
+
   it("handles a lone focus and an empty graph", () => {
     const lone: Graph = { focus: "game:g1", truncated: false, nodes: [node("game", "g1", "Chess", 0)], edges: [] };
     const mapped = mapGraph(lone);

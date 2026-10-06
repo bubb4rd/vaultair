@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-graph-prospect-set-dismissed"
+description = "Enables the graph_prospect_set_dismissed command without any pre-configured scope."
+commands.allow = ["graph_prospect_set_dismissed"]
+
+[[permission]]
+identifier = "deny-graph-prospect-set-dismissed"
+description = "Denies the graph_prospect_set_dismissed command without any pre-configured scope."
+commands.deny = ["graph_prospect_set_dismissed"]

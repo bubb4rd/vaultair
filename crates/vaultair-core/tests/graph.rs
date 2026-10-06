@@ -130,13 +130,16 @@ fn has_edge(g: &Graph, source: &GraphNode, kind: EdgeKind, target: &GraphNode) -
 fn assert_well_formed(g: &Graph) {
     let ids: HashSet<&str> = g.nodes.iter().map(|n| n.id.as_str()).collect();
     assert_eq!(ids.len(), g.nodes.len(), "node ids repeat");
-    assert!(ids.contains(g.focus.as_str()));
+    if let Some(focus) = &g.focus {
+        assert!(ids.contains(focus.as_str()));
+    }
     for e in &g.edges {
         assert!(ids.contains(e.source.as_str()) && ids.contains(e.target.as_str()));
     }
     for n in &g.nodes {
-        if n.id == g.focus {
-            assert_eq!((n.depth, n.parent.as_deref()), (0, None));
+        // With a focus it is the only root; without one, every tree has its own.
+        if n.parent.is_none() && g.focus.as_ref().is_none_or(|f| *f == n.id) {
+            assert_eq!(n.depth, 0);
             continue;
         }
         let parent = n.parent.as_deref().expect("a parent");
@@ -203,7 +206,7 @@ fn the_spec_example_tree_has_its_nodes_edges_and_nesting() {
     assert!(!g.truncated);
 
     let root = node(&g, NodeKind::Identity, "Primary Gaming Identity");
-    assert_eq!(g.focus, root.id);
+    assert_eq!(g.focus.as_deref(), Some(root.id.as_str()));
     let email = node(&g, NodeKind::Email, "primary@example.com");
     let recovery = node(&g, NodeKind::Email, "recovery@example.com");
     let phone = node(&g, NodeKind::RecoveryMethod, "Pixel, ends 42");
@@ -291,8 +294,8 @@ fn the_spec_example_tree_has_its_nodes_edges_and_nesting() {
     assert_well_formed(&from_email);
     assert_eq!(
         from_email.nodes.len(),
-        8,
-        "the email, its identity, six accounts"
+        9,
+        "the email, its identity, six accounts, the mailbox not in the vault"
     );
     assert_eq!(
         under(node(&from_email, NodeKind::Account, "CS2 Main Account")).1,
@@ -448,6 +451,178 @@ fn archived_accounts_and_every_secret_stay_out() {
     }
 }
 
+fn account(
+    v: &mut OpenVault,
+    c: &dyn Clock,
+    title: &str,
+    kind: AccountType,
+    email: &str,
+) -> String {
+    let mut form = input(title, kind);
+    form.email = Some(email.into());
+    accounts::create(v, c, &form).unwrap().id
+}
+
+fn prospects(g: &Graph) -> Vec<&str> {
+    g.nodes
+        .iter()
+        .filter(|n| n.kind == NodeKind::ProspectiveAccount)
+        .map(|n| n.label.as_str())
+        .collect()
+}
+
+#[test]
+fn an_email_without_its_mailbox_is_a_prospective_account() {
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = ManualClock::default();
+    let c = &clock;
+    let mut v = new_vault(tmp.path(), c);
+    let me = identity(&mut v, c, "Main", "me@xyz.com");
+    let steam = account(&mut v, c, "Steam", AccountType::Launcher, "Me@XYZ.com");
+    account(&mut v, c, "Discord", AccountType::Social, "me@xyz.com");
+    account(&mut v, c, "Twitch", AccountType::Streaming, "me@xyz.com");
+    let old = account(
+        &mut v,
+        c,
+        "Old launcher",
+        AccountType::Launcher,
+        "old@xyz.com",
+    );
+    accounts::set_archived(&mut v, c, &old, true).unwrap();
+
+    let at = focus(FocusKind::Account, &steam);
+    let g = graph::query(&v, &at, None, None).unwrap();
+    assert_well_formed(&g);
+    let email = node(&g, NodeKind::Email, "me@xyz.com");
+    let prospect = node(&g, NodeKind::ProspectiveAccount, "me@xyz.com");
+    assert_eq!(prospect.record_id, email.record_id);
+    assert_eq!(
+        (
+            prospect.parent.as_deref(),
+            prospect.parent_edge,
+            prospect.depth
+        ),
+        (Some(email.id.as_str()), Some(EdgeKind::Prospective), 2)
+    );
+    assert!(has_edge(&g, email, EdgeKind::Prospective, prospect));
+    // An address only an identity names, or only an archived account uses,
+    // has nothing depending on its mailbox.
+    let whole = graph::query(&v, &focus(FocusKind::Identity, &me), None, None).unwrap();
+    assert_well_formed(&whole);
+    assert_eq!(prospects(&whole), ["me@xyz.com"]);
+
+    let contact = email.record_id.clone();
+    graph::set_prospect_dismissed(&mut v, c, &contact, true).unwrap();
+    let g = graph::query(&v, &at, None, None).unwrap();
+    assert_well_formed(&g);
+    assert!(prospects(&g).is_empty());
+    graph::set_prospect_dismissed(&mut v, c, &contact, false).unwrap();
+    assert_eq!(
+        prospects(&graph::query(&v, &at, None, None).unwrap()),
+        ["me@xyz.com"]
+    );
+
+    let phone: String = v
+        .conn()
+        .query_row(
+            "SELECT id FROM contact_point WHERE kind = 'phone'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    for not_an_email in [phone.as_str(), "no-such-contact"] {
+        assert_eq!(
+            graph::set_prospect_dismissed(&mut v, c, not_an_email, true).unwrap_err(),
+            AppError::NotFound
+        );
+    }
+
+    // The mailbox itself, once added, is an account like any other.
+    account(&mut v, c, "XYZ mail", AccountType::Email, "me@xyz.com");
+    let g = graph::query(&v, &at, None, None).unwrap();
+    assert_well_formed(&g);
+    assert!(prospects(&g).is_empty());
+    assert_eq!(node(&g, NodeKind::Account, "XYZ mail").depth, 2);
+}
+
+#[test]
+fn the_whole_vault_is_a_tree_per_identity_and_per_group_nothing_owns() {
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = ManualClock::default();
+    let c = &clock;
+    let mut v = new_vault(tmp.path(), c);
+    spec_vault(&mut v, c);
+    identity(&mut v, c, "Alt", "alt@example.com");
+    account(
+        &mut v,
+        c,
+        "Forum",
+        AccountType::Website,
+        "stray@example.com",
+    );
+    account(&mut v, c, "Wiki", AccountType::Website, "stray@example.com");
+    accounts::create(&mut v, c, &input("Notes app", AccountType::App)).unwrap();
+    let old = account(&mut v, c, "Old", AccountType::Website, "old@example.com");
+    accounts::set_archived(&mut v, c, &old, true).unwrap();
+
+    let g = graph::overview(&v, None).unwrap();
+    assert_well_formed(&g);
+    assert_eq!(g.focus, None);
+    assert!(!g.truncated);
+    let roots: Vec<(NodeKind, &str)> = g
+        .nodes
+        .iter()
+        .filter(|n| n.parent.is_none())
+        .map(|n| (n.kind, n.label.as_str()))
+        .collect();
+    assert_eq!(
+        roots,
+        [
+            (NodeKind::Identity, "Alt"),
+            (NodeKind::Identity, "Primary Gaming Identity"),
+            (NodeKind::Email, "stray@example.com"),
+            (NodeKind::Account, "Notes app"),
+        ]
+    );
+    let stray = node(&g, NodeKind::Email, "stray@example.com");
+    for title in ["Forum", "Wiki"] {
+        assert_eq!(
+            node(&g, NodeKind::Account, title).parent.as_deref(),
+            Some(stray.id.as_str())
+        );
+    }
+    // The same nesting as the identity's own map, however deep it goes.
+    let cod = node(
+        &g,
+        NodeKind::Account,
+        "Activision / Call of Duty Main Account",
+    );
+    assert_eq!(cod.parent_edge, Some(EdgeKind::LinkedLauncher));
+    assert_eq!(node(&g, NodeKind::Game, "Call of Duty").depth, 2);
+    // Nearest its root first.
+    assert_eq!(prospects(&g), ["stray@example.com", "primary@example.com"]);
+    // Two identities name the recovery address and the phone: each is drawn once.
+    let labels: Vec<&str> = g.nodes.iter().map(|n| n.label.as_str()).collect();
+    for once in ["recovery@example.com", "Pixel, ends 42"] {
+        assert_eq!(labels.iter().filter(|l| **l == once).count(), 1);
+    }
+    // Nothing active uses these.
+    for gone in ["Old", "old@example.com", "Epic Games Store"] {
+        assert!(!labels.contains(&gone), "{gone} should not be drawn");
+    }
+
+    let capped = graph::overview(&v, Some(3)).unwrap();
+    assert_well_formed(&capped);
+    assert_eq!(capped.nodes.len(), 3);
+    assert!(capped.truncated);
+    for limit in [0, MAX_NODES + 1] {
+        assert_eq!(
+            graph::overview(&v, Some(limit)).unwrap_err(),
+            AppError::InvalidInput { field: "limit" }
+        );
+    }
+}
+
 #[test]
 fn demo_vault_maps_shared_emails_and_platforms() {
     let tmp = tempfile::tempdir().unwrap();
@@ -460,8 +635,16 @@ fn demo_vault_maps_shared_emails_and_platforms() {
     let g = graph::query(&v, &focus(FocusKind::Identity, &main), None, None).unwrap();
     assert_well_formed(&g);
     let kinds: HashSet<NodeKind> = g.nodes.iter().map(|n| n.kind).collect();
-    assert_eq!(kinds.len(), NodeKind::ALL.len());
+    // Every kind but one: the mailbox behind Main's email is in the vault.
+    assert_eq!(kinds.len(), NodeKind::ALL.len() - 1);
+    assert!(prospects(&g).is_empty());
     assert!(g.nodes.iter().all(|n| n.label != "Beta test account"));
+    // The ranked address has accounts signing in with it and no mailbox account.
+    let ranked = id_of("SELECT id FROM identity WHERE name = 'Competitive'");
+    let g = graph::query(&v, &focus(FocusKind::Identity, &ranked), None, None).unwrap();
+    assert_well_formed(&g);
+    assert_eq!(prospects(&g), ["nightowl.ranked@example.com"]);
+    let g = graph::query(&v, &focus(FocusKind::Identity, &main), None, None).unwrap();
     // Other identities' accounts recover through Main's email, so they're in reach.
     assert_eq!(node(&g, NodeKind::Account, "Community chat").depth, 2);
 

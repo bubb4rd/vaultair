@@ -34,7 +34,9 @@ export interface TreeLink {
 
 export interface TreeItem {
   node: GraphNode;
-  /** How it relates to the item it hangs under; null for the focus. */
+  /** The record the map is centred on. No item is, on the whole-vault map. */
+  focus: boolean;
+  /** How it relates to the item it hangs under; null for the focus or a root. */
   edge: EdgeKind | null;
   children: TreeItem[];
   also: TreeLink[];
@@ -43,7 +45,10 @@ export interface TreeItem {
 export interface MappedGraph {
   nodes: MapNode[];
   edges: MapEdge[];
+  /** The first of `roots`: the focus's tree when there is a focus. */
   tree: TreeItem | null;
+  /** The focus's tree alone, or every tree of the whole-vault map. */
+  roots: TreeItem[];
   /** The size of the drawing, margins included. */
   width: number;
   height: number;
@@ -60,6 +65,7 @@ const KIND_ORDER: EdgeKind[] = [
   "on_platform",
   "plays",
   "mfa",
+  "prospective",
   "owns",
 ];
 
@@ -74,7 +80,8 @@ function hangsUnder(byId: Map<string, GraphNode>, node: GraphNode, ancestor: str
 
 /**
  * Turns Rust's graph into what the two views draw: a left-to-right layout
- * with the focus at the left, and the same data as a tree.
+ * with the focus at the left, and the same data as a tree. The whole-vault
+ * graph has no focus: its trees are stacked, each root at the left.
  *
  * An "assigned" link is left out when the account already hangs under that
  * identity another way (identity, its email, the account): the nesting says
@@ -111,13 +118,18 @@ export function mapGraph(graph: Graph): MappedGraph {
     visited.add(node.id);
     return {
       node,
+      focus: node.id === graph.focus,
       edge: node.id === graph.focus ? null : node.parentEdge,
       also: also.get(node.id) ?? [],
       children: (children.get(node.id) ?? []).filter((c) => !visited.has(c.id)).map(item),
     };
   };
-  const root = byId.get(graph.focus);
-  const tree = root ? item(root) : null;
+  // One tree under the focus; without a focus, one under every node that hangs under nothing.
+  const focus = graph.focus === null ? undefined : byId.get(graph.focus);
+  const tops =
+    graph.focus === null ? graph.nodes.filter((n) => n.parent === null || !byId.has(n.parent)) : focus ? [focus] : [];
+  const roots = tops.map(item);
+  const tree = roots[0] ?? null;
 
   const layout = new dagre.graphlib.Graph();
   // The gap between columns leaves room for a line's label before the node it runs into.
@@ -153,7 +165,7 @@ export function mapGraph(graph: Graph): MappedGraph {
   const loops = edges.some((e) => xOf.get(e.source) === xOf.get(e.target));
   const width = Math.max(0, ...nodes.map((n) => n.x + NODE_WIDTH)) + MARGIN + (loops ? LOOP_ROOM : 0);
   const height = Math.max(0, ...nodes.map((n) => n.y + NODE_HEIGHT)) + MARGIN;
-  return { nodes, edges, tree, width, height };
+  return { nodes, edges, tree, roots, width, height };
 }
 
 /** How many items a tree holds, the focus included. */

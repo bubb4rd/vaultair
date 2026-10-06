@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef, useState, type PointerEvent } from "react";
 import { CornersOutIcon, MinusIcon, PlusIcon } from "@phosphor-icons/react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { GraphNode } from "@/ipc/client";
 import { NODE_HEIGHT, NODE_WIDTH, type MapEdge, type MapNode, type MappedGraph } from "./graphMapper";
 import { familyDash } from "./labels";
 import { NodeCard, nodeCaption, nodeTarget } from "./NodeCard";
+import { ProspectPanel, type Prospects } from "./Prospect";
 import "./graph.css";
 
 const MIN_ZOOM = 0.4;
@@ -51,7 +53,8 @@ function ZoomButton({ label, onClick, children }: { label: string; onClick: () =
  * The map itself. Positions come from the mapper and nothing moves by
  * itself: the drawing scrolls (drag the background, or use the scrollbars
  * and the keyboard) and zooms with the corner buttons. Every node is a
- * button. The list view shows the same data without a canvas.
+ * button; a prospective account's opens its add, edit and discard choices.
+ * The list view shows the same data without a canvas.
  *
  * Drawn here, not with a graph library: the ones built on d3 assign to
  * prototypes at load, which the frozen-prototype security setting forbids.
@@ -60,23 +63,28 @@ export function GraphCanvas({
   mapped,
   labelOf,
   onOpen,
+  prospects,
+  fitted = true,
 }: {
   mapped: MappedGraph;
   labelOf: (node: GraphNode) => string;
   onOpen: (node: GraphNode) => void;
+  prospects: Prospects;
+  /** False for the whole vault: it opens at full size, to scroll through, not shrunk to fit. */
+  fitted?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
   const { width, height } = mapped;
 
-  // A new drawing starts fitted to the window.
+  // A new drawing starts fitted to the window, or at full size from its top-left corner.
   useLayoutEffect(() => {
     const box = scroller.current;
     if (!box) return;
-    setZoom(fitZoom(box, width, height));
+    setZoom(fitted ? fitZoom(box, width, height) : 1);
     box.scrollTo(0, 0);
-  }, [width, height]);
+  }, [width, height, fitted]);
 
   const at = new Map(mapped.nodes.map((n) => [n.node.id, n]));
   const lines = mapped.edges.flatMap((edge: MapEdge) => {
@@ -151,7 +159,28 @@ export function GraphCanvas({
             ))}
             {mapped.nodes.map(({ node, x, y, focus }) => {
               const label = labelOf(node);
-              const verb = nodeTarget(node).type === "focus" ? "Focus the map on" : "Open";
+              const target = nodeTarget(node).type;
+              // A prospective account opens nothing: its button offers to add, edit or discard it.
+              if (target === "prospect") {
+                return (
+                  <Popover key={node.id}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Review ${label}, ${nodeCaption(node)}`}
+                        className="absolute rounded-lg hover:brightness-125 focus-visible:outline-2 focus-visible:outline-ring"
+                        style={{ left: x, top: y }}
+                      >
+                        <NodeCard node={node} label={label} focus={focus} />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" aria-label={`Suggested account for ${label}`}>
+                      <ProspectPanel node={node} label={label} prospects={prospects} />
+                    </PopoverContent>
+                  </Popover>
+                );
+              }
+              const verb = target === "focus" ? "Focus the map on" : "Open";
               return (
                 <button
                   key={node.id}

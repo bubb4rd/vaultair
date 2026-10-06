@@ -29,12 +29,15 @@ pub struct GraphFocus {
 
 text_enum!(
     /// What a node stands for. A recovery method is a phone (a recovery
-    /// email is an email node with a recovery edge).
+    /// email is an email node with a recovery edge). A prospective account
+    /// is not a record: it is the mailbox behind an email that accounts use
+    /// while no email account in the vault signs in with it.
     NodeKind {
         Identity => "identity",
         Email => "email",
         RecoveryMethod => "recovery_method",
         Account => "account",
+        ProspectiveAccount => "prospective_account",
         Platform => "platform",
         Game => "game",
         MfaMethod => "mfa_method",
@@ -69,6 +72,8 @@ text_enum!(
         Plays => "plays",
         // Account to an MFA method that is turned on.
         Mfa => "mfa",
+        // Email to the mailbox account the vault doesn't have for it.
+        Prospective => "prospective",
     }
 );
 
@@ -81,6 +86,7 @@ pub struct GraphNode {
     pub kind: NodeKind,
     /// The record a click opens: the identity, the account (for an account
     /// and for its MFA method), or the contact, platform or game to refocus on.
+    /// A prospective account names the email's contact point.
     pub record_id: String,
     pub label: String,
     /// An account's purpose name.
@@ -88,9 +94,10 @@ pub struct GraphNode {
     /// A catalog icon slug: the platform's or game's own, or an account's mark.
     pub icon: Option<String>,
     pub color: Option<IdentityColor>,
-    /// Steps from the focus (0 is the focus).
+    /// Steps from the focus (0 is the focus), or from its tree's root.
     pub depth: u8,
-    /// The node this one hangs under in the tree view; `None` for the focus.
+    /// The node this one hangs under in the tree view; `None` for the focus
+    /// or a root.
     pub parent: Option<String>,
     /// How it relates to `parent`.
     pub parent_edge: Option<EdgeKind>,
@@ -106,13 +113,16 @@ pub struct GraphEdge {
     pub kind: EdgeKind,
 }
 
-/// A focus and everything within `depth` steps of it, capped at `limit` nodes.
+/// A focus and everything within `depth` steps of it, capped at `limit`
+/// nodes; or, with no focus, the whole vault as one tree per identity and
+/// one per group of records no identity reaches.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Graph {
-    /// The focus node's id.
-    pub focus: String,
+    /// The focus node's id. `None` for the whole vault: every node without
+    /// a `parent` is then the root of its own tree.
+    pub focus: Option<String>,
     /// Nearest first, then by kind and label.
     pub nodes: Vec<GraphNode>,
     /// Every relationship between two of `nodes`.

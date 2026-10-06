@@ -5,4 +5,4 @@
 
 pub mod builder;
 
-pub use builder::{query, MAX_DEPTH, MAX_NODES};
+pub use builder::{overview, query, MAX_DEPTH, MAX_NODES};
