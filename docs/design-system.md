@@ -78,6 +78,7 @@ Measured with the WCAG relative-luminance formula.
 | `StatusBadge` | The status system above. |
 | `EmptyState` | Left-aligned icon tile, title, one sentence on what appears here and how. |
 | `KeyboardHint` | Keycaps with a screen-reader label. |
+| `CatalogLogo` | A platform's, game's or account's mark, in lists, the catalog pages and map nodes. A logo stands free, in its brand colour if that reaches 3:1 on the card, otherwise in the text colour. A reviewed file is shown as an image in the same box, never as inline markup. With no logo, initials sit in a tile: neutral for user-added entries, and for a built-in tinted with its brand colour (15% fill and 45% border mixed into the card; the initials take the colour only at 3:1). Brand tints appear only on this tile, never on text, rows or status, so they can't be mistaken for a status or an identity colour. Always decorative: the name is written next to it. |
 | `features/shell/*` | Sidebar, PageHeader (drag region + WindowControls), CommandPalette (Ctrl+K), AppLayout (skip link). |
 
 ## Voice

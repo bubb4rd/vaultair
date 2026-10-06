@@ -78,7 +78,7 @@ function ProfileLine({ kind, profile }: { kind: CatalogKind; profile: GameProfil
         params={{ accountId: profile.accountId }}
         className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
       >
-        <CatalogLogo icon={profile.gameIcon} name={profile.gameName} />
+        <CatalogLogo id={profile.gameId} icon={profile.gameIcon} name={profile.gameName} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium text-foreground">
             {profile.gamertag ?? profile.gameName}
@@ -108,7 +108,7 @@ function EntryCard({
   return (
     <section aria-labelledby={headingId} className="rounded-lg border border-border bg-card">
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <CatalogLogo icon={entry.icon} name={entry.name} size="lg" />
+        <CatalogLogo id={entry.id} icon={entry.icon} name={entry.name} size="lg" />
         <div className="min-w-0 flex-1">
           <h2 id={headingId} className="truncate text-[15px] font-semibold">
             {entry.name}
@@ -249,7 +249,7 @@ export function CatalogPage({ kind }: { kind: CatalogKind }) {
                             setEditing(e);
                           }}
                         >
-                          <CatalogLogo icon={e.icon} name={e.name} />
+                          <CatalogLogo id={e.id} icon={e.icon} name={e.name} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[13px] text-foreground">{e.name}</span>
                             <span className="block truncate text-xs text-subtle-foreground">

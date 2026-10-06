@@ -347,7 +347,7 @@ function ProfileRow({ account, profile }: { account: AccountDetail; profile: Gam
 
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
-      <CatalogLogo icon={profile.gameIcon} name={profile.gameName} />
+      <CatalogLogo id={profile.gameId} icon={profile.gameIcon} name={profile.gameName} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium">{name}</p>
         <p className="truncate text-xs text-muted-foreground">{[...details, ...links].join(" · ")}</p>

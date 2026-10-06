@@ -35,6 +35,9 @@ Desktop.ini
 # Junction to .agents/skills/design-taste-frontend (recreate per README "Design tooling")
 .claude/skills/design-taste-frontend
 
+# Logo review scratch: contact sheet and candidate files (docs/logo-pipeline.md)
+.asset-work/
+
 # Python bytecode (ui-ux-pro-max scripts)
 __pycache__/
 

@@ -15,7 +15,11 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest",
-    "check:release-config": "node scripts/check-release-config.mjs"
+    "check:release-config": "node scripts/check-release-config.mjs",
+    "logos:report": "node scripts/logos.mjs report",
+    "logos:suggest": "node scripts/logos.mjs suggest",
+    "logos:sheet": "node scripts/logos.mjs sheet",
+    "logos:build": "node scripts/logos.mjs build"
   },
   "dependencies": {
     "@dagrejs/dagre": "3.1.1",
