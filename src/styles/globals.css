@@ -146,6 +146,12 @@
   .select-text {
     user-select: text;
   }
+  /* WebView2 draws its own reveal and clear buttons inside inputs. PasswordInput
+     has a show/hide button already, so the built-in one would be a second eye. */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
