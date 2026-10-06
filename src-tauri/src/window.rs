@@ -40,8 +40,14 @@ pub fn create_main(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     Ok(window)
 }
 
+pub fn main(app: &AppHandle) -> Option<WebviewWindow> {
+    app.get_webview_window(MAIN)
+}
+
+/// Brings the main window back to the front, including from the tray.
 pub fn focus_main(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN) {
+    if let Some(window) = main(app) {
+        let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
     }

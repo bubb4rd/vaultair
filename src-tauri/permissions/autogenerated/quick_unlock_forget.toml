@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-quick-unlock-forget"
+description = "Enables the quick_unlock_forget command without any pre-configured scope."
+commands.allow = ["quick_unlock_forget"]
+
+[[permission]]
+identifier = "deny-quick-unlock-forget"
+description = "Denies the quick_unlock_forget command without any pre-configured scope."
+commands.deny = ["quick_unlock_forget"]

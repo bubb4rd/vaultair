@@ -17,6 +17,8 @@ use serde::Serialize;
 use crate::clock::{Clock, SystemClock};
 use crate::config::{CaptureLevel, CaptureMode};
 use crate::crypto::kdf::KdfParams;
+use crate::crypto::keys::VaultKeys;
+use crate::vault::device_slot::Binding;
 use crate::vault::{self, CreateOptions, IntegrityReport, OpenVault, VaultError, VaultInfo};
 
 /// Lock and clipboard behaviour. The defaults are ADR-0004 decision 11.
@@ -45,6 +47,9 @@ pub struct SessionConfig {
     pub capture_level: CaptureLevel,
     /// Whether the window is hidden from capture right now.
     pub capture_protection: bool,
+    /// Closing the window hides Vaultair to the tray (and locks) instead
+    /// of quitting.
+    pub keep_in_tray: bool,
 }
 
 impl Default for SessionConfig {
@@ -60,6 +65,7 @@ impl Default for SessionConfig {
             capture_mode: CaptureMode::Always,
             capture_level: CaptureLevel::Risk,
             capture_protection: true,
+            keep_in_tray: false,
         }
     }
 }
@@ -203,6 +209,25 @@ impl SessionManager {
             vault::install_header(v, &header, next, &now)?;
             Ok(v.info())
         })
+    }
+
+    /// Unlocks the vault in `dir` with keys a device slot gave back
+    /// (`service::quick_unlock`). Locks any open vault first.
+    pub fn unlock_quick(
+        &self,
+        dir: &Path,
+        keys: VaultKeys,
+        binding: &Binding,
+    ) -> Result<VaultInfo, VaultError> {
+        self.lock();
+        let vault = vault::open_vault_with_keys(dir, keys, binding)?;
+        Ok(self.install(vault))
+    }
+
+    /// Checks `password` against the open vault. Argon2 runs outside the lock.
+    pub fn verify_password(&self, password: &SecretString) -> Result<(), VaultError> {
+        let header = self.with_vault(|v| Ok::<_, VaultError>(v.header().clone()))?;
+        vault::unwrap_dek(&header, password).map(drop)
     }
 
     /// The vault's current KDF parameters.

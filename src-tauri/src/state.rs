@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{AppHandle, WebviewWindow};
+use vaultair_core::clock::SystemClock;
 use vaultair_core::config::{default_app_dir, ConfigStore};
+use vaultair_core::service::quick_unlock::QuickUnlock;
 use vaultair_core::service::session::{SessionConfig, SessionManager};
 use vaultair_core::vault::location::CloudRoots;
 use vaultair_core::{AppError, ErrorCode};
@@ -11,6 +13,7 @@ use vaultair_platform::{CaptureProtection, Clipboard, SessionEvent, SessionEvent
 use crate::clipboard::ClipboardService;
 use crate::events::{emit, ClipboardCleared, VaultLocked};
 use crate::lock::{spawn_idle_timer, Locker};
+use crate::quick_unlock::HelloDevice;
 
 /// Managed Tauri state. Built in `setup`, once the main window exists: the
 /// clipboard, capture protection and session events all hang off its HWND.
@@ -21,6 +24,8 @@ pub struct AppState {
     pub clipboard: Arc<ClipboardService>,
     pub locker: Arc<Locker>,
     pub capture: Arc<dyn CaptureProtection>,
+    /// Windows Hello quick unlock (ADR-0005).
+    pub quick: Arc<QuickUnlock>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -47,6 +52,7 @@ impl AppState {
             capture_level: config.capture_level(),
             capture_protection: capture_mode.hides_at_rest(),
             hide_emails: config.hide_emails(),
+            keep_in_tray: config.keep_in_tray(),
             ..SessionConfig::default()
         });
         let handle = app.clone();
@@ -70,6 +76,11 @@ impl AppState {
             clipboard,
             locker,
             capture: platform.capture,
+            quick: Arc::new(QuickUnlock::new(
+                Arc::new(HelloDevice::for_this_pc()),
+                default_app_dir(),
+                Arc::new(SystemClock),
+            )),
         }
     }
 }

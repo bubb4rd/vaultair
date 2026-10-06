@@ -850,6 +850,12 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
 
 **DPAPI and Credential Manager scoping**
 - **Superseded by [ADR-0005](adr/0005-quick-unlock.md) and Phase 15b:** quick unlock uses a Hello-signed device sidecar, not a header key slot, and never Credential Manager. The notes below are the original design, kept for history.
+- **As built (Phase 15b):**
+  - `KeyCredentialManager` holds a key named `Vaultair-<vault_id>`; its signature over a random 32-byte challenge goes through HKDF-SHA256 to the key that wraps the DEK. Format: `docs/vault-format.md` §12.
+  - The slot is `%LOCALAPPDATA%\Vaultair\devices\<vault_id>.qu`, wrapped once more with `CryptProtectData` (`CRYPTPROTECT_UI_FORBIDDEN`, entropy = the vault id). Nothing goes in `vault.vhdr` or Credential Manager.
+  - The TPM is detected with `Tbsi_GetDeviceInfo`, not Hello attestation. The start of the Windows session is now minus `GetTickCount64`, compared within 2 minutes.
+  - All of it is called from blocking worker threads: every Hello call waits on a WinRT async operation, and `enroll` and `sign` wait for the user.
+  - Limits are in `docs/security-assumptions.md` (Fast Startup, the unauthenticated failure count, rules enforced by Vaultair rather than by the key).
 - MVP: master password only. No OS-level unlock, and nothing written to Credential Manager.
 - Phase 2 "quick unlock" design:
   - Add a `key_slot {kind:"windows-hello"}` whose wrapping key is protected by Windows Hello (`KeyCredentialManager` / `UserConsentVerifier` gating), with the wrapped material stored via DPAPI (`CryptProtectData`, `CRYPTPROTECT_UI_FORBIDDEN`, per-vault entropy).

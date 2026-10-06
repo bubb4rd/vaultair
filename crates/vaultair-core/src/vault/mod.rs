@@ -3,6 +3,7 @@
 
 pub mod atomic_write;
 mod create;
+pub mod device_slot;
 pub mod error;
 pub mod header;
 pub mod layout;
@@ -19,7 +20,7 @@ use serde::Serialize;
 
 pub use create::{create_vault, CreateOptions};
 pub use error::{CorruptPart, VaultError};
-pub use open::open_vault;
+pub use open::{open_vault, open_vault_with_keys, read_header, unwrap_dek};
 pub use rekey::{install_header, prepare_rewrap};
 
 use crate::crypto::keys::VaultKeys;

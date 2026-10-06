@@ -32,6 +32,11 @@ crates/vaultair-platform  OS integrations; the only crate with `unsafe` (windows
 | `crates/vaultair-core/src/redact.rs` | `Redacted<T>`, `redact_email`, `redact_username` for anything that might reach logs |
 | `crates/vaultair-platform/src/lib.rs` | `Clipboard`, `SessionEvents`, `CaptureProtection` traits; the `fake` feature has in-memory versions for tests |
 | `crates/vaultair-platform/src/windows/` | WebView2 settings hardening (COM); native folder picker (`IFileOpenDialog`); clipboard with history exclusion (`clipboard.rs`); WTS and power events from subclassing the main window (`session.rs`); display affinity (`capture.rs`) |
+| `crates/vaultair-core/src/vault/device_slot.rs` | The quick-unlock device slot: the data key wrapped under a key made from a Windows Hello signature, plus the MACed policy record (`docs/vault-format.md` §12) |
+| `crates/vaultair-core/src/service/quick_unlock.rs` | Quick unlock's rules (restart, 7 days, 3 failures, changed password) and the enable, unlock and forget steps, against the `QuickUnlockDevice` port |
+| `crates/vaultair-platform/src/windows/{hello,dpapi,sysinfo}.rs` | Windows Hello keys (`KeyCredentialManager`), DPAPI, TPM detection (`Tbsi_GetDeviceInfo`) and the uptime; fakes in `fake.rs` |
+| `src-tauri/src/quick_unlock.rs`, `src-tauri/src/commands/quick_unlock.rs` | Connects the port to the platform crate; `quick_unlock_status/enable/unlock/forget` |
+| `src-tauri/src/tray.rs` | The tray icon (Open, Lock, Quit) and close-to-tray, which hides the window and locks |
 | `src-tauri/src/ipc.rs` | The command list; generates `src/ipc/bindings.ts` |
 | `src-tauri/src/window.rs` | Creates the main window in Rust; navigation allow-list |
 | `src-tauri/src/logging.rs` | File logging and the panic hook |

@@ -28,6 +28,10 @@ pub enum ErrorCode {
     InvalidBackup,
     BackupOtherVault,
     BackupDestination,
+    QuickUnlockUnavailable,
+    QuickUnlockPasswordRequired,
+    QuickUnlockCancelled,
+    QuickUnlockFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -68,6 +72,17 @@ pub enum AppError {
     BackupOtherVault,
     #[error("backup folder is not usable")]
     BackupDestination,
+    /// Windows Hello isn't set up, or this PC doesn't support it.
+    #[error("Windows Hello is not available")]
+    QuickUnlockUnavailable,
+    /// Quick unlock is off for this vault, or one of its rules (restart,
+    /// 7 days, 3 failed attempts, a changed password) asks for the password.
+    #[error("quick unlock needs the master password")]
+    QuickUnlockPasswordRequired,
+    #[error("the Windows Hello prompt was cancelled")]
+    QuickUnlockCancelled,
+    #[error("Windows Hello failed")]
+    QuickUnlockFailed,
 }
 
 impl AppError {
@@ -88,6 +103,10 @@ impl AppError {
             Self::InvalidBackup => ErrorCode::InvalidBackup,
             Self::BackupOtherVault => ErrorCode::BackupOtherVault,
             Self::BackupDestination => ErrorCode::BackupDestination,
+            Self::QuickUnlockUnavailable => ErrorCode::QuickUnlockUnavailable,
+            Self::QuickUnlockPasswordRequired => ErrorCode::QuickUnlockPasswordRequired,
+            Self::QuickUnlockCancelled => ErrorCode::QuickUnlockCancelled,
+            Self::QuickUnlockFailed => ErrorCode::QuickUnlockFailed,
         }
     }
 
@@ -116,6 +135,14 @@ impl AppError {
             }
             Self::BackupDestination => {
                 "Vaultair couldn't write to the backup folder. Check that it exists and the drive is connected."
+            }
+            Self::QuickUnlockUnavailable => {
+                "Windows Hello isn't set up on this PC. Set it up in Windows Settings, under Accounts > Sign-in options."
+            }
+            Self::QuickUnlockPasswordRequired => "Enter your master password to unlock this vault.",
+            Self::QuickUnlockCancelled => "Windows Hello was cancelled. Enter your master password instead.",
+            Self::QuickUnlockFailed => {
+                "Windows Hello couldn't confirm it's you. Enter your master password instead."
             }
         }
     }
@@ -197,6 +224,10 @@ mod tests {
             AppError::InvalidBackup,
             AppError::BackupOtherVault,
             AppError::BackupDestination,
+            AppError::QuickUnlockUnavailable,
+            AppError::QuickUnlockPasswordRequired,
+            AppError::QuickUnlockCancelled,
+            AppError::QuickUnlockFailed,
         ] {
             let json = serde_json::to_value(&err).unwrap();
             let keys: Vec<_> = json.as_object().unwrap().keys().cloned().collect();

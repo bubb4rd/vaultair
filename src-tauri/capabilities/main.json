@@ -115,6 +115,11 @@
     "allow-vault-kdf-check",
     "allow-vault-strengthen-kdf",
     "allow-logs-folder",
-    "allow-logs-open"
+    "allow-logs-open",
+    "allow-quick-unlock-status",
+    "allow-quick-unlock-enable",
+    "allow-quick-unlock-unlock",
+    "allow-quick-unlock-forget",
+    "allow-tray-set"
   ]
 }

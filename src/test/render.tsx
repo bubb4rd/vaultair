@@ -29,6 +29,7 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   captureMode: "always",
   captureLevel: "risk",
   captureProtection: true,
+  keepInTray: false,
 };
 
 /** A vault's saved settings before the user changes any (the same defaults). */

@@ -32,15 +32,16 @@ export function lockNoticeText(n: LockNotice): { title: string; description?: st
 
 /**
  * The webview reloads on lock, so the reason comes back from Rust (once).
- * Called when the lock screen opens.
+ * Called when the lock screen opens. Resolves the notice it showed, or null.
  */
-export function showLockNotice() {
-  session
+export function showLockNotice(): Promise<LockNotice | null> {
+  return session
     .takeLockNotice()
     .then((n) => {
-      if (!n) return;
+      if (!n) return null;
       const { title, ...rest } = lockNoticeText(n);
       toast.info(title, { ...rest, icon: LockSimpleIcon, id: "lock-notice" });
+      return n;
     })
-    .catch(() => undefined);
+    .catch(() => null);
 }

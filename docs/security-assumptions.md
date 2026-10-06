@@ -1,6 +1,6 @@
 # Security assumptions
 
-> **Status:** Phase 3 first version. Updated in Phase 5 (OS integrations, clipboard) and Phase 7 (accounts). The threat model (`docs/threat-model.md`) says what Vaultair defends against; this document lists what that defense *relies on* and where its limits are.
+> **Status:** Phase 3 first version. Updated in Phase 5 (OS integrations, clipboard), Phase 7 (accounts) and Phase 15b (Windows Hello unlock). The threat model (`docs/threat-model.md`) says what Vaultair defends against; this document lists what that defense *relies on* and where its limits are.
 
 ## Libraries we trust
 
@@ -22,6 +22,8 @@ Versions are pinned in `Cargo.lock`; `cargo deny` checks advisories, licenses an
 3. **Argon2id at ≥ 64 MiB, t=3 makes offline guessing expensive.** It doesn't make a weak password strong, which is why the policy requires 12+ characters and a zxcvbn score of 3+.
 4. **The machine isn't compromised while the vault is unlocked.** See the threat model.
 5. **NTFS rename is atomic.** Header writes rely on write-temp, `fsync`, rename (`MoveFileExW` with replace).
+6. **Windows Hello keeps its keys and asks before using them** (only with Windows Hello unlock on). The key can't be exported, every signature needs the user's approval in a prompt Windows draws, and the same challenge always gives the same signature (RSA PKCS#1 v1.5, checked in `docs/spikes/hello-quick-unlock.md` within a process, across processes, after a restart and after a PIN change).
+7. **DPAPI is tied to the Windows account**, and is trusted for nothing more: any process running as the user can undo it without a prompt. It is an outer layer on the slot, not what protects the data key.
 
 ## Known limits
 
@@ -39,6 +41,11 @@ Versions are pinned in `Cargo.lock`; `cargo deny` checks advisories, licenses an
 - **A crash before the clear leaves the value on the clipboard.** Timed clears, "Clear now", lock and a normal exit all clear; a crash or a killed process doesn't. "Keep in clipboard" is the user opting out of the clear.
 - **Idle lock can come up to 15 s early**, because activity pings are throttled. The deadline itself is in Rust, so a stalled or compromised UI can't extend it without sending pings.
 - **Capture protection stops capture APIs, not people.** It hides the window from screenshot tools, screen sharing, streaming and Recall snapshots. It doesn't stop a camera, or code running with your rights that reads the window's memory. Before Windows 10 2004, captures show a black box instead of nothing.
+
+- **Windows Hello unlock keeps a wrapped copy of the DEK on this PC.** Opening it takes a Hello approval; see the threat model for what that does and doesn't stop. Its rules (restart, 7 days, 3 failed attempts) are enforced by Vaultair, not by the key, and the failure count in the slot has no MAC, because nothing can be authenticated before the DEK is known. Editing the count buys more Hello prompts, never an unlock.
+- **The Hello signature is key material while it is in memory.** Rust's copy is wiped after the HKDF; the WinRT buffer it arrived in can't be.
+- **Restart detection is the uptime** (`GetTickCount64`), read as now minus uptime and compared within 2 minutes. Fast Startup keeps the uptime across "Shut down", and moving the system clock by more than 2 minutes reads as a restart (the safe direction).
+- **TPM detection asks the TPM service** (`Tbsi_GetDeviceInfo`). Hello's own attestation reports `NotSupported` on working firmware TPMs, so it isn't used. A PC with a TPM that Hello doesn't use for some reason would not get the "no TPM" warning.
 
 ## Verified by tests
 
@@ -58,3 +65,10 @@ Phase 5 tests elsewhere:
 - `src-tauri/src/clipboard.rs` (paused tokio clock, fake clipboard): clears after the timeout, "Keep" cancels, a later user copy is never cleared, "Clear now", a new copy restarts the timer, a busy clipboard fails cleanly.
 - `src-tauri/src/lock.rs`: the ADR-0004 lock policy; a fake session-lock event locks the vault and clears the clipboard; idle and manual locks take the same path.
 - `crates/vaultair-platform/src/windows/clipboard.rs` (ignored, real clipboard): the three exclusion formats are present; only our write is cleared; clearing works after the owner window is destroyed (exit).
+
+Phase 15b tests:
+- `crates/vaultair-core/src/vault/device_slot.rs`: round trip; a different signature, vault id or header is rejected; every single changed byte is caught, and edits that keep the CRC valid still fail the unwrap; a forged policy record, or one MACed with another vault's key, is refused; the data key and the signature never appear in the slot or its `Debug` output.
+- `crates/vaultair-core/src/service/quick_unlock.rs` (in-memory Hello, DPAPI and uptime; `ManualClock`): unlock after one password unlock; the restart, 7-day and 3-failure rules, each without showing a Hello prompt once it applies, and each cleared by a password unlock; a changed password voids the slot, including one edited to claim the new header; a forged policy record gets past the hint and is refused after the unwrap; a damaged slot, another vault's slot and a missing Hello key all fall back to the password; turning it on or off needs the right password; a cancelled enrollment leaves no slot and no key; the data key is in neither the stored nor the unwrapped slot bytes.
+- `src-tauri/src/quick_unlock.rs`: the same service through the platform crate's `FakeHello`.
+- `crates/vaultair-platform/src/windows/dpapi.rs`: a real DPAPI round trip, bound to its entropy, refusing changed bytes. `hello.rs` has a real-Hello determinism test, ignored because it needs someone to approve the prompts (`cargo test -p vaultair-platform -- --ignored real_hello`).
+- `src/features/lock/LockScreen.test.tsx`, `src/features/settings/quickUnlock.test.tsx`: the lock screen falls back to the password on cancel and shows only the password when a rule requires it; Settings turns it on and off with the password and warns when there is no TPM.

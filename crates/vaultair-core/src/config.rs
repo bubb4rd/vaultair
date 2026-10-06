@@ -2,8 +2,9 @@
 //!
 //! Holds only what the app needs *before* a vault is unlocked: the
 //! recent-vaults list (folder paths plus when each was last opened), the
-//! screen-capture policy (it must apply to the lock screen too), and whether
-//! account emails are masked on screen. Never vault contents, names from
+//! screen-capture policy (it must apply to the lock screen too), whether
+//! account emails are masked on screen, and whether closing the window keeps
+//! Vaultair in the tray. Never vault contents, names from
 //! inside a vault, or anything secret. See docs/local-data-storage.md.
 
 use std::path::{Path, PathBuf};
@@ -84,6 +85,8 @@ pub struct AppConfig {
     pub capture_level: CaptureLevel,
     /// Mask email and recovery email on an account until the user shows them.
     pub hide_emails: bool,
+    /// Closing the window hides Vaultair to the tray instead of quitting.
+    pub keep_in_tray: bool,
 }
 
 impl Default for AppConfig {
@@ -94,6 +97,7 @@ impl Default for AppConfig {
             capture_mode: CaptureMode::Always,
             capture_level: CaptureLevel::Risk,
             hide_emails: false,
+            keep_in_tray: false,
         }
     }
 }
@@ -214,6 +218,14 @@ impl ConfigStore {
         self.update(|c| c.hide_emails = enabled);
     }
 
+    pub fn keep_in_tray(&self) -> bool {
+        self.guard().keep_in_tray
+    }
+
+    pub fn set_keep_in_tray(&self, enabled: bool) {
+        self.update(|c| c.keep_in_tray = enabled);
+    }
+
     pub fn recent_vaults(&self) -> Vec<RecentVault> {
         self.guard()
             .recent_vaults
@@ -256,6 +268,8 @@ struct StoredConfig {
     capture_level: Option<CaptureLevel>,
     #[serde(default)]
     hide_emails: bool,
+    #[serde(default)]
+    keep_in_tray: bool,
 }
 
 fn policy_from_stored(
@@ -284,6 +298,7 @@ fn read_config(path: &Path) -> AppConfig {
                 capture_mode,
                 capture_level,
                 hide_emails: c.hide_emails,
+                keep_in_tray: c.keep_in_tray,
             }
         }
         Ok(_) => {
@@ -400,7 +415,8 @@ mod tests {
                 "recentVaults": [{ "path": r"C:\V\Main", "lastOpenedAt": "2026-01-01T00:00:00Z" }],
                 "captureMode": "always",
                 "captureLevel": "risk",
-                "hideEmails": false
+                "hideEmails": false,
+                "keepInTray": false
             })
         );
     }
@@ -478,6 +494,22 @@ mod tests {
         )
         .unwrap();
         assert!(!ConfigStore::load(Some(dir.path().to_path_buf())).hide_emails());
+    }
+
+    #[test]
+    fn keep_in_tray_defaults_off_and_persists() {
+        let (dir, store) = store();
+        assert!(!store.keep_in_tray());
+        store.set_keep_in_tray(true);
+        assert!(ConfigStore::load(Some(dir.path().to_path_buf())).keep_in_tray());
+
+        // A config written before the tray setting existed leaves it off.
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            br#"{"version": 1, "recentVaults": [], "hideEmails": true}"#,
+        )
+        .unwrap();
+        assert!(!ConfigStore::load(Some(dir.path().to_path_buf())).keep_in_tray());
     }
 
     #[test]

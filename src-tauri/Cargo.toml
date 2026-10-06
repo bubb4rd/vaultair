@@ -17,7 +17,7 @@ tauri-build = { version = "=2.6.3", features = [] }
 [dependencies]
 vaultair-core = { path = "../crates/vaultair-core", features = ["specta"] }
 vaultair-platform = { path = "../crates/vaultair-platform" }
-tauri = { version = "=2.11.6", features = [] }
+tauri = { version = "=2.11.6", features = ["tray-icon"] }
 tauri-plugin-single-instance = "=2.4.5"
 serde.workspace = true
 serde_json.workspace = true

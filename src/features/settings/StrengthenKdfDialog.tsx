@@ -1,5 +1,5 @@
 import { useState, type SubmitEvent } from "react";
-import { useVaultInfoUpdated } from "@/app/queries";
+import { useOpenVault, useQuickUnlock, useQuickUnlockChanged, useVaultInfoUpdated } from "@/app/queries";
 import { Field, FieldError, describedBy } from "@/components/common/Field";
 import { PasswordInput } from "@/components/common/PasswordInput";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ import { settings, toIpcError, type KdfCheck } from "@/ipc/client";
  */
 export function StrengthenKdfDialog({ check, onClose }: { check: KdfCheck | null; onClose: () => void }) {
   const updated = useVaultInfoUpdated();
+  const vault = useOpenVault();
+  const quickUnlockOn = useQuickUnlock(vault?.path ?? null).data?.enabled === true;
+  const quickUnlockChanged = useQuickUnlockChanged();
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +48,15 @@ export function StrengthenKdfDialog({ check, onClose }: { check: KdfCheck | null
     setError(null);
     setPasswordError(null);
     try {
-      updated(await settings.strengthenKdf(password, check.suggested));
-      toast.success("Key derivation strengthened", { description: check.suggestedSummary });
+      const info = await settings.strengthenKdf(password, check.suggested);
+      updated(info);
+      // The vault key was wrapped again, which turns Windows Hello unlock off.
+      quickUnlockChanged(info.path);
+      toast.success("Key derivation strengthened", {
+        description: quickUnlockOn
+          ? `${check.suggestedSummary}. Windows Hello unlock is off until you turn it on again.`
+          : check.suggestedSummary,
+      });
       setBusy(false);
       setPassword("");
       onClose();
@@ -88,6 +98,7 @@ export function StrengthenKdfDialog({ check, onClose }: { check: KdfCheck | null
           )}
           <p className="text-[13px] text-muted-foreground">
             Unlocking takes about a second on this PC. A slower PC takes longer to open this vault.
+            {quickUnlockOn && " Windows Hello unlock turns off; you can turn it on again afterwards."}
           </p>
           <Field id="kdf-password" label="Master password" error={passwordError}>
             <PasswordInput

@@ -9,6 +9,7 @@ pub mod health;
 pub mod identities;
 pub mod mfa;
 pub mod purposes;
+pub mod quick_unlock;
 pub mod search;
 pub mod session;
 pub mod settings;

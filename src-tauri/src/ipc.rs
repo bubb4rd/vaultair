@@ -108,6 +108,11 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::settings::vault_strengthen_kdf,
             commands::settings::logs_folder,
             commands::settings::logs_open,
+            commands::quick_unlock::quick_unlock_status,
+            commands::quick_unlock::quick_unlock_enable,
+            commands::quick_unlock::quick_unlock_unlock,
+            commands::quick_unlock::quick_unlock_forget,
+            commands::session::tray_set,
         ])
         .events(collect_events![
             events::VaultLocked,

@@ -83,6 +83,7 @@ import {
   type ErrorCode,
   type FolderPurpose,
   type Generated,
+  type HelloState,
   type IntegrityReport,
   type KdfCheck,
   type KdfParams,
@@ -90,6 +91,8 @@ import {
   type LocationCheck,
   type PassphraseOptions,
   type PasswordOptions,
+  type PasswordReason,
+  type QuickUnlockStatus,
   type RecentVault,
   type RestoreBackupRequest,
   type RestoredVault,
@@ -183,6 +186,7 @@ export type {
   ErrorCode,
   FolderPurpose,
   Generated,
+  HelloState,
   IntegrityReport,
   KdfCheck,
   KdfParams,
@@ -190,6 +194,8 @@ export type {
   LockNotice,
   PassphraseOptions,
   PasswordOptions,
+  PasswordReason,
+  QuickUnlockStatus,
   RecentVault,
   SessionConfig,
   StrengthEstimate,
@@ -223,6 +229,10 @@ const KNOWN_CODES = {
   invalid_backup: true,
   backup_other_vault: true,
   backup_destination: true,
+  quick_unlock_unavailable: true,
+  quick_unlock_password_required: true,
+  quick_unlock_cancelled: true,
+  quick_unlock_failed: true,
 } as const satisfies Record<ErrorCode, true>;
 
 const FALLBACK: IpcError = {
@@ -351,13 +361,33 @@ export const session = {
   applyCapture: (enabled: boolean): Promise<SessionConfig> => call(() => commands.captureApply(enabled)),
   /** Why the vault last locked, once; null after that. */
   takeLockNotice: (): Promise<LockNotice | null> => call(() => commands.sessionTakeLockNotice()),
+  /** Saves whether closing the window keeps Vaultair in the tray (it still locks). */
+  setKeepInTray: (enabled: boolean): Promise<SessionConfig> => call(() => commands.traySet(enabled)),
+};
+
+/**
+ * Unlocking with Windows Hello. Turning it on or off takes the master
+ * password; every failure to unlock falls back to the password field.
+ */
+export const quickUnlock = {
+  /** Works while locked: whether Hello can unlock the vault in `path` now, and why not. */
+  status: (path: string): Promise<QuickUnlockStatus> => unwrap(() => commands.quickUnlockStatus(path)),
+  /** Shows a Windows Hello prompt. */
+  enable: (password: string): Promise<QuickUnlockStatus> => data(() => commands.quickUnlockEnable(password)),
+  /** Shows a Windows Hello prompt. */
+  unlock: (path: string): Promise<VaultInfo> => unwrap(() => commands.quickUnlockUnlock(path)),
+  forget: (password: string): Promise<QuickUnlockStatus> => data(() => commands.quickUnlockForget(password)),
 };
 
 /** The open vault's settings, its name and colour, and its master password. */
 export const settings = {
   get: (): Promise<VaultSettings> => data(() => commands.settingsGet()),
-  /** Saves and applies the settings at once; resolves the session config they produce. */
-  update: (next: VaultSettings): Promise<SessionConfig> => data(() => commands.settingsUpdate(next)),
+  /**
+   * Saves and applies the settings at once; resolves the session config they produce.
+   * `password` is only needed to turn auto-lock off while Windows Hello unlock is on.
+   */
+  update: (next: VaultSettings, password: string | null = null): Promise<SessionConfig> =>
+    data(() => commands.settingsUpdate(next, password)),
   updateProfile: (input: VaultProfileInput): Promise<VaultInfo> => data(() => commands.vaultProfileUpdate(input)),
   /** The vault stays unlocked. Rust checks `current` and the policy for `next`. */
   changePassword: (current: string, next: string): Promise<VaultInfo> =>
