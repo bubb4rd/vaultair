@@ -1,6 +1,7 @@
 //! Application services: the layer the Tauri commands call.
 
 pub mod accounts;
+pub mod backup;
 pub mod catalog;
 pub mod dashboard;
 pub mod graph;

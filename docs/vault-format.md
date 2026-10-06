@@ -1,6 +1,6 @@
 # Vault format (v1)
 
-> **Status:** Phase 3. Describes what `crates/vaultair-core` writes today. Backups (Phase 14) and password change (Phase 15) will extend this document. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
+> **Status:** Phase 3. Updated in Phase 14 (backup container, §11). Describes what `crates/vaultair-core` writes today. Password change (Phase 15) will extend this document. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
 
 This document is meant to be precise enough for an independent implementation to open a vault, given the master password.
 
@@ -111,7 +111,7 @@ The DEK is 32 random bytes from the OS RNG, generated once per vault.
 | `vaultair/v1/sqlcipher` | DB_KEY | SQLCipher raw key |
 | `vaultair/v1/field` | FIELD_KEY | Field envelopes (§7) |
 | `vaultair/v1/pwfp` | FP_KEY | `HMAC-SHA256(FP_KEY, NFC(password))` for reuse detection |
-| `vaultair/v1/backup-mac` | BACKUP_KEY | Backup container MAC (Phase 14) |
+| `vaultair/v1/backup-mac` | BACKUP_KEY | Backup container MAC (§11) |
 
 ## 6. Database (`vault.vdb`)
 
@@ -173,3 +173,37 @@ Binding table, column and row id means an envelope can't be moved to another cel
 ## 10. Golden fixtures
 
 `tests-fixtures/v1/Golden/` is a real v1 vault (password: `fixture-only password, not a secret`) opened by `golden_fixture_v1_still_opens` on every test run, so format or schema changes are always tested against an existing vault. Until the first public release, V1 may still change and the fixture is regenerated; after it, fixtures are append-only.
+
+## 11. Backup container (`*.vaultair-backup`)
+
+One file holding a vault's header and database. User guide: [`backup-restore.md`](backup-restore.md). Code: `crates/vaultair-core/src/backup/`.
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 8 | Magic: ASCII `VAIRBKUP` |
+| 8 | 2 | Container version, u16 LE. Currently `1` |
+| 10 | 2 + n | `created_at`: u16 LE length, then UTF-8 RFC 3339 UTC. At most 64 bytes |
+| … | 2 + n | `vault_id`: u16 LE length, then UTF-8. At most 64 bytes |
+| … | 4 + n | Header: u32 LE length, then a complete `vault.vhdr` (§2). At most 128 KiB |
+| … | 8 + n | Database: u64 LE length, then a complete `vault.vdb` (§6) |
+| end − 32 | 32 | `HMAC-SHA256(BACKUP_KEY, every byte before it)` |
+
+The lengths must add up to the file size exactly: no trailing bytes.
+
+**Nothing in the file is plaintext vault data.** The header has no user data, and the database bytes are the SQLCipher file as it is on disk. `created_at` and `vault_id` are readable without a password and are not trusted until the MAC has been checked.
+
+**Reading a backup, in this order:**
+
+1. Check the magic and the version. A version above `1` is **too new**.
+2. Read the fields with the caps above. Decode the header by the rules in §2. Its `vault_id` must equal the container's.
+3. Get the DEK: from the password, through the header's key wrap (§3, §4), or already in hand for a backup of the open vault. A failed unwrap is **wrong password or tampered header**.
+4. Derive BACKUP_KEY (§5) and check the MAC over the whole file, in constant time, while copying the database bytes out.
+5. Open the copy with DB_KEY. Run `PRAGMA cipher_integrity_check` and `PRAGMA quick_check`. `PRAGMA user_version` above what the reader knows is **too new**. `vault_meta.vault_id` must equal the header's.
+
+Anything else that fails in steps 1, 2, 4 or 5 is an **invalid backup**.
+
+**Writing a backup.** The database bytes are read from `vault.vdb` under a SQLite read transaction, with the vault held so no write of ours is in flight. With `journal_mode = DELETE`, the file alone is then the whole database. SQLCipher refuses SQLite's online backup API on encrypted databases, and `sqlcipher_export` would rewrite every page; a byte copy keeps the pages and their HMACs exactly as they are. The header bytes are read from `vault.vhdr`. The container is written to `<name>.vaultair-backup.tmp`, flushed and renamed. Vaultair then reads it back (steps 1 to 5) before reporting success.
+
+**Password change.** A backup carries the header it was made with, so it opens with the master password of that time. The DEK does not change on a password change, so BACKUP_KEY stays the same and older backups of the same vault still pass step 4 with the open vault's key.
+
+**Restore** writes the database first and the header last, into a folder that must be new or empty, like create (§8). The restored vault takes its folder's name: `vault_meta.display_name` is updated if it differs.

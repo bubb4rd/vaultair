@@ -20,13 +20,13 @@ import {
   strengthEstimate,
   toIpcError,
   vault,
-  type CloudProvider,
   type IpcError,
   type KdfParams,
   type LocationCheck,
   type StrengthEstimate,
   type VaultInfo,
 } from "@/ipc/client";
+import { PROVIDER_NAMES } from "@/features/backup/labels";
 import { StepPage } from "./StepPage";
 import { Requirement, StrengthMeter } from "./StrengthMeter";
 import { vaultNameError } from "./vaultName";
@@ -237,14 +237,6 @@ export function NameStep({
     </StepPage>
   );
 }
-
-const PROVIDER_NAMES: Record<CloudProvider, string> = {
-  oneDrive: "OneDrive",
-  dropbox: "Dropbox",
-  googleDrive: "Google Drive",
-  iCloud: "iCloud",
-  box: "Box",
-};
 
 export function LocationStep({
   name,
@@ -618,7 +610,8 @@ export function BackupsStep({ onFinish }: { onFinish: () => void }) {
     >
       <ul className="flex max-w-[60ch] list-disc flex-col gap-2 pl-5 text-[14px] text-muted-foreground marker:text-subtle-foreground">
         <li>
-          Encrypted backups come to Vaultair in a later version. When they arrive, you&apos;ll find them in Settings.
+          Vaultair makes encrypted backups. Once your vault is open, choose a backup folder in Settings and back up
+          from there.
         </li>
         <li>Keep a backup on a USB drive or another disk, not only on this PC.</li>
         <li>A backup opens with the master password it was made with, so keep that password too.</li>

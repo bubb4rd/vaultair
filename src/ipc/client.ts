@@ -70,6 +70,9 @@ import {
   type TotpCodeView,
   type UrlTarget,
   type AppInfo,
+  type BackupOutcome,
+  type BackupStatus,
+  type BackupSummary,
   type CaptureLevel,
   type CaptureMode,
   type ClipboardCopy,
@@ -85,6 +88,8 @@ import {
   type PassphraseOptions,
   type PasswordOptions,
   type RecentVault,
+  type RestoreBackupRequest,
+  type RestoredVault,
   type SessionConfig,
   type StrengthEstimate,
   type VaultInfo,
@@ -158,6 +163,11 @@ export type {
   TotpCodeView,
   UrlTarget,
   AppInfo,
+  BackupOutcome,
+  BackupStatus,
+  BackupSummary,
+  RestoreBackupRequest,
+  RestoredVault,
   CaptureLevel,
   CaptureMode,
   ClipboardCopy,
@@ -200,6 +210,9 @@ const KNOWN_CODES = {
   vault_too_new: true,
   vault_corrupted: true,
   clipboard_busy: true,
+  invalid_backup: true,
+  backup_other_vault: true,
+  backup_destination: true,
 } as const satisfies Record<ErrorCode, true>;
 
 const FALLBACK: IpcError = {
@@ -287,6 +300,22 @@ export const vault = {
     unwrap(() => commands.vaultLocationCheck(location, name)),
   /** Resolves null if the user cancels the dialog. */
   pickFolder: (purpose: FolderPurpose): Promise<string | null> => unwrap(() => commands.vaultPickFolder(purpose)),
+};
+
+/**
+ * Encrypted backups. Making and checking one need the unlocked vault;
+ * choosing a file and restoring don't, so the lock screen can offer them.
+ */
+export const backup = {
+  status: (): Promise<BackupStatus> => data(() => commands.backupStatus()),
+  /** `null` clears the folder. */
+  setDestination: (path: string | null): Promise<BackupStatus> => data(() => commands.backupSetDestination(path)),
+  /** Writes a backup and reads it back before resolving. */
+  create: (): Promise<BackupSummary> => data(() => commands.backupCreate()),
+  verify: (path: string): Promise<BackupSummary> => data(() => commands.backupVerify(path)),
+  /** The system file picker. `null` when cancelled. */
+  pickFile: (): Promise<BackupSummary | null> => unwrap(() => commands.backupPickFile()),
+  restore: (request: RestoreBackupRequest): Promise<RestoredVault> => unwrap(() => commands.backupRestoreTo(request)),
 };
 
 export const recentVaults = {

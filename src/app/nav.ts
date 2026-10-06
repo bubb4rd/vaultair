@@ -134,11 +134,15 @@ export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), 
  * plain strings because these routes are built from `NAV_GROUPS` at runtime,
  * so the router can't list them in its typed path union.
  */
-export const PAGE_PATHS: Record<"accounts" | "archived" | "identities" | "games" | "platforms" | "health", string> = {
+export const PAGE_PATHS: Record<
+  "accounts" | "archived" | "identities" | "games" | "platforms" | "health" | "settings",
+  string
+> = {
   accounts: "/accounts",
   archived: "/archived",
   identities: "/identities",
   games: "/games",
   platforms: "/platforms",
   health: "/health",
+  settings: "/settings",
 };

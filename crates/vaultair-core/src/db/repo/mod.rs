@@ -13,6 +13,7 @@ pub mod identity;
 pub mod mfa;
 pub mod purpose;
 pub mod saved_view;
+pub mod settings;
 pub mod tag;
 
 use zeroize::Zeroizing;

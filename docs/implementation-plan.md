@@ -748,7 +748,7 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
 - **Files:** `backup/{container, create, verify, restore}.rs`, `src/features/backup/*`, `docs/backup-restore.md`.
 - **Container `*.vaultair-backup`:**
   - magic, version, created_at, vault_id, header bytes (length-prefixed), DB bytes, then HMAC-SHA256 (BACKUP_KEY) over everything before it.
-  - The DB bytes come from the SQLite online backup API into a temporary *SQLCipher* file keyed with the same DB_KEY, so plaintext never touches disk. The whole file is written to a `.tmp` and atomically renamed.
+  - The DB bytes are `vault.vdb` as it is on disk, read under a read transaction, so plaintext never touches disk. (Built this way because SQLCipher refuses the SQLite online backup API on encrypted databases; see `vault-format.md` §11.) The whole file is written to a `.tmp` and atomically renamed.
   - File name: `<VaultName>-YYYYMMDD-HHMMSS.vaultair-backup`.
   - The backup opens with **the master password that was current when the backup was made** (documented).
 - **UI:** choose a destination (with the cloud-folder notice when applicable), "Back up now", backup age, last success or failure in Settings, and a reminder when the last backup is older than N days.

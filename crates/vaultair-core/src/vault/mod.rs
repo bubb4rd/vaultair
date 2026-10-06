@@ -87,6 +87,14 @@ impl OpenVault {
         &self.paths.dir
     }
 
+    pub(crate) fn paths(&self) -> &VaultPaths {
+        &self.paths
+    }
+
+    pub(crate) fn header(&self) -> &VaultHeader {
+        &self.header
+    }
+
     pub fn keys(&self) -> &VaultKeys {
         &self.keys
     }

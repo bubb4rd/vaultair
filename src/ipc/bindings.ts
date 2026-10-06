@@ -221,6 +221,42 @@ export const commands = {
 	/**  Renames a user view or replaces its filter. Built-ins can't change. */
 	savedViewUpdate: (id: string, input: SavedViewInput) => typedError<SavedView, IpcError_Serialize>(__TAURI_INVOKE("saved_view_update", { id, input })),
 	savedViewDelete: (id: string) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("saved_view_delete", { id })),
+	/**  Where backups go, how the last one went, and whether one is due. */
+	backupStatus: () => typedError<BackupStatus, IpcError_Serialize>(__TAURI_INVOKE("backup_status")),
+	/**
+	 *  Sets the folder backups are written to; `null` clears it. The folder must
+	 *  exist and be outside the vault's own folder.
+	 */
+	backupSetDestination: (path: string | null) => typedError<BackupStatus, IpcError_Serialize>(__TAURI_INVOKE("backup_set_destination", { path })),
+	/**
+	 *  Writes a backup to the destination folder and reads it back before
+	 *  reporting success.
+	 */
+	backupCreate: () => typedError<BackupSummary, IpcError_Serialize>(__TAURI_INVOKE("backup_create")),
+	/**
+	 *  Checks a backup of the open vault: the MAC over the whole file, then
+	 *  every database page.
+	 */
+	backupVerify: (path: string) => typedError<BackupSummary, IpcError_Serialize>(__TAURI_INVOKE("backup_verify", { path })),
+	/**
+	 *  Shows the system file picker for a backup. Returns `None` if cancelled,
+	 *  and `invalid_backup` for a file that isn't one. The date and size come
+	 *  from the file itself and aren't checked until it's verified or restored.
+	 */
+	backupPickFile: () => typedError<{
+	path: string,
+	fileName: string,
+	/**  RFC 3339 UTC. */
+	createdAt: string,
+	/**  Saturates at 4 GiB; a vault database is a few megabytes. */
+	sizeBytes: number,
+} | null, IpcError_Serialize>(__TAURI_INVOKE("backup_pick_file")),
+	/**
+	 *  Restores a backup into a new vault folder. Works with or without an open
+	 *  vault and never changes one: the restored vault is opened like any other,
+	 *  from the lock screen.
+	 */
+	backupRestoreTo: (request: RestoreBackupRequest) => typedError<RestoredVault, IpcError_Serialize>(__TAURI_INVOKE("backup_restore_to", { request })),
 };
 
 /** Events */
@@ -432,6 +468,39 @@ export type BackupCodeSlot = {
 	used: boolean,
 };
 
+export type BackupOutcome = "ok" | "failed";
+
+export type BackupStatus = {
+	/**  The folder backups are written to. `None` until the user picks one. */
+	destination: string | null,
+	/**  False when the folder can't be found (a drive that isn't connected). */
+	destinationAvailable: boolean,
+	/**  Set when the folder looks synced to a cloud service (warn, don't block). */
+	cloudProvider: CloudProvider | null,
+	/**  When the last backup that succeeded was made. RFC 3339 UTC. */
+	lastBackupAt: string | null,
+	lastBackupPath: string | null,
+	/**  How the most recent attempt went, and when. */
+	lastOutcome: BackupOutcome | null,
+	lastAttemptAt: string | null,
+	/**
+	 *  No backup yet, or the last one is older than `reminder_after_days`.
+	 *  Never set for a demo vault.
+	 */
+	reminderDue: boolean,
+	reminderAfterDays: number,
+};
+
+/**  One backup file, as the UI shows it. */
+export type BackupSummary = {
+	path: string,
+	fileName: string,
+	/**  RFC 3339 UTC. */
+	createdAt: string,
+	/**  Saturates at 4 GiB; a vault database is a few megabytes. */
+	sizeBytes: number,
+};
+
 export type BuildProfile = "debug" | "release";
 
 /**  What a bulk action did. */
@@ -568,7 +637,7 @@ export type Dependent = {
 export type EdgeKind = "owns" | "primary_email" | "recovery_email" | "phone" | "login_email" | "recovery_phone" | "linked_launcher" | "linked_console" | "on_platform" | "plays" | "mfa";
 
 /**  Stable, machine-readable error codes. The frontend switches on these. */
-export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy";
+export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy" | "invalid_backup" | "backup_other_vault" | "backup_destination";
 
 /**  What the map can be centred on. A contact is an email or a phone. */
 export type FocusKind = "identity" | "account" | "contact" | "platform" | "game";
@@ -577,7 +646,11 @@ export type FolderPurpose =
 /**  Choose where a new vault's folder goes. */
 "newVaultLocation" | 
 /**  Choose an existing vault's folder (the one containing `vault.vhdr`). */
-"existingVault";
+"existingVault" | 
+/**  Choose the folder backups are written to. */
+"backupDestination" | 
+/**  Choose where a restored vault's folder goes. */
+"restoreLocation";
 
 export type GameInput = {
 	name: string,
@@ -1068,6 +1141,24 @@ export type RecoveryDependency = {
 	 */
 	mailboxAccounts: OverviewAccount[],
 	dependents: Dependent[],
+};
+
+export type RestoreBackupRequest = {
+	backupPath: string,
+	/**
+	 *  Parent folder for the restored vault. Defaults to
+	 *  `%LOCALAPPDATA%\Vaultair\Vaults`.
+	 */
+	location: string | null,
+	/**  The restored vault's name, also its folder name. */
+	name: string,
+	/**  The master password the vault had when the backup was made. */
+	password: string,
+};
+
+export type RestoredVault = {
+	/**  The new vault folder. It is added to the recent vaults. */
+	path: string,
 };
 
 /**
