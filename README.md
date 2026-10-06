@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 15 (settings). Phase 9 (purpose labels) is deferred and still needed before release. Next: Phase 15b, Windows Hello quick unlock. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 15 (settings), with Phase 9 (purpose labels) done after it. Next: Phase 15b, Windows Hello quick unlock. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -107,6 +107,18 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - Accounts group by platform, falling back to the publisher until Phase 10 catalogs platforms.
 - `dashboard_summary` arrives early, with only the counts accounts and identities can answer (accounts, main/alt, identities, missing MFA, favorites, recent) and an optional identity filter (`useIdentityFilter`, in memory, cleared by the lock reload). Phase 12 adds the health counts.
 - Identity names are unique, case-insensitively. Identity `icon` is not used yet; the avatar is initials on the identity's color.
+
+## Phase 9 notes
+
+- **Settings > Purpose labels** lists every label in the order the account form and filters show them. The built-ins (Main, Competitive, Ranked, Casual, Alt, Creator, Testing, Work, Recovery, Other, seeded by V2) can be hidden, recolored and moved, but keep their name and can't be deleted; Rust refuses both, not just the UI. Labels you add can also be renamed and deleted. No migration: V1's `purpose_label` already had every column.
+- **Hidden** means not offered for new picks. Accounts keep a hidden label and still show it. `purpose_list` now returns every label with `isHidden`, `color` and `accountCount` (archived accounts included). The form offers the visible ones plus the account's own; the filter menu offers the visible ones plus hidden ones that accounts still use or the current filter has. At least one label always stays visible (`invalid_input` on `lastVisible`).
+- **Slugs** come from the name (`slug_of` in `service/purposes.rs`: lowercase ASCII letters and digits joined by hyphens, `custom` when there are none), get `-2`, `-3` on a collision, and never change, not even on a rename. The High-priority view and the dashboard's Main/Alt counts match on built-in slugs. Names are unique ignoring ASCII case, hidden labels included, and at most 40 characters.
+- **Delete** needs a replacement when any account (archived too) uses the label: `purpose_delete(id, reassignTo)`, where the target must be another visible label. Moving the accounts, deleting the label and reindexing run in one transaction. Moving doesn't change an account's `updatedAt`, like assigning an identity. Your saved views that filter on the deleted label switch to the replacement, or drop it when nothing replaced it.
+- **Rename** reindexes every account with the label, archived ones included, so search finds them by the new name only.
+- **Colors** are the identity palette (`PurposeColor`), never a status color. `PurposeBadge` (a dot in the label's color, then the name) is how the account table, cards, compact list and account page show a purpose. A label without a color gets an outlined dot.
+- **Reordering** is by Move up and Move down buttons, so it works from the keyboard; focus stays on the moved label. `purpose_reorder` takes every id in the new order and refuses anything else.
+- **Still open:** "Shared household" (ADR-0004) isn't decided, so it isn't a built-in; anyone who wants it can add it as a custom label. "Smurf" is custom-only (ADR-0004 decision 1).
+- Not done in Phase 9: the identity page's account rows, the dashboard's recent accounts, sidebar favorites, Ctrl+K results and map nodes still show the purpose as plain text (they don't carry the purpose id, or fold it into a longer line). The UI is tested against mocked IPC and has not been driven in the running app.
 
 ## Phase 10 notes
 

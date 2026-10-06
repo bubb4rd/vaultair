@@ -8,6 +8,7 @@ pub mod graph;
 pub mod health;
 pub mod identities;
 pub mod mfa;
+pub mod purposes;
 pub mod search;
 pub mod session;
 pub mod settings;

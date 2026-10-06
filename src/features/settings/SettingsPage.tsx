@@ -5,6 +5,7 @@ import { CatalogSettings } from "./Catalog";
 import { DevPanel } from "./DevPanel";
 import { GeneralSettings } from "./General";
 import { PrivacySettings } from "./Privacy";
+import { PurposeLabels } from "./PurposeLabels";
 import { SecuritySettings } from "./Security";
 
 export function SettingsPage() {
@@ -17,6 +18,7 @@ export function SettingsPage() {
           <SecuritySettings />
           <PrivacySettings />
           <BackupSettings />
+          <PurposeLabels />
           <CatalogSettings />
           <AboutSettings />
           {import.meta.env.DEV && <DevPanel />}

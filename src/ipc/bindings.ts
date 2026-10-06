@@ -126,8 +126,20 @@ export const commands = {
 	 *  ACCOUNTS" for exactly that many, as typed by the user.
 	 */
 	accountBulkDelete: (ids: string[], confirm: string) => typedError<BulkResult, IpcError_Serialize>(__TAURI_INVOKE("account_bulk_delete", { ids, confirm })),
-	/**  Purposes the account form offers. */
+	/**
+	 *  Every purpose label, hidden ones too. Forms offer only the visible ones
+	 *  (plus an account's current one).
+	 */
 	purposeList: () => typedError<PurposeView[], IpcError_Serialize>(__TAURI_INVOKE("purpose_list")),
+	purposeCreate: (input: PurposeInput) => typedError<PurposeView, IpcError_Serialize>(__TAURI_INVOKE("purpose_create", { input })),
+	/**  Renames and recolours. Built-ins only recolour. */
+	purposeUpdate: (id: string, input: PurposeInput) => typedError<PurposeView, IpcError_Serialize>(__TAURI_INVOKE("purpose_update", { id, input })),
+	/**  Hides a label from new picks, or shows it again. */
+	purposeSetHidden: (id: string, hidden: boolean) => typedError<PurposeView, IpcError_Serialize>(__TAURI_INVOKE("purpose_set_hidden", { id, hidden })),
+	/**  `ids` is every label, in the new order. */
+	purposeReorder: (ids: string[]) => typedError<PurposeView[], IpcError_Serialize>(__TAURI_INVOKE("purpose_reorder", { ids })),
+	/**  Deletes a custom label, moving its accounts to `reassign_to` first. */
+	purposeDelete: (id: string, reassignTo: string | null) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("purpose_delete", { id, reassignTo })),
 	/**  Every tag in the vault, for suggestions. */
 	tagList: () => typedError<string[], IpcError_Serialize>(__TAURI_INVOKE("tag_list")),
 	secretReveal: (target: SecretRef) => typedError<RevealedSecret, IpcError_Serialize>(__TAURI_INVOKE("secret_reveal", { target })),
@@ -1138,11 +1150,37 @@ export type PlatformView = {
 	profileCount: number,
 };
 
+/**
+ *  A purpose label's colour: the identity palette, so the UI maps each
+ *  name to a token that reads well on the dark theme. Never a status
+ *  colour, and never the only cue (the name is always shown).
+ */
+export type PurposeColor = "blue" | "violet" | "teal" | "amber" | "rose" | "slate";
+
+/**  What the purpose label editor sends on create and update. */
+export type PurposeInput = {
+	/**  Built-ins keep their name: anything else is rejected on update. */
+	name: string,
+	color: PurposeColor | null,
+};
+
+/**
+ *  A purpose label. Hidden ones are listed too: accounts that already use
+ *  one keep showing it, but forms don't offer it for new picks.
+ */
 export type PurposeView = {
 	id: string,
+	/**
+	 *  Stable: built-in slugs are what the High-priority view and dashboard
+	 *  counts match on, and a custom label keeps its slug when renamed.
+	 */
 	slug: string,
 	name: string,
 	isBuiltin: boolean,
+	isHidden: boolean,
+	color: PurposeColor | null,
+	/**  Accounts using it, archived ones included (a delete has to move them all). */
+	accountCount: number,
 };
 
 /**  A recent vault as the lock screen shows it. */

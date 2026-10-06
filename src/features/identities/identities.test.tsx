@@ -17,7 +17,7 @@ import { renderApp, type RenderOptions } from "@/test/render";
 
 vi.mock("@/lib/webview", () => ({ reloadWebview: vi.fn() }));
 
-const PURPOSES: PurposeView[] = [{ id: "builtin-main", slug: "main", name: "Main", isBuiltin: true }];
+const PURPOSES: PurposeView[] = [{ id: "builtin-main", slug: "main", name: "Main", isBuiltin: true, isHidden: false, color: null, accountCount: 0 }];
 
 const REFS: IdentityRef[] = [
   { id: "i1", name: "Competitive", color: "rose" },

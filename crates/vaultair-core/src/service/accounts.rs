@@ -48,8 +48,9 @@ fn not_found<T>(value: Option<T>) -> Result<T, AppError> {
 
 // ---- Reads -------------------------------------------------------------------
 
+/// Every purpose, hidden ones included (see `service::purposes`).
 pub fn purposes(vault: &OpenVault) -> Result<Vec<PurposeView>, AppError> {
-    Ok(purpose::list_visible(vault.conn())?)
+    Ok(purpose::list(vault.conn())?)
 }
 
 pub fn tags(vault: &OpenVault) -> Result<Vec<String>, AppError> {

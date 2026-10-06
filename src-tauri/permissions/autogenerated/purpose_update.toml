@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-purpose-update"
+description = "Enables the purpose_update command without any pre-configured scope."
+commands.allow = ["purpose_update"]
+
+[[permission]]
+identifier = "deny-purpose-update"
+description = "Denies the purpose_update command without any pre-configured scope."
+commands.deny = ["purpose_update"]

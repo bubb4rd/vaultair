@@ -402,6 +402,10 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
   if (existing?.identityId && existing.identityName && !identityOptions.some((r) => r.id === existing.identityId)) {
     identityOptions.push({ id: existing.identityId, name: `${existing.identityName} (archived)`, color: null });
   }
+  // Likewise a hidden purpose: only an account that already has it sees it.
+  const purposeOptions = (purposes.data ?? [])
+    .filter((p) => !p.isHidden || p.id === existing?.purposeId)
+    .map((p) => ({ id: p.id, name: p.isHidden ? `${p.name} (hidden)` : p.name }));
   const emails = (contacts.data ?? []).filter((c) => c.kind === "email").map((c) => c.value);
   const phones = (contacts.data ?? []).filter((c) => c.kind === "phone").map((c) => c.value);
   const [errors, setErrors] = useState<Errors>({});
@@ -550,7 +554,7 @@ function Form({ initial, existing }: { initial: FormState; existing: AccountDeta
                     set("purposeId", e.target.value);
                   }}
                 >
-                  {(purposes.data ?? []).map((p) => (
+                  {purposeOptions.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
@@ -982,7 +986,8 @@ export function AccountForm({ accountId, identityId }: { accountId?: string; ide
       </div>
     );
   } else if (purposes.data && !identityRefs.isPending && (!editing || existing.data)) {
-    const initial = editing && existing.data ? fromDetail(existing.data) : blank(purposes.data[0]?.id ?? "", identityId ?? "");
+    const firstVisible = purposes.data.find((p) => !p.isHidden)?.id ?? "";
+    const initial = editing && existing.data ? fromDetail(existing.data) : blank(firstVisible, identityId ?? "");
     body = <Form key={accountId ?? "new"} initial={initial} existing={editing ? (existing.data ?? null) : null} />;
   }
 

@@ -11,8 +11,8 @@ import { DORMANT_AFTER_DAYS, STALE_AFTER_DAYS, displayStatus } from "./labels";
 vi.mock("@/lib/webview", () => ({ reloadWebview: vi.fn() }));
 
 const PURPOSES: PurposeView[] = [
-  { id: "builtin-main", slug: "main", name: "Main", isBuiltin: true },
-  { id: "builtin-alt", slug: "alt", name: "Alt", isBuiltin: true },
+  { id: "builtin-main", slug: "main", name: "Main", isBuiltin: true, isHidden: false, color: null, accountCount: 0 },
+  { id: "builtin-alt", slug: "alt", name: "Alt", isBuiltin: true, isHidden: false, color: null, accountCount: 0 },
 ];
 
 const summary = (over: Partial<AccountSummary> = {}): AccountSummary => ({

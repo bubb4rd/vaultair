@@ -225,7 +225,8 @@ pub async fn account_bulk_delete(
     with_vault(&state, move |v| accounts::bulk_delete(v, &ids, &confirm)).await
 }
 
-/// Purposes the account form offers.
+/// Every purpose label, hidden ones too. Forms offer only the visible ones
+/// (plus an account's current one).
 #[tauri::command]
 #[specta::specta]
 pub async fn purpose_list(state: State<'_, AppState>) -> IpcResult<Vec<PurposeView>> {

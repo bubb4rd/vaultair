@@ -142,6 +142,7 @@ export function useAccount(id: string, enabled = true) {
   return useQuery({ queryKey: queryKeys.account(id), queryFn: () => accounts.get(id), enabled });
 }
 
+/** Every purpose label, hidden ones included, in display order. */
 export function usePurposes() {
   return useQuery({ queryKey: queryKeys.purposes, queryFn: catalog.purposes });
 }
@@ -280,6 +281,21 @@ export function useIdentitiesChanged() {
       queryClient.removeQueries({ queryKey: queryKeys.identity(removedId) });
       queryClient.removeQueries({ queryKey: queryKeys.identityOverview(removedId) });
     }
+    invalidateDerived(queryClient);
+    void queryClient.invalidateQueries({ queryKey: ["accounts", "detail"] });
+  };
+}
+
+/**
+ * After a purpose label write: the labels themselves, and everything that
+ * names an account's purpose (a rename or a delete moves or renames it),
+ * account details included.
+ */
+export function usePurposesChanged() {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.purposes });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.savedViews });
     invalidateDerived(queryClient);
     void queryClient.invalidateQueries({ queryKey: ["accounts", "detail"] });
   };

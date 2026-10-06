@@ -64,6 +64,8 @@ import {
   type MfaInput,
   type MfaMethod,
   type MfaView,
+  type PurposeColor,
+  type PurposeInput,
   type PurposeView,
   type SecretRef,
   type SecretUpdate,
@@ -160,6 +162,8 @@ export type {
   MfaInput,
   MfaMethod,
   MfaView,
+  PurposeColor,
+  PurposeInput,
   PurposeView,
   SecretRef,
   SecretUpdate,
@@ -499,6 +503,7 @@ export const graph = {
 };
 
 export const catalog = {
+  /** Every purpose label, hidden ones included. */
   purposes: (): Promise<PurposeView[]> => data(() => commands.purposeList()),
   tags: (): Promise<string[]> => data(() => commands.tagList()),
   platforms: (): Promise<PlatformView[]> => data(() => commands.platformList()),
@@ -508,6 +513,20 @@ export const catalog = {
   games: (): Promise<GameView[]> => data(() => commands.gameList()),
   createGame: (input: GameInput): Promise<GameView> => data(() => commands.gameCreate(input)),
   updateGame: (id: string, input: GameInput): Promise<GameView> => data(() => commands.gameUpdate(id, input)),
+};
+
+/**
+ * Editing purpose labels (listing is `catalog.purposes`). Built-ins only
+ * hide, recolour and move; Rust refuses renaming or deleting them.
+ */
+export const purposes = {
+  create: (input: PurposeInput): Promise<PurposeView> => data(() => commands.purposeCreate(input)),
+  update: (id: string, input: PurposeInput): Promise<PurposeView> => data(() => commands.purposeUpdate(id, input)),
+  setHidden: (id: string, hidden: boolean): Promise<PurposeView> => data(() => commands.purposeSetHidden(id, hidden)),
+  /** `ids` is every label, in the new order. */
+  reorder: (ids: string[]): Promise<PurposeView[]> => data(() => commands.purposeReorder(ids)),
+  /** `reassignTo` is required when accounts use the label. */
+  delete: (id: string, reassignTo: string | null): Promise<null> => data(() => commands.purposeDelete(id, reassignTo)),
 };
 
 /** Who you are in one game, on one account. */
