@@ -100,6 +100,14 @@
     "allow-backup-create",
     "allow-backup-verify",
     "allow-backup-pick-file",
-    "allow-backup-restore-to"
+    "allow-backup-restore-to",
+    "allow-settings-get",
+    "allow-settings-update",
+    "allow-vault-profile-update",
+    "allow-vault-change-password",
+    "allow-vault-kdf-check",
+    "allow-vault-strengthen-kdf",
+    "allow-logs-folder",
+    "allow-logs-open"
   ]
 }

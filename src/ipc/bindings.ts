@@ -257,6 +257,29 @@ export const commands = {
 	 *  from the lock screen.
 	 */
 	backupRestoreTo: (request: RestoreBackupRequest) => typedError<RestoredVault, IpcError_Serialize>(__TAURI_INVOKE("backup_restore_to", { request })),
+	settingsGet: () => typedError<VaultSettings, IpcError_Serialize>(__TAURI_INVOKE("settings_get")),
+	/**
+	 *  Saves the settings and applies them now: the idle deadline, the lock
+	 *  policy and the clipboard and reveal timings change without a restart.
+	 */
+	settingsUpdate: (settings: VaultSettings) => typedError<SessionConfig, IpcError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),
+	vaultProfileUpdate: (input: VaultProfileInput) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_profile_update", { input })),
+	/**
+	 *  Changes the master password. The vault stays unlocked. Backups made
+	 *  before this still open with the old password.
+	 */
+	vaultChangePassword: (current: string, newPassword: string) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_change_password", { current, newPassword })),
+	/**  Measures this PC (about a second) and compares with the vault's KDF. */
+	vaultKdfCheck: () => typedError<KdfCheck, IpcError_Serialize>(__TAURI_INVOKE("vault_kdf_check")),
+	/**
+	 *  Re-wraps the vault key with `kdf` (from `vault_kdf_check`), keeping the
+	 *  master password. Never lowers the memory or iteration count.
+	 */
+	vaultStrengthenKdf: (password: string, kdf: KdfParams) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_strengthen_kdf", { password, kdf })),
+	/**  Where the diagnostic logs are. `None` without `LOCALAPPDATA`. */
+	logsFolder: () => __TAURI_INVOKE<string | null>("logs_folder"),
+	/**  Opens the logs folder in File Explorer. */
+	logsOpen: () => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("logs_open")),
 };
 
 /** Events */
@@ -941,6 +964,16 @@ export type IpcError_Serialize = {
 	field?: string | null,
 };
 
+export type KdfCheck = {
+	current: KdfParams,
+	currentSummary: string,
+	/**  What this PC can unlock in about a second. */
+	suggested: KdfParams,
+	suggestedSummary: string,
+	/**  `suggested` is stronger than `current`. */
+	canStrengthen: boolean,
+};
+
 export type KdfParams = {
 	mKib: number,
 	t: number,
@@ -1219,8 +1252,9 @@ export type SecretUpdate =
 
 /**
  *  Lock and clipboard behaviour. The defaults are ADR-0004 decision 11.
- *  Phase 15 makes them editable: capture protection in the app config (it
- *  applies while locked), the rest in the vault's settings.
+ *  Capture protection and email masking come from the app config (they
+ *  apply while locked); the rest from the open vault's settings
+ *  (`service::settings`), applied on unlock.
  */
 export type SessionConfig = {
 	/**  Lock after this many seconds without activity. `None` never locks. */
@@ -1298,7 +1332,13 @@ export type UrlTarget = {
 /**  Non-secret facts about a vault, safe to show in the UI. */
 export type VaultInfo = {
 	vaultId: string,
+	/**
+	 *  The display name. Starts as the folder name; renaming the vault in
+	 *  Settings changes this, not the folder.
+	 */
 	name: string,
+	/**  Accent for the vault's avatar. Same palette as identities. */
+	color: IdentityColor | null,
 	path: string,
 	kdfSummary: string,
 	createdAt: string,
@@ -1311,6 +1351,25 @@ export type VaultInfo = {
  *  every value the JS heap held while unlocked.
  */
 export type VaultLocked = null;
+
+/**  The vault's display name and colour, from Settings > General. */
+export type VaultProfileInput = {
+	/**  Same rules as a new vault's name (it names backup files too). */
+	name: string,
+	color: IdentityColor | null,
+};
+
+/**  The lock and clipboard settings the user can change. Sent whole. */
+export type VaultSettings = {
+	/**  Lock after this many minutes without activity. `None` never locks. */
+	autoLockMinutes: number | null,
+	/**  Lock when Windows locks (Win+L), signs out or disconnects. */
+	lockOnSessionLock: boolean,
+	lockOnSleep: boolean,
+	lockOnMinimize: boolean,
+	clipboardClearSecs: number,
+	revealHideSecs: number,
+};
 
 export type VaultStatus = { state: "locked" } | { state: "unlocked"; vault: VaultInfo };
 

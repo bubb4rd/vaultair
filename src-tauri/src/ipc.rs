@@ -93,6 +93,14 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::backup::backup_verify,
             commands::backup::backup_pick_file,
             commands::backup::backup_restore_to,
+            commands::settings::settings_get,
+            commands::settings::settings_update,
+            commands::settings::vault_profile_update,
+            commands::settings::vault_change_password,
+            commands::settings::vault_kdf_check,
+            commands::settings::vault_strengthen_kdf,
+            commands::settings::logs_folder,
+            commands::settings::logs_open,
         ])
         .events(collect_events![
             events::VaultLocked,

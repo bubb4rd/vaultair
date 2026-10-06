@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-strengthen-kdf"
+description = "Enables the vault_strengthen_kdf command without any pre-configured scope."
+commands.allow = ["vault_strengthen_kdf"]
+
+[[permission]]
+identifier = "deny-vault-strengthen-kdf"
+description = "Denies the vault_strengthen_kdf command without any pre-configured scope."
+commands.deny = ["vault_strengthen_kdf"]

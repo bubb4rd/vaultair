@@ -1,6 +1,6 @@
 # Vault format (v1)
 
-> **Status:** Phase 3. Updated in Phase 14 (backup container, §11). Describes what `crates/vaultair-core` writes today. Password change (Phase 15) will extend this document. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
+> **Status:** Phase 3. Updated in Phase 14 (backup container, §11) and Phase 15 (password change, §8). Describes what `crates/vaultair-core` writes today. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
 
 This document is meant to be precise enough for an independent implementation to open a vault, given the master password.
 
@@ -14,7 +14,7 @@ A vault is a folder. Its name is the vault's display name (validated: 1–64 cha
 | `vault.vdb` | SQLCipher 4 database. All user data. |
 | `.lock` | Empty file. Vaultair holds an exclusive OS lock on it while the vault is unlocked. |
 | `vault.vhdr.tmp` | Exists only for a moment during a header write. |
-| `vault.vhdr.prev` | Reserved for password change (Phase 15). |
+| `vault.vhdr.prev` | The previous header, kept only while a password or KDF change replaces it (§8). |
 
 Default parent folder: `%LOCALAPPDATA%\Vaultair\Vaults`.
 
@@ -156,6 +156,13 @@ Binding table, column and row id means an envelope can't be moved to another cel
 
 - **Create:** the database is built first (keyed, migrated, `vault_meta` inserted), and the header is written last via write-temp, `fsync`, rename. A crash part-way leaves a folder without a header ("not found"), never a header pointing at a half-built database. If creation fails, the folder is removed (it was verified new or empty first).
 - **Header writes** always use the temp-file-and-rename pattern.
+- **Changing the master password or the KDF** (`vault/rekey.rs`) re-wraps the same DEK; the database is not touched. Vaultair unwraps the DEK with the current password, draws a new 32-byte salt, derives a new KEK (new password, or the same one with stronger parameters), and seals the DEK under the new header's AAD (§4). Every other header field stays the same. The header is then replaced:
+  1. `vault.vhdr` is copied to `vault.vhdr.prev` and flushed.
+  2. The new header is written to `vault.vhdr.tmp`, flushed, and renamed over `vault.vhdr`.
+  3. `vault.vhdr` is read back and decoded. If it doesn't match what was written, `.prev` is renamed back over it and the change fails.
+  4. `.prev` is deleted.
+
+  A crash before the rename leaves the old header (old password opens); after it, the new one (new password opens). `.prev` and `.tmp` open with the old password at most, so neither is kept: a successful unlock deletes any left behind. `vault_meta.kdf_summary` is updated afterwards. Backups made earlier keep their own header and the old password.
 
 ## 9. Error classification
 

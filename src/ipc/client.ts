@@ -82,6 +82,7 @@ import {
   type FolderPurpose,
   type Generated,
   type IntegrityReport,
+  type KdfCheck,
   type KdfParams,
   type LockNotice,
   type LocationCheck,
@@ -93,6 +94,8 @@ import {
   type SessionConfig,
   type StrengthEstimate,
   type VaultInfo,
+  type VaultProfileInput,
+  type VaultSettings,
   type VaultStatus,
 } from "./bindings";
 
@@ -177,6 +180,7 @@ export type {
   FolderPurpose,
   Generated,
   IntegrityReport,
+  KdfCheck,
   KdfParams,
   LocationCheck,
   LockNotice,
@@ -186,6 +190,8 @@ export type {
   SessionConfig,
   StrengthEstimate,
   VaultInfo,
+  VaultProfileInput,
+  VaultSettings,
   VaultStatus,
 };
 
@@ -341,6 +347,23 @@ export const session = {
   applyCapture: (enabled: boolean): Promise<SessionConfig> => call(() => commands.captureApply(enabled)),
   /** Why the vault last locked, once; null after that. */
   takeLockNotice: (): Promise<LockNotice | null> => call(() => commands.sessionTakeLockNotice()),
+};
+
+/** The open vault's settings, its name and colour, and its master password. */
+export const settings = {
+  get: (): Promise<VaultSettings> => data(() => commands.settingsGet()),
+  /** Saves and applies the settings at once; resolves the session config they produce. */
+  update: (next: VaultSettings): Promise<SessionConfig> => data(() => commands.settingsUpdate(next)),
+  updateProfile: (input: VaultProfileInput): Promise<VaultInfo> => data(() => commands.vaultProfileUpdate(input)),
+  /** The vault stays unlocked. Rust checks `current` and the policy for `next`. */
+  changePassword: (current: string, next: string): Promise<VaultInfo> =>
+    data(() => commands.vaultChangePassword(current, next)),
+  /** Measures this PC (about a second) against the vault's KDF. */
+  kdfCheck: (): Promise<KdfCheck> => data(() => commands.vaultKdfCheck()),
+  strengthenKdf: (password: string, kdf: KdfParams): Promise<VaultInfo> =>
+    data(() => commands.vaultStrengthenKdf(password, kdf)),
+  logsFolder: (): Promise<string | null> => call(() => commands.logsFolder()),
+  openLogs: (): Promise<null> => unwrap(() => commands.logsOpen()),
 };
 
 /**

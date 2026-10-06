@@ -12,7 +12,7 @@ use tracing_appender::rolling::{Builder, Rotation};
 
 const MAX_LOG_FILES: usize = 7;
 
-fn log_dir() -> Option<PathBuf> {
+pub(crate) fn log_dir() -> Option<PathBuf> {
     std::env::var_os("LOCALAPPDATA").map(|base| PathBuf::from(base).join("Vaultair").join("logs"))
 }
 
