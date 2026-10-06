@@ -14,6 +14,7 @@ import {
   recentVaults,
   search,
   session,
+  settings,
   vault,
   type AccountDetail,
   type AccountFilter,
@@ -23,6 +24,7 @@ import {
   type HealthRule,
   type IdentityDetail,
   type VaultInfo,
+  type VaultStatus,
 } from "@/ipc/client";
 
 /**
@@ -60,6 +62,7 @@ export const queryKeys = {
   gameProfileList: (filter: GameProfileFilter) => ["gameProfiles", filter] as const,
   savedViews: ["savedViews"] as const,
   backupStatus: ["backup", "status"] as const,
+  vaultSettings: ["settings", "vault"] as const,
 };
 
 /**
@@ -92,6 +95,20 @@ export function useRecentVaults() {
 /** Lock, clipboard and reveal timings (reveal auto-hide uses it). */
 export function useSessionConfig() {
   return useQuery({ queryKey: queryKeys.sessionConfig, queryFn: session.config });
+}
+
+/** The open vault's lock and clipboard settings, as saved. */
+export function useVaultSettings() {
+  return useQuery({ queryKey: queryKeys.vaultSettings, queryFn: settings.get });
+}
+
+/** After the vault's name, colour or KDF changes: show the fresh `VaultInfo` everywhere. */
+export function useVaultInfoUpdated() {
+  const queryClient = useQueryClient();
+  return (vault: VaultInfo) => {
+    const status: VaultStatus = { state: "unlocked", vault };
+    queryClient.setQueryData(queryKeys.vaultStatus, status);
+  };
 }
 
 /** Where backups go and how the last one went. Refetched after each backup. */

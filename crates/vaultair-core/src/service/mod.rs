@@ -10,3 +10,4 @@ pub mod identities;
 pub mod mfa;
 pub mod search;
 pub mod session;
+pub mod settings;

@@ -177,6 +177,18 @@ impl VaultHeader {
         out
     }
 
+    /// The same vault with new KDF parameters and salt, and an empty wrap for
+    /// `set_wrap` to fill. Used when the master password or KDF changes.
+    pub fn with_kdf(&self, params: KdfParams, salt: &[u8; SALT_LEN]) -> Self {
+        let mut next = self.clone();
+        next.kdf.m_kib = params.m_kib;
+        next.kdf.t = params.t;
+        next.kdf.p = params.p;
+        next.kdf.salt_b64 = B64.encode(salt);
+        next.set_wrap(&[0; NONCE_LEN], &[]);
+        next
+    }
+
     pub fn set_wrap(&mut self, nonce: &[u8; NONCE_LEN], ciphertext: &[u8]) {
         if let Some(slot) = self.key_slots.first_mut() {
             slot.wrap.nonce_b64 = B64.encode(nonce);
@@ -391,6 +403,23 @@ mod tests {
             m(&mut h);
             assert_ne!(base.aad(), h.aad());
         }
+    }
+
+    #[test]
+    fn with_kdf_changes_only_the_kdf() {
+        let base = sample();
+        let params = KdfParams {
+            m_kib: KdfParams::MINIMUM.m_kib * 2,
+            ..KdfParams::MINIMUM
+        };
+        let next = base.with_kdf(params, &[8; SALT_LEN]);
+        assert_eq!(next.kdf_params(), params);
+        assert_eq!(next.kdf.salt_b64, B64.encode([8; SALT_LEN]));
+        assert_eq!(
+            (&next.vault_id, &next.created_at, next.demo),
+            (&base.vault_id, &base.created_at, base.demo)
+        );
+        assert_ne!(next.aad(), base.aad());
     }
 
     fn reencode(json: &serde_json::Value) -> Vec<u8> {

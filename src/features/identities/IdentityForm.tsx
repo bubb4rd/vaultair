@@ -136,13 +136,16 @@ function TextField({
 }
 
 /** Colour swatches as native radios: arrow keys move, each has a name. */
-function ColorPicker({
+export function ColorPicker({
   value,
   name,
+  group = "identity-color",
   onChange,
 }: {
   value: IdentityColor | null;
   name: string;
+  /** The radios' `name`, unique per form. */
+  group?: string;
   onChange: (c: IdentityColor) => void;
 }) {
   return (
@@ -158,7 +161,7 @@ function ColorPicker({
             >
               <input
                 type="radio"
-                name="identity-color"
+                name={group}
                 value={c.value}
                 checked={checked}
                 aria-label={c.label}

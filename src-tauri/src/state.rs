@@ -76,8 +76,9 @@ impl AppState {
 
 /// Debug builds only: `VAULTAIR_DEV_IDLE_LOCK_SECS` and
 /// `VAULTAIR_DEV_CLIPBOARD_CLEAR_SECS` shorten the timeouts for manual
-/// testing. Release builds ignore them.
-fn dev_overrides(config: SessionConfig) -> SessionConfig {
+/// testing. They also win over a vault's saved settings on unlock. Release
+/// builds ignore them.
+pub(crate) fn dev_overrides(config: SessionConfig) -> SessionConfig {
     if !cfg!(debug_assertions) {
         return config;
     }

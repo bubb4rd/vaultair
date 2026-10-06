@@ -9,18 +9,21 @@ pub mod layout;
 pub mod location;
 pub mod lockfile;
 mod open;
+mod rekey;
 
 use std::fmt;
 use std::path::PathBuf;
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde::Serialize;
 
 pub use create::{create_vault, CreateOptions};
 pub use error::{CorruptPart, VaultError};
 pub use open::open_vault;
+pub use rekey::{install_header, prepare_rewrap};
 
 use crate::crypto::keys::VaultKeys;
+use crate::domain::identity::IdentityColor;
 use header::VaultHeader;
 use layout::VaultPaths;
 use lockfile::VaultLock;
@@ -31,7 +34,11 @@ use lockfile::VaultLock;
 #[serde(rename_all = "camelCase")]
 pub struct VaultInfo {
     pub vault_id: String,
+    /// The display name. Starts as the folder name; renaming the vault in
+    /// Settings changes this, not the folder.
     pub name: String,
+    /// Accent for the vault's avatar. Same palette as identities.
+    pub color: Option<IdentityColor>,
     pub path: String,
     pub kdf_summary: String,
     pub created_at: String,
@@ -59,6 +66,7 @@ pub struct OpenVault {
     header: VaultHeader,
     paths: VaultPaths,
     name: String,
+    color: Option<IdentityColor>,
     _lock: VaultLock,
 }
 
@@ -76,6 +84,7 @@ impl OpenVault {
         VaultInfo {
             vault_id: self.header.vault_id.clone(),
             name: self.name.clone(),
+            color: self.color,
             path: self.paths.dir.display().to_string(),
             kdf_summary: self.header.kdf_params().summary(),
             created_at: self.header.created_at.clone(),
@@ -111,6 +120,23 @@ impl OpenVault {
     /// inside a transaction.
     pub fn conn_and_keys(&mut self) -> (&mut Connection, &VaultKeys) {
         (&mut self.conn, &self.keys)
+    }
+
+    /// Renames the vault (display name only; the folder keeps its name) and
+    /// sets its colour. `name` must already be validated.
+    pub(crate) fn set_profile(
+        &mut self,
+        name: &str,
+        color: Option<IdentityColor>,
+        now: &str,
+    ) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "UPDATE vault_meta SET display_name = ?1, color = ?2, updated_at = ?3 WHERE id = 'singleton'",
+            params![name, color, now],
+        )?;
+        name.clone_into(&mut self.name);
+        self.color = color;
+        Ok(())
     }
 
     /// Verifies every page's HMAC (SQLCipher) and the SQLite structure, and

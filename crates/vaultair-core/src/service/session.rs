@@ -16,11 +16,13 @@ use serde::Serialize;
 
 use crate::clock::{Clock, SystemClock};
 use crate::config::{CaptureLevel, CaptureMode};
+use crate::crypto::kdf::KdfParams;
 use crate::vault::{self, CreateOptions, IntegrityReport, OpenVault, VaultError, VaultInfo};
 
 /// Lock and clipboard behaviour. The defaults are ADR-0004 decision 11.
-/// Phase 15 makes them editable: capture protection in the app config (it
-/// applies while locked), the rest in the vault's settings.
+/// Capture protection and email masking come from the app config (they
+/// apply while locked); the rest from the open vault's settings
+/// (`service::settings`), applied on unlock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
@@ -182,6 +184,30 @@ impl SessionManager {
         let unlocked = guard.as_mut().ok_or(VaultError::Locked)?;
         unlocked.last_activity = self.clock.monotonic();
         f(&mut unlocked.vault)
+    }
+
+    /// Wraps the vault key again: under a new master password (`new`), with
+    /// new KDF parameters (`kdf`), or both. Argon2 runs outside the lock;
+    /// only the header write holds it.
+    pub fn rewrap(
+        &self,
+        current: &SecretString,
+        new: Option<&SecretString>,
+        kdf: Option<KdfParams>,
+    ) -> Result<VaultInfo, VaultError> {
+        let header = self.with_vault(|v| Ok::<_, VaultError>(v.header().clone()))?;
+        let kdf = kdf.unwrap_or_else(|| header.kdf_params());
+        let next = vault::prepare_rewrap(&header, current, new, kdf)?;
+        let now = self.clock.now_rfc3339();
+        self.with_vault(|v| {
+            vault::install_header(v, &header, next, &now)?;
+            Ok(v.info())
+        })
+    }
+
+    /// The vault's current KDF parameters.
+    pub fn kdf_params(&self) -> Result<KdfParams, VaultError> {
+        self.with_vault(|v| Ok(v.header().kdf_params()))
     }
 
     pub fn integrity_check(&self) -> Result<IntegrityReport, VaultError> {

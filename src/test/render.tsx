@@ -5,11 +5,12 @@ import { App } from "@/app/App";
 import { createQueryClient } from "@/app/queries";
 import { createAppRouter } from "@/app/router";
 import { resetListState } from "@/features/accounts/listState";
-import type { RecentVault, SessionConfig, VaultInfo } from "@/ipc/client";
+import type { RecentVault, SessionConfig, VaultInfo, VaultSettings } from "@/ipc/client";
 
 export const TEST_VAULT: VaultInfo = {
   vaultId: "0193a1b2-0000-7000-8000-000000000001",
   name: "Main",
+  color: null,
   path: "C:\\Users\\sam\\AppData\\Local\\Vaultair\\Vaults\\Main",
   kdfSummary: "Argon2id 256 MiB, t=3, p=4",
   createdAt: "2026-09-24T10:00:00Z",
@@ -28,6 +29,16 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
   captureMode: "always",
   captureLevel: "risk",
   captureProtection: true,
+};
+
+/** A vault's saved settings before the user changes any (the same defaults). */
+export const DEFAULT_VAULT_SETTINGS: VaultSettings = {
+  autoLockMinutes: 5,
+  lockOnSessionLock: true,
+  lockOnSleep: true,
+  lockOnMinimize: false,
+  clipboardClearSecs: 30,
+  revealHideSecs: 20,
 };
 
 export const recent = (name: string, available = true): RecentVault => ({
@@ -70,6 +81,8 @@ export async function renderApp(path = "/", { unlocked = true, recents = [], han
           return unlocked;
         case "session_config_get":
           return DEFAULT_SESSION_CONFIG;
+        case "settings_get":
+          return DEFAULT_VAULT_SETTINGS;
         case "clipboard_copy_plain":
           return { clearAfterSecs: DEFAULT_SESSION_CONFIG.clipboardClearSecs };
         case "plugin:window|is_maximized":
