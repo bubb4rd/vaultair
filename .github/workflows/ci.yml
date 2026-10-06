@@ -83,6 +83,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --run
+      - name: Logo manifest and generated module are up to date
+        shell: bash
+        run: |
+          npm run logos:build
+          git diff --exit-code -- src/features/catalog/logos.generated.ts crates/vaultair-core/catalog/logos.json || (echo "::error::The logo manifest or logos.generated.ts is stale. Run npm run logos:build and commit both." && exit 1)
       - run: npm run check:release-config
 
   repo-hygiene:

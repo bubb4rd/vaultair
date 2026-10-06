@@ -15,7 +15,7 @@ import {
 import { axeViolations } from "@/test/axe";
 import { renderApp, type RenderOptions } from "@/test/render";
 import { accountMark } from "./CatalogLogo";
-import { EMAIL_PROVIDER_ENTRIES, LOGO_SLUGS, emailProvider, logoColor, monogram } from "./logos";
+import { EMAIL_PROVIDER_IDS, emailProvider, logoColor, logoFor, monogram } from "./logos";
 
 vi.mock("@/lib/webview", () => ({ reloadWebview: vi.fn() }));
 
@@ -207,21 +207,6 @@ function handlers(extra: RenderOptions["handlers"] = {}): RenderOptions {
 }
 
 describe("logos", () => {
-  it("bundles a logo for every icon the built-in catalog names", () => {
-    const files = import.meta.glob<{
-      platforms: { icon: string | null }[];
-      games: { icon: string | null }[];
-    }>("/crates/vaultair-core/catalog/default_catalog.json", {
-      eager: true,
-      import: "default",
-    });
-    const json = Object.values(files)[0];
-    expect(json).toBeDefined();
-    const icons = [...(json?.platforms ?? []), ...(json?.games ?? [])].map((e) => e.icon).filter(Boolean);
-    expect(icons.length).toBeGreaterThan(10);
-    for (const icon of icons) expect(LOGO_SLUGS).toContain(icon);
-  });
-
   it("keeps brand colours only where they stay visible on the dark UI", () => {
     expect(logoColor("000000")).toBeNull();
     expect(logoColor("313131")).toBeNull();
@@ -242,15 +227,23 @@ describe("logos", () => {
       title: "Ranked",
       email: null,
       publisher: null,
+      platformId: "builtin-pl-riot",
       platformName: "Riot Games",
       platformIcon: "riotgames",
+      gameId: "builtin-game-valorant",
       gameName: "Valorant",
       gameIcon: "valorant",
     };
-    expect(accountMark({ ...both, accountType: "game" }).icon).toBe("valorant");
-    expect(accountMark({ ...both, accountType: "launcher" }).icon).toBe("riotgames");
+    expect(accountMark({ ...both, accountType: "game" }).id).toBe("builtin-game-valorant");
+    expect(accountMark({ ...both, accountType: "launcher" }).id).toBe("builtin-pl-riot");
     // A logo beats a monogram: the platform has one, the game doesn't.
-    expect(accountMark({ ...both, accountType: "game", gameIcon: null }).icon).toBe("riotgames");
+    const noLogo = { gameId: "builtin-game-wow", gameName: "World of Warcraft", gameIcon: null };
+    expect(accountMark({ ...both, ...noLogo, accountType: "game" }).id).toBe("builtin-pl-riot");
+    // Found by id: a vault seeded before the game had a logo still shows it.
+    expect(accountMark({ ...both, accountType: "game", gameIcon: null }).id).toBe("builtin-game-valorant");
+    // A user-added game has no id in the manifest; its platform's logo wins.
+    const custom = { gameId: "g-custom", gameName: "Arena Legends", gameIcon: null };
+    expect(accountMark({ ...both, ...custom, accountType: "game" }).id).toBe("builtin-pl-riot");
     expect(
       accountMark({
         ...both,
@@ -259,30 +252,34 @@ describe("logos", () => {
         gameName: null,
         publisher: "Example",
       }),
-    ).toEqual({ icon: null, name: "Example" });
+    ).toEqual({ id: null, icon: null, name: "Example" });
   });
 });
 
 describe("email providers", () => {
-  const files = import.meta.glob<{ platforms: { id: string; icon: string | null; kind: string }[] }>(
+  const files = import.meta.glob<{ platforms: { id: string; kind: string }[] }>(
     "/crates/vaultair-core/catalog/default_catalog.json",
     { eager: true, import: "default" },
   );
   const platforms = Object.values(files)[0]?.platforms ?? [];
 
-  it("point at built-in email platforms with the same logo", () => {
-    for (const { platformId, icon } of EMAIL_PROVIDER_ENTRIES) {
+  it("point at built-in email platforms", () => {
+    expect(EMAIL_PROVIDER_IDS.length).toBeGreaterThan(10);
+    for (const platformId of EMAIL_PROVIDER_IDS) {
       const entry = platforms.find((p) => p.id === platformId);
       expect(entry, platformId).toBeDefined();
       expect(entry?.kind).toBe("email");
-      expect(entry?.icon ?? null).toBe(icon);
     }
+  });
+
+  it("take their mark from that platform", () => {
+    expect(logoFor(emailProvider("owl@pm.me")?.platformId, null)).toMatchObject({ kind: "path", slug: "protonmail" });
+    expect(logoFor(emailProvider("owl@yahoo.com")?.platformId, null)).toEqual({ kind: "monogram", color: "6001D2" });
   });
 
   it("match addresses by domain, case-insensitively", () => {
     expect(emailProvider("Owl@GMail.com")?.name).toBe("Gmail");
     expect(emailProvider("owl@hotmail.com")?.platformId).toBe("builtin-pl-outlook");
-    expect(emailProvider("owl@pm.me")?.icon).toBe("protonmail");
     expect(emailProvider("owl@example.com")).toBeNull();
     expect(emailProvider(null)).toBeNull();
   });
@@ -293,15 +290,21 @@ describe("email providers", () => {
       title: "Primary email",
       email: "owl@gmail.com",
       publisher: null,
+      platformId: null,
       platformName: null,
       platformIcon: null,
+      gameId: null,
       gameName: null,
       gameIcon: null,
     };
-    expect(accountMark(mail)).toEqual({ icon: "gmail", name: "Gmail" });
-    expect(accountMark({ ...mail, email: "owl@outlook.com" })).toEqual({ icon: null, name: "Outlook.com" });
+    expect(accountMark(mail)).toEqual({ id: "builtin-pl-gmail", icon: null, name: "Gmail" });
+    expect(accountMark({ ...mail, email: "owl@outlook.com" })).toEqual({
+      id: "builtin-pl-outlook",
+      icon: null,
+      name: "Outlook.com",
+    });
     // Only email accounts: a launcher's login email says nothing about it.
-    expect(accountMark({ ...mail, accountType: "launcher" })).toEqual({ icon: null, name: "Primary email" });
+    expect(accountMark({ ...mail, accountType: "launcher" })).toEqual({ id: null, icon: null, name: "Primary email" });
   });
 });
 

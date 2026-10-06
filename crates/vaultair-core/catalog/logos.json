@@ -1,0 +1,252 @@
+{
+  "builtin-game-apex": {
+    "kind": "monogram",
+    "color": "DA292A",
+    "reason": "Not in the pinned Simple Icons package; no Electronic Arts brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-cod": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Activision brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-cs2": {
+    "kind": "simple-icons",
+    "slug": "counterstrike"
+  },
+  "builtin-game-destiny2": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Bungie brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-dota2": {
+    "kind": "simple-icons",
+    "slug": "dota2"
+  },
+  "builtin-game-eafc": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Electronic Arts brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-fortnite": {
+    "kind": "simple-icons",
+    "slug": "fortnite"
+  },
+  "builtin-game-genshin": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no HoYoverse brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-gtav": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Rockstar Games brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-lol": {
+    "kind": "simple-icons",
+    "slug": "leagueoflegends"
+  },
+  "builtin-game-minecraft": {
+    "kind": "monogram",
+    "color": "3C8527",
+    "reason": "Not in the pinned Simple Icons package; no Mojang Studios brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-osu": {
+    "kind": "simple-icons",
+    "slug": "osu"
+  },
+  "builtin-game-overwatch2": {
+    "kind": "monogram",
+    "color": "F99E1A",
+    "reason": "Not in the pinned Simple Icons package; no Blizzard Entertainment brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-pubg": {
+    "kind": "simple-icons",
+    "slug": "pubg"
+  },
+  "builtin-game-r6": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Ubisoft brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-roblox": {
+    "kind": "simple-icons",
+    "slug": "roblox"
+  },
+  "builtin-game-rocketleague": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Epic Games brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-game-valorant": {
+    "kind": "simple-icons",
+    "slug": "valorant"
+  },
+  "builtin-game-wow": {
+    "kind": "monogram",
+    "reason": "Not in the pinned Simple Icons package; no Blizzard Entertainment brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-activision": {
+    "kind": "simple-icons",
+    "slug": "activision"
+  },
+  "builtin-pl-aol": {
+    "kind": "monogram",
+    "color": "3399FF",
+    "reason": "Removed from Simple Icons at Yahoo's request; no brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-battlenet": {
+    "kind": "simple-icons",
+    "slug": "battledotnet"
+  },
+  "builtin-pl-discord": {
+    "kind": "simple-icons",
+    "slug": "discord"
+  },
+  "builtin-pl-ea": {
+    "kind": "simple-icons",
+    "slug": "ea"
+  },
+  "builtin-pl-epic": {
+    "kind": "simple-icons",
+    "slug": "epicgames"
+  },
+  "builtin-pl-fastmail": {
+    "kind": "monogram",
+    "color": "0067B9",
+    "reason": "Removed from Simple Icons at Fastmail's request; no brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-gmail": {
+    "kind": "simple-icons",
+    "slug": "gmail"
+  },
+  "builtin-pl-gmx": {
+    "kind": "simple-icons",
+    "slug": "gmx"
+  },
+  "builtin-pl-gog": {
+    "kind": "simple-icons",
+    "slug": "gogdotcom"
+  },
+  "builtin-pl-hey": {
+    "kind": "simple-icons",
+    "slug": "hey"
+  },
+  "builtin-pl-icloud": {
+    "kind": "simple-icons",
+    "slug": "icloud"
+  },
+  "builtin-pl-itch": {
+    "kind": "simple-icons",
+    "slug": "itchdotio"
+  },
+  "builtin-pl-kick": {
+    "kind": "simple-icons",
+    "slug": "kick"
+  },
+  "builtin-pl-mailboxorg": {
+    "kind": "simple-icons",
+    "slug": "mailbox"
+  },
+  "builtin-pl-maildotcom": {
+    "kind": "simple-icons",
+    "slug": "maildotcom"
+  },
+  "builtin-pl-mailru": {
+    "kind": "simple-icons",
+    "slug": "maildotru"
+  },
+  "builtin-pl-microsoft": {
+    "kind": "monogram",
+    "color": "5E5E5E",
+    "reason": "Removed from Simple Icons at Microsoft's request; no brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-nintendo": {
+    "kind": "monogram",
+    "color": "E60012",
+    "reason": "Not in the pinned Simple Icons package; no Nintendo brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-outlook": {
+    "kind": "monogram",
+    "color": "0078D4",
+    "reason": "Removed from Simple Icons at Microsoft's request; no brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-proton": {
+    "kind": "simple-icons",
+    "slug": "protonmail"
+  },
+  "builtin-pl-psn": {
+    "kind": "simple-icons",
+    "slug": "playstation"
+  },
+  "builtin-pl-reddit": {
+    "kind": "simple-icons",
+    "slug": "reddit"
+  },
+  "builtin-pl-riot": {
+    "kind": "simple-icons",
+    "slug": "riotgames"
+  },
+  "builtin-pl-roblox": {
+    "kind": "simple-icons",
+    "slug": "roblox"
+  },
+  "builtin-pl-rockstar": {
+    "kind": "simple-icons",
+    "slug": "rockstargames"
+  },
+  "builtin-pl-steam": {
+    "kind": "simple-icons",
+    "slug": "steam"
+  },
+  "builtin-pl-tuta": {
+    "kind": "simple-icons",
+    "slug": "tuta"
+  },
+  "builtin-pl-twitch": {
+    "kind": "simple-icons",
+    "slug": "twitch"
+  },
+  "builtin-pl-ubisoft": {
+    "kind": "simple-icons",
+    "slug": "ubisoft"
+  },
+  "builtin-pl-x": {
+    "kind": "simple-icons",
+    "slug": "x"
+  },
+  "builtin-pl-xbox": {
+    "kind": "monogram",
+    "color": "107C10",
+    "reason": "Removed from Simple Icons at Microsoft's request; Xbox brand guidelines don't allow use in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-yahoo": {
+    "kind": "monogram",
+    "color": "6001D2",
+    "reason": "Removed from Simple Icons at Yahoo's request; no brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-yandex": {
+    "kind": "monogram",
+    "color": "FC3F1D",
+    "reason": "Removed from Simple Icons at Yandex's request; no brand terms on record that allow the logo in third-party apps.",
+    "checkedAt": "2026-10-06"
+  },
+  "builtin-pl-youtube": {
+    "kind": "simple-icons",
+    "slug": "youtube"
+  },
+  "builtin-pl-zoho": {
+    "kind": "simple-icons",
+    "slug": "zoho"
+  }
+}
