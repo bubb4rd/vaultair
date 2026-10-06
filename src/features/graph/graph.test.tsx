@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type {
   AccountSummary,
@@ -14,6 +14,7 @@ import type {
 } from "@/ipc/client";
 import { axeViolations } from "@/test/axe";
 import { DEFAULT_SESSION_CONFIG, renderApp, type RenderOptions } from "@/test/render";
+import { NodeMark } from "./NodeCard";
 import { resetMapState } from "./useMapFocus";
 
 function node(
@@ -306,6 +307,17 @@ describe("relationship map", () => {
   });
 
   describe("prospective accounts", () => {
+    it("shows the provider's catalog mark from the on-screen address, and a plus otherwise", () => {
+      const known = render(<NodeMark node={node("prospective_account", "c1", "owl@pm.me", 1)} label="owl@pm.me" />);
+      expect(known.container.querySelector("[data-logo='protonmail']")).toBeTruthy();
+      known.unmount();
+
+      const hidden = render(
+        <NodeMark node={node("prospective_account", "c1", "Hidden email 1", 1)} label="Hidden email 1" />,
+      );
+      expect(hidden.container.querySelector("[data-logo]")).toBeNull();
+    });
+
     const PROSPECT = "prospective_account:c1";
     const NAME = "Review primary@example.com, Suggested account";
 

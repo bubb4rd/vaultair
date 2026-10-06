@@ -27,9 +27,13 @@ export function NodeMark({ node, label, size = "sm" }: { node: GraphNode; label:
     case "game":
       return <CatalogLogo icon={node.icon} name={label} size={size} />;
     case "prospective_account": {
-      // From the label on screen, so a hidden address doesn't give its provider away.
+      // The label on screen, not the stored address: a hidden email is not a
+      // domain, so it does not give its provider away. The mark is that
+      // platform's, looked up by catalog id. `emailProvider` has no icon slug.
       const provider = emailProvider(label);
-      if (provider) return <CatalogLogo icon={provider.icon} name={label} size={size} className="opacity-60" />;
+      if (provider) {
+        return <CatalogLogo id={provider.platformId} icon={null} name={label} size={size} className="opacity-60" />;
+      }
       return (
         <span
           aria-hidden="true"
