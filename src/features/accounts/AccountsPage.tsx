@@ -190,8 +190,13 @@ function SearchBox({
   );
 }
 
-/** What the filter menus offer: only what the vault has. */
-function useFilterContext(all: AccountSummary[]): FilterContext {
+const EMPTY_IDS: string[] = [];
+
+/**
+ * What the filter menus offer: only what the vault has. A hidden purpose is
+ * still offered while accounts use it or the filter has it.
+ */
+function useFilterContext(all: AccountSummary[], selectedPurposes: string[]): FilterContext {
   const identities = useIdentityRefs().data;
   const purposes = usePurposes().data;
   const platforms = usePlatforms().data;
@@ -206,13 +211,13 @@ function useFilterContext(all: AccountSummary[]): FilterContext {
     const usedPlatforms = new Set(all.map((a) => a.platformId));
     return {
       identities: identities ?? [],
-      purposes: purposes ?? [],
+      purposes: (purposes ?? []).filter((p) => !p.isHidden || p.accountCount > 0 || selectedPurposes.includes(p.id)),
       platforms: (platforms ?? []).filter((p) => usedPlatforms.has(p.id)),
       games: (games ?? []).filter((g) => g.accountCount > 0 || g.profileCount > 0),
       tags: tags ?? [],
       publishers: [...publishers.values()].sort((a, b) => a.localeCompare(b)),
     };
-  }, [all, identities, purposes, platforms, games, tags]);
+  }, [all, selectedPurposes, identities, purposes, platforms, games, tags]);
 }
 
 /**
@@ -232,7 +237,7 @@ export function AccountsPage({ archived = false }: { archived?: boolean }) {
   const vault = useOpenVault();
   const refs = useIdentityRefs();
   const identityColor = (id: string | null) => refs.data?.find((r) => r.id === id)?.color ?? null;
-  const ctx = useFilterContext(all.data ?? []);
+  const ctx = useFilterContext(all.data ?? [], filter.purposeIds ?? EMPTY_IDS);
   const rows = useMemo(() => list.data ?? [], [list.data]);
   const ids = useMemo(() => rows.map((a) => a.id), [rows]);
   const selection = useSelection(ids);

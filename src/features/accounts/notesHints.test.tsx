@@ -42,7 +42,7 @@ describe("scanNotes (mirrors notes_hints.rs)", () => {
   });
 });
 
-const PURPOSES: PurposeView[] = [{ id: "builtin-main", slug: "main", name: "Main", isBuiltin: true }];
+const PURPOSES: PurposeView[] = [{ id: "builtin-main", slug: "main", name: "Main", isBuiltin: true, isHidden: false, color: null, accountCount: 0 }];
 
 const detail = (suggestions: Partial<NotesSuggestions>): AccountDetail => ({
   id: "a1",

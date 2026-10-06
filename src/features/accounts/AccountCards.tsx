@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { PurposeBadge } from "@/components/common/PurposeBadge";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { AccountLogo } from "@/features/catalog/CatalogLogo";
 import { IdentityChip } from "@/features/identities/IdentityAvatar";
@@ -106,7 +107,7 @@ export function AccountCards({ rows, scrollRef, selection, identityColor, label 
                   <span aria-hidden="true" className="text-subtle-foreground">
                     ·
                   </span>
-                  <span className="truncate">{account.purposeName}</span>
+                  <PurposeBadge purposeId={account.purposeId} name={account.purposeName} />
                 </div>
                 <div className="mt-auto flex items-end justify-between gap-2">
                   <div className="flex min-w-0 flex-col gap-1.5">

@@ -15,8 +15,8 @@ import { renderApp, type RenderOptions } from "@/test/render";
 import { FILTER_KINDS, activeChips, normalizeFilter, sameSpec, withoutChips, type FilterContext } from "./filters";
 
 const PURPOSES: PurposeView[] = [
-  { id: "builtin-main", slug: "main", name: "Main", isBuiltin: true },
-  { id: "builtin-alt", slug: "alt", name: "Alt", isBuiltin: true },
+  { id: "builtin-main", slug: "main", name: "Main", isBuiltin: true, isHidden: false, color: null, accountCount: 0 },
+  { id: "builtin-alt", slug: "alt", name: "Alt", isBuiltin: true, isHidden: false, color: null, accountCount: 0 },
 ];
 
 const summary = (id: string, title: string, over: Partial<AccountSummary> = {}): AccountSummary => ({

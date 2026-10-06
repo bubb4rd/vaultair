@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
+import { PurposeBadge } from "@/components/common/PurposeBadge";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { AccountLogo } from "@/features/catalog/CatalogLogo";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,11 @@ export function AccountCompact({ rows, scrollRef, selection, label }: AccountLis
             <span className="hidden w-28 truncate text-xs text-muted-foreground lg:block">
               {account.identityName ?? ""}
             </span>
-            <span className="hidden w-24 truncate text-xs text-muted-foreground md:block">{account.purposeName}</span>
+            <PurposeBadge
+              purposeId={account.purposeId}
+              name={account.purposeName}
+              className="hidden w-24 text-xs text-muted-foreground md:inline-flex"
+            />
             <StatusBadge status={status.badge} label={status.label} className="shrink-0" />
             <QuickCopy account={account} />
           </div>

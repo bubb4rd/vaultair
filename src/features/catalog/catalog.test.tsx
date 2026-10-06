@@ -19,7 +19,7 @@ import { EMAIL_PROVIDER_ENTRIES, LOGO_SLUGS, emailProvider, logoColor, monogram 
 
 vi.mock("@/lib/webview", () => ({ reloadWebview: vi.fn() }));
 
-const PURPOSES: PurposeView[] = [{ id: "builtin-main", slug: "main", name: "Main", isBuiltin: true }];
+const PURPOSES: PurposeView[] = [{ id: "builtin-main", slug: "main", name: "Main", isBuiltin: true, isHidden: false, color: null, accountCount: 0 }];
 
 const platform = (over: Partial<PlatformView>): PlatformView => ({
   id: "builtin-pl-steam",

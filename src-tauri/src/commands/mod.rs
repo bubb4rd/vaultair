@@ -9,6 +9,7 @@ pub mod health;
 pub mod identity;
 pub mod mfa;
 pub mod password;
+pub mod purpose;
 pub mod recent;
 pub mod search;
 pub mod secret;

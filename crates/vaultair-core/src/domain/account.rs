@@ -238,14 +238,46 @@ pub enum AccountUrl {
 // never the secrets. The only types that carry a secret value are
 // `RevealedSecret` and `TotpCodeView`, returned by the reveal commands.
 
+text_enum!(
+    /// A purpose label's colour: the identity palette, so the UI maps each
+    /// name to a token that reads well on the dark theme. Never a status
+    /// colour, and never the only cue (the name is always shown).
+    PurposeColor {
+        Blue => "blue",
+        Violet => "violet",
+        Teal => "teal",
+        Amber => "amber",
+        Rose => "rose",
+        Slate => "slate",
+    }
+);
+
+/// A purpose label. Hidden ones are listed too: accounts that already use
+/// one keep showing it, but forms don't offer it for new picks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct PurposeView {
     pub id: String,
+    /// Stable: built-in slugs are what the High-priority view and dashboard
+    /// counts match on, and a custom label keeps its slug when renamed.
     pub slug: String,
     pub name: String,
     pub is_builtin: bool,
+    pub is_hidden: bool,
+    pub color: Option<PurposeColor>,
+    /// Accounts using it, archived ones included (a delete has to move them all).
+    pub account_count: u32,
+}
+
+/// What the purpose label editor sends on create and update.
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct PurposeInput {
+    /// Built-ins keep their name: anything else is rejected on update.
+    pub name: String,
+    pub color: Option<PurposeColor>,
 }
 
 /// A row in the account list.

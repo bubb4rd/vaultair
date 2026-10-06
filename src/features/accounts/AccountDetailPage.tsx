@@ -16,6 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues, useSessionConfig } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
+import { PurposeBadge } from "@/components/common/PurposeBadge";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,7 +115,9 @@ function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () =
             <span className="text-subtle-foreground">None</span>
           )}
         </Meta>
-        <Meta label="Purpose">{account.purposeName}</Meta>
+        <Meta label="Purpose">
+          <PurposeBadge purposeId={account.purposeId} name={account.purposeName} />
+        </Meta>
         {account.platformName && <Meta label="Platform">{account.platformName}</Meta>}
         {account.gameName && <Meta label="Game">{account.gameName}</Meta>}
         <Meta label="Tags">

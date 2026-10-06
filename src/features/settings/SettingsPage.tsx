@@ -10,6 +10,7 @@ import { toast } from "@/features/toast/toast";
 import { appInfo, session, type AppInfo, type CaptureLevel, type CaptureMode, type SessionConfig } from "@/ipc/client";
 import { CAPTURE_LEVELS, CAPTURE_MODES, captureModeDescription } from "./capturePolicy";
 import { DevPanel } from "./DevPanel";
+import { PurposeLabels } from "./PurposeLabels";
 
 function AppVersion() {
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -147,6 +148,7 @@ export function SettingsPage() {
         <div className="flex max-w-xl flex-col gap-10">
           <PrivacySettings />
           <BackupSettings />
+          <PurposeLabels />
           <AppVersion />
           {import.meta.env.DEV && <DevPanel />}
         </div>
