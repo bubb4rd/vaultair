@@ -201,6 +201,18 @@ export const commands = {
 	 *  than that is `invalid_input`. An unknown focus is `not_found`.
 	 */
 	graphQuery: (focus: GraphFocus, depth: number | null, limit: number | null) => typedError<Graph, IpcError_Serialize>(__TAURI_INVOKE("graph_query", { focus, depth, limit })),
+	/**
+	 *  The whole vault as one map: a tree under every identity, then one under
+	 *  each email and account no identity reaches. Null `limit` is the most
+	 *  allowed (300 nodes); `truncated` says when the vault holds more.
+	 */
+	graphOverview: (limit: number | null) => typedError<Graph, IpcError_Serialize>(__TAURI_INVOKE("graph_overview", { limit })),
+	/**
+	 *  Discards the prospective account drawn for an email (`dismissed: true`),
+	 *  or brings it back. `contact_id` is the email's contact point; anything
+	 *  else is `not_found`.
+	 */
+	graphProspectSetDismissed: (contactId: string, dismissed: boolean) => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("graph_prospect_set_dismissed", { contactId, dismissed })),
 	/**  Every platform, built-in and user-added, with how many accounts use each. */
 	platformList: () => typedError<PlatformView[], IpcError_Serialize>(__TAURI_INVOKE("platform_list")),
 	platformCreate: (input: PlatformInput) => typedError<PlatformView, IpcError_Serialize>(__TAURI_INVOKE("platform_create", { input })),
@@ -669,7 +681,7 @@ export type Dependent = {
  *  depends on it: identity, then contact, then account, then what the
  *  account uses.
  */
-export type EdgeKind = "owns" | "primary_email" | "recovery_email" | "phone" | "login_email" | "recovery_phone" | "linked_launcher" | "linked_console" | "on_platform" | "plays" | "mfa";
+export type EdgeKind = "owns" | "primary_email" | "recovery_email" | "phone" | "login_email" | "recovery_phone" | "linked_launcher" | "linked_console" | "on_platform" | "plays" | "mfa" | "prospective";
 
 /**  Stable, machine-readable error codes. The frontend switches on these. */
 export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy" | "invalid_backup" | "backup_other_vault" | "backup_destination";
@@ -769,10 +781,17 @@ export type Generated = {
 	score: number,
 };
 
-/**  A focus and everything within `depth` steps of it, capped at `limit` nodes. */
+/**
+ *  A focus and everything within `depth` steps of it, capped at `limit`
+ *  nodes; or, with no focus, the whole vault as one tree per identity and
+ *  one per group of records no identity reaches.
+ */
 export type Graph = {
-	/**  The focus node's id. */
-	focus: string,
+	/**
+	 *  The focus node's id. `None` for the whole vault: every node without
+	 *  a `parent` is then the root of its own tree.
+	 */
+	focus: string | null,
 	/**  Nearest first, then by kind and label. */
 	nodes: GraphNode[],
 	/**  Every relationship between two of `nodes`. */
@@ -801,6 +820,7 @@ export type GraphNode = {
 	/**
 	 *  The record a click opens: the identity, the account (for an account
 	 *  and for its MFA method), or the contact, platform or game to refocus on.
+	 *  A prospective account names the email's contact point.
 	 */
 	recordId: string,
 	label: string,
@@ -809,9 +829,12 @@ export type GraphNode = {
 	/**  A catalog icon slug: the platform's or game's own, or an account's mark. */
 	icon: string | null,
 	color: IdentityColor | null,
-	/**  Steps from the focus (0 is the focus). */
+	/**  Steps from the focus (0 is the focus), or from its tree's root. */
 	depth: number,
-	/**  The node this one hangs under in the tree view; `None` for the focus. */
+	/**
+	 *  The node this one hangs under in the tree view; `None` for the focus
+	 *  or a root.
+	 */
 	parent: string | null,
 	/**  How it relates to `parent`. */
 	parentEdge: EdgeKind | null,
@@ -1063,9 +1086,11 @@ export type MfaView = {
 
 /**
  *  What a node stands for. A recovery method is a phone (a recovery
- *  email is an email node with a recovery edge).
+ *  email is an email node with a recovery edge). A prospective account
+ *  is not a record: it is the mailbox behind an email that accounts use
+ *  while no email account in the vault signs in with it.
  */
-export type NodeKind = "identity" | "email" | "recovery_method" | "account" | "platform" | "game" | "mfa_method";
+export type NodeKind = "identity" | "email" | "recovery_method" | "account" | "prospective_account" | "platform" | "game" | "mfa_method";
 
 /**  What the account page suggests. All false once dismissed. */
 export type NotesSuggestions = {

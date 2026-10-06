@@ -103,12 +103,15 @@ describe("relationship map", () => {
     const { calls } = await renderApp("/map", handlers());
     expect(await screen.findByRole("group", { name: "Relationship map" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Map" })).toBeChecked();
-    expect(within(screen.getByRole("list", { name: "Line styles" })).getAllByRole("listitem")).toHaveLength(4);
+    const legend = within(screen.getByRole("list", { name: "Line styles" }));
+    expect(legend.getAllByRole("listitem")).toHaveLength(5);
+    expect(legend.getByText("Suggested, not in vault")).toBeInTheDocument();
     expect(calls).toContainEqual({
       cmd: "graph_query",
       args: { focus: { kind: "identity", id: "i1" }, depth: null, limit: null },
     });
-    expect(screen.getByRole("combobox", { name: "Focus" })).toHaveValue("identity:i1");
+    expect(screen.getByRole("combobox", { name: "Focus" })).toHaveTextContent("Primary Gaming Identity");
+    expect(screen.getByRole("radio", { name: "Focused" })).toBeChecked();
   });
 
   it("draws every record as a button with its relationship written beside it, and opens one", async () => {
@@ -204,10 +207,65 @@ describe("relationship map", () => {
         args: { focus: { kind: "contact", id: "c1" }, depth: null, limit: null },
       });
     });
-    expect(screen.getByRole("combobox", { name: "Focus" })).toHaveValue("contact:c1");
+    const picker = screen.getByRole("combobox", { name: "Focus" });
+    expect(picker).toHaveTextContent("primary@example.com");
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Focus" }), "identity:i1");
-    expect(screen.getByRole("combobox", { name: "Focus" })).toHaveValue("identity:i1");
+    // The picker is the app's own list: grouped by kind, and it filters by name as you type.
+    await user.click(picker);
+    const choices = await screen.findByRole("dialog", { name: "Choose a focus" });
+    expect(within(choices).getByText("Identities")).toBeInTheDocument();
+    expect(within(choices).getByText("Emails")).toBeInTheDocument();
+    await user.type(within(choices).getByPlaceholderText("Find a record"), "gaming");
+    expect(within(choices).queryByRole("option", { name: "primary@example.com" })).not.toBeInTheDocument();
+    await user.click(within(choices).getByRole("option", { name: "Primary Gaming Identity" }));
+    expect(screen.queryByRole("dialog", { name: "Choose a focus" })).not.toBeInTheDocument();
+    expect(picker).toHaveTextContent("Primary Gaming Identity");
+  });
+
+  it("switches to the whole vault as one map of several trees, and back by picking a record", async () => {
+    const user = userEvent.setup();
+    const base = graph();
+    const whole: Graph = {
+      ...base,
+      focus: null,
+      nodes: [
+        ...base.nodes,
+        node("email", "c2", "stray@example.com", 0),
+        node("account", "a3", "Forum", 1, "email:c2", "login_email"),
+      ],
+      edges: [
+        ...base.edges,
+        { id: "email:c2>login_email>account:a3", source: "email:c2", target: "account:a3", kind: "login_email" },
+      ],
+    };
+    const stray: ContactPointView = { ...contact, id: "c2", value: "stray@example.com", identityId: null, accountCount: 1 };
+    const { calls } = await renderApp(
+      "/map",
+      handlers({ graph_overview: () => whole, contact_point_list: () => [contact, stray] }),
+    );
+    await user.click(await screen.findByRole("radio", { name: "All" }));
+    const map = await screen.findByRole("group", { name: "Relationship map" });
+    await within(map).findByRole("button", { name: "Open Forum, Account" });
+    expect(calls).toContainEqual({ cmd: "graph_overview", args: { limit: null } });
+    // Nothing is the focus, and there is no record to pick.
+    expect(map.querySelector("[aria-current]")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Focus" })).not.toBeInTheDocument();
+
+    const list = await openList(user);
+    const tops = Array.from(list.children, (li) => li.querySelector("a, button")?.textContent);
+    expect(tops).toEqual(["Primary Gaming Identity", "stray@example.com"]);
+    expect(within(list).queryByText(/the focus/)).not.toBeInTheDocument();
+    expect(await axeViolations(list)).toEqual([]);
+
+    // Choosing a record from the whole map narrows to it.
+    await user.click(within(list).getByRole("button", { name: "Focus the map on stray@example.com" }));
+    expect(await screen.findByRole("radio", { name: "Focused" })).toBeChecked();
+    await waitFor(() => {
+      expect(calls).toContainEqual({
+        cmd: "graph_query",
+        args: { focus: { kind: "contact", id: "c2" }, depth: null, limit: null },
+      });
+    });
   });
 
   it("opens in the list when the system asks for reduced motion", async () => {
@@ -226,7 +284,8 @@ describe("relationship map", () => {
     const list = await openList(user);
     expect(within(list).getByRole("button", { name: "Focus the map on Hidden email 1" })).toBeInTheDocument();
     expect(screen.queryByText("primary@example.com", { exact: false })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Hidden email 1" })).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Focus" }));
+    expect(await screen.findByRole("option", { name: "Hidden email 1" })).toBeInTheDocument();
   });
 
   it("says when the map was cut short", async () => {
@@ -244,6 +303,121 @@ describe("relationship map", () => {
     const empty = await screen.findByTestId("empty-state");
     expect(within(empty).getByRole("heading", { name: "Nothing to map yet" })).toBeInTheDocument();
     expect(calls.some((c) => c.cmd === "graph_query")).toBe(false);
+  });
+
+  describe("prospective accounts", () => {
+    const PROSPECT = "prospective_account:c1";
+    const NAME = "Review primary@example.com, Suggested account";
+
+    /** Two accounts sign in with the address, and no email account in the vault does. */
+    function withProspect(extra: RenderOptions["handlers"] = {}): RenderOptions {
+      const base = graph();
+      return handlers({
+        graph_query: () => ({
+          ...base,
+          nodes: [...base.nodes, node("prospective_account", "c1", "primary@example.com", 2, EMAIL, "prospective")],
+          edges: [...base.edges, { id: `${EMAIL}>prospective>${PROSPECT}`, source: EMAIL, target: PROSPECT, kind: "prospective" }],
+        }),
+        purpose_list: () => [
+          { id: "builtin-main", slug: "main", name: "Main", isBuiltin: true, isHidden: false, color: null, accountCount: 0 },
+        ],
+        tag_list: () => [],
+        ...extra,
+      });
+    }
+
+    async function openPanel(user: ReturnType<typeof userEvent.setup>) {
+      const map = await screen.findByRole("group", { name: "Relationship map" });
+      await user.click(within(map).getByRole("button", { name: NAME }));
+      return screen.findByRole("dialog", { name: "Suggested account for primary@example.com" });
+    }
+
+    it("draws the mailbox the vault lacks with its own line and adds it in one click", async () => {
+      const user = userEvent.setup();
+      const { calls } = await renderApp(
+        "/map",
+        withProspect({ account_create: () => ({ id: "a9", title: "example.com" }) }),
+      );
+      const map = await screen.findByRole("group", { name: "Relationship map" });
+      expect(map.querySelectorAll("path.map-edge-suggested")).toHaveLength(1);
+      expect(Array.from(map.querySelectorAll(".map-edge-label"), (l) => l.textContent)).toContain("Mailbox");
+
+      const panel = await openPanel(user);
+      expect(panel).toHaveTextContent("2 accounts use this address, but the mailbox itself isn't in your vault.");
+      await user.click(within(panel).getByRole("button", { name: "Add account" }));
+      await waitFor(() => {
+        expect(calls.find((c) => c.cmd === "account_create")?.args.input).toMatchObject({
+          title: "example.com",
+          accountType: "email",
+          email: "primary@example.com",
+          purposeId: "builtin-main",
+          identityId: "i1",
+          platformId: null,
+          password: { op: "unchanged" },
+        });
+      });
+      expect(await screen.findByText("Account added")).toBeInTheDocument();
+    });
+
+    it("discards the suggestion and brings it back with Undo", async () => {
+      const user = userEvent.setup();
+      const { calls } = await renderApp("/map", withProspect());
+      const panel = await openPanel(user);
+      await user.click(within(panel).getByRole("button", { name: "Discard" }));
+      await waitFor(() => {
+        expect(calls).toContainEqual({
+          cmd: "graph_prospect_set_dismissed",
+          args: { contactId: "c1", dismissed: true },
+        });
+      });
+      await user.click(await screen.findByRole("button", { name: "Undo" }));
+      await waitFor(() => {
+        expect(calls).toContainEqual({
+          cmd: "graph_prospect_set_dismissed",
+          args: { contactId: "c1", dismissed: false },
+        });
+      });
+    });
+
+    it("opens the new-account form filled in for the mailbox", async () => {
+      const user = userEvent.setup();
+      const { router } = await renderApp("/map", withProspect());
+      const panel = await openPanel(user);
+      await user.click(within(panel).getByRole("button", { name: "Edit first" }));
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/accounts/new");
+      });
+      expect(router.state.location.search).toEqual({ mailbox: "c1" });
+      expect(await screen.findByDisplayValue("primary@example.com")).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: /^Name/ })).toHaveValue("example.com");
+    });
+
+    it("offers the same three actions in the list, and masks the address when emails are hidden", async () => {
+      const user = userEvent.setup();
+      const { calls } = await renderApp(
+        "/map",
+        withProspect({ session_config_get: () => ({ ...DEFAULT_SESSION_CONFIG, hideEmails: true }) }),
+      );
+      const list = await openList(user);
+      for (const name of [
+        "Add Hidden email 1 as an account",
+        "Edit Hidden email 1 before adding it",
+        "Discard the suggestion for Hidden email 1",
+      ]) {
+        expect(within(list).getByRole("button", { name })).toBeInTheDocument();
+      }
+      expect(within(list).getByText("Suggested account")).toBeInTheDocument();
+      expect(screen.queryByText("primary@example.com", { exact: false })).not.toBeInTheDocument();
+      expect(await axeViolations(list)).toEqual([]);
+
+      await user.click(within(list).getByRole("button", { name: "Discard the suggestion for Hidden email 1" }));
+      await waitFor(() => {
+        expect(calls.some((c) => c.cmd === "graph_prospect_set_dismissed")).toBe(true);
+      });
+      // The toast names it the way the map does.
+      expect(await screen.findByText("Suggestion discarded")).toBeInTheDocument();
+      expect(screen.queryByText("primary@example.com", { exact: false })).not.toBeInTheDocument();
+    });
   });
 
   it("says so when the map can't be loaded", async () => {

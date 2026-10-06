@@ -65,7 +65,7 @@ Types are generated to TS with **tauri-specta** (pin the version; fall back to `
 | Search/views | `search`, `saved_view_list/create/update/delete`, `search_rebuild_index` |
 | Generator | `generate_password`, `generate_passphrase`, `strength_estimate` |
 | Health | `health_summary`, `health_issues` |
-| Graph | `graph_query({focus, depth, limit})` |
+| Graph | `graph_query({focus, depth, limit})`, `graph_overview({limit})`, `graph_prospect_set_dismissed({contactId, dismissed})` |
 | Backup | `backup_create`, `backup_status`, `backup_set_destination`, `backup_verify`, `backup_restore_to` (see §8) |
 | Settings | `settings_get`, `settings_update`, `app_config_get`, `app_config_update`, `capture_protection_set` |
 | Dashboard | `dashboard_summary` |

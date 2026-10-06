@@ -9,7 +9,8 @@
   stroke-width: 1.5;
 }
 
-.map-edge-uses {
+.map-edge-uses,
+.map-edge-suggested {
   stroke-linecap: round;
 }
 

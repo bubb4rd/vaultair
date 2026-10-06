@@ -10,6 +10,8 @@ export function kindLabel(kind: NodeKind): string {
       return "Recovery method";
     case "account":
       return "Account";
+    case "prospective_account":
+      return "Suggested account";
     case "platform":
       return "Platform";
     case "game":
@@ -44,11 +46,13 @@ export function edgeLabel(kind: EdgeKind): string {
       return "Game";
     case "mfa":
       return "MFA";
+    case "prospective":
+      return "Mailbox";
   }
 }
 
 /** Relationships drawn with the same line. The line style is the signal; every edge also carries its label. */
-export type EdgeFamily = "sign_in" | "recovery" | "linked" | "uses";
+export type EdgeFamily = "sign_in" | "recovery" | "linked" | "uses" | "suggested";
 
 export function edgeFamily(kind: EdgeKind): EdgeFamily {
   switch (kind) {
@@ -67,6 +71,8 @@ export function edgeFamily(kind: EdgeKind): EdgeFamily {
     case "plays":
     case "mfa":
       return "uses";
+    case "prospective":
+      return "suggested";
   }
 }
 
@@ -75,6 +81,8 @@ export const EDGE_FAMILIES: { family: EdgeFamily; label: string; dash: string | 
   { family: "recovery", label: "Recovers through", dash: "6 4" },
   { family: "linked", label: "Linked account", dash: "10 3 2 3" },
   { family: "uses", label: "Platform, game or MFA", dash: "1 4" },
+  // Dots in pairs: an account the vault doesn't have yet.
+  { family: "suggested", label: "Suggested, not in vault", dash: "1 4 1 10" },
 ];
 
 export function familyDash(family: EdgeFamily): string | undefined {

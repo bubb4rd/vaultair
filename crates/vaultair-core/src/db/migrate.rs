@@ -17,6 +17,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("migrations/V5__notes_hints.sql"),
     include_str!("migrations/V6__last_used.sql"),
     include_str!("migrations/V7__saved_views.sql"),
+    include_str!("migrations/V8__prospects.sql"),
 ];
 
 /// Versions whose migration (re)seeds the built-in platform and game catalog

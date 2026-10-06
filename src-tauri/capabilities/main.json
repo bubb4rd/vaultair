@@ -81,6 +81,8 @@
     "allow-health-summary",
     "allow-health-issues",
     "allow-graph-query",
+    "allow-graph-overview",
+    "allow-graph-prospect-set-dismissed",
     "allow-platform-list",
     "allow-platform-create",
     "allow-platform-update",

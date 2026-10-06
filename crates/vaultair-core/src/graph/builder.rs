@@ -337,6 +337,34 @@ fn load_mfa(conn: &Connection, g: &mut Loaded) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Prospective accounts: the mailbox behind an email that active accounts
+/// sign in or recover with, when no email account signs in with that
+/// address. An archived mailbox account counts as having one, so the same
+/// mailbox isn't suggested twice. Suggestions the user discarded are skipped.
+fn load_prospects(conn: &Connection, g: &mut Loaded) -> Result<(), AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT c.id, COALESCE(c.value_display, c.value_normalized, '')
+         FROM contact_point c
+         WHERE c.kind = 'email' AND c.mailbox_dismissed_at IS NULL
+           AND EXISTS (SELECT 1 FROM account_contact ac JOIN account a ON a.id = ac.account_id
+                        WHERE ac.contact_point_id = c.id AND a.archived_at IS NULL
+                          AND ac.role IN ('login_email', 'recovery_email'))
+           AND NOT EXISTS (SELECT 1 FROM account_contact ac JOIN account a ON a.id = ac.account_id
+                            WHERE ac.contact_point_id = c.id AND a.account_type = 'email'
+                              AND ac.role = 'login_email')",
+    )?;
+    let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+    for row in rows {
+        let (id, address) = row?;
+        let Some(from) = g.find(NodeKind::Email, &id) else {
+            continue;
+        };
+        let at = g.add(NodeKind::ProspectiveAccount, &id, address);
+        g.link(from, at, EdgeKind::Prospective);
+    }
+    Ok(())
+}
+
 fn load(conn: &Connection) -> Result<Loaded, AppError> {
     let mut g = Loaded::default();
     load_catalog(conn, &mut g)?;
@@ -345,6 +373,7 @@ fn load(conn: &Connection) -> Result<Loaded, AppError> {
     load_identities(conn, &mut g, &owners, &contacts)?;
     load_profiles(conn, &mut g)?;
     load_mfa(conn, &mut g)?;
+    load_prospects(conn, &mut g)?;
     Ok(g)
 }
 
@@ -356,7 +385,7 @@ fn parent_rank(kind: EdgeKind) -> u8 {
         EdgeKind::LoginEmail | EdgeKind::PrimaryEmail => 1,
         EdgeKind::RecoveryEmail | EdgeKind::Phone => 2,
         EdgeKind::RecoveryPhone => 3,
-        EdgeKind::OnPlatform | EdgeKind::Plays | EdgeKind::Mfa => 4,
+        EdgeKind::OnPlatform | EdgeKind::Plays | EdgeKind::Mfa | EdgeKind::Prospective => 4,
         EdgeKind::Owns => 5,
     }
 }
@@ -396,6 +425,13 @@ fn hangs_under(parents: &HashMap<usize, (usize, EdgeKind)>, node: usize, ancesto
     true
 }
 
+fn checked_limit(limit: u32) -> Result<usize, AppError> {
+    if limit == 0 || limit > MAX_NODES {
+        return Err(AppError::InvalidInput { field: "limit" });
+    }
+    Ok(usize::try_from(limit).unwrap_or(usize::MAX))
+}
+
 /// The focus and everything within `depth` steps, nearest first, stopping at
 /// `limit` nodes. An unknown focus (or an archived account) is `NotFound`;
 /// a depth outside 1..=[`MAX_DEPTH`] or a limit outside 1..=[`MAX_NODES`] is
@@ -409,13 +445,25 @@ pub fn query(
     if depth == 0 || depth > MAX_DEPTH {
         return Err(AppError::InvalidInput { field: "depth" });
     }
-    if limit == 0 || limit > MAX_NODES {
-        return Err(AppError::InvalidInput { field: "limit" });
-    }
-    let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+    let limit = checked_limit(limit)?;
     let g = load(conn)?;
     let root = focus_node(&g, focus).ok_or(AppError::NotFound)?;
+    Ok(walk(&g, Some(root), depth, limit))
+}
 
+/// The whole vault, stopping at `limit` nodes: a tree under every identity,
+/// then one under each email and account no identity reaches. Platforms and
+/// games no active account uses are left out. A limit outside
+/// 1..=[`MAX_NODES`] is `InvalidInput`.
+pub fn overview(conn: &Connection, limit: u32) -> Result<Graph, AppError> {
+    let limit = checked_limit(limit)?;
+    let g = load(conn)?;
+    Ok(walk(&g, None, u8::MAX, limit))
+}
+
+/// Walks out from `focus`, or with none from every identity at once and then
+/// from whatever is still unreached, and hangs each node it keeps in a tree.
+fn walk(g: &Loaded, focus: Option<usize>, depth: u8, limit: usize) -> Graph {
     // Neighbours in a fixed order, so the same vault always draws the same map.
     let mut near: Vec<Vec<(usize, Link)>> = vec![Vec::new(); g.nodes.len()];
     for link in &g.links {
@@ -429,26 +477,77 @@ pub fn query(
         });
     }
 
-    let mut depths: HashMap<usize, u8> = HashMap::from([(root, 0)]);
-    let mut kept = vec![root];
-    let mut queue = VecDeque::from([root]);
-    let mut truncated = false;
-    while let Some(at) = queue.pop_front() {
-        let d = depths.get(&at).copied().unwrap_or(0);
-        if d >= depth {
-            continue;
+    // Where a walk may start. With no focus: identities, then emails
+    // something uses, then accounts. Everything else worth drawing is linked
+    // to one of those.
+    let mut starts: VecDeque<usize> = VecDeque::new();
+    let mut together = 1;
+    match focus {
+        Some(root) => starts.push_back(root),
+        None => {
+            let mut order: Vec<usize> = (0..g.nodes.len())
+                .filter(|at| match g.nodes[*at].kind {
+                    NodeKind::Identity | NodeKind::Account => true,
+                    NodeKind::Email => !near[*at].is_empty(),
+                    _ => false,
+                })
+                .collect();
+            order.sort_by_cached_key(|at| {
+                let n = &g.nodes[*at];
+                (kind_rank(n.kind), n.label.to_lowercase(), n.id.clone())
+            });
+            // Identities set out together, so a shared record hangs under
+            // the nearest one.
+            together = order
+                .iter()
+                .filter(|at| g.nodes[**at].kind == NodeKind::Identity)
+                .count()
+                .max(1);
+            starts.extend(order);
         }
-        for (to, _) in &near[at] {
-            if depths.contains_key(to) {
+    }
+
+    let mut depths: HashMap<usize, u8> = HashMap::new();
+    let mut kept = Vec::new();
+    let mut queue = VecDeque::new();
+    let mut truncated = false;
+    loop {
+        for _ in 0..together {
+            let Some(root) = starts.pop_front() else {
+                break;
+            };
+            if depths.contains_key(&root) {
                 continue;
             }
             if kept.len() >= limit {
                 truncated = true;
                 continue;
             }
-            depths.insert(*to, d + 1);
-            kept.push(*to);
-            queue.push_back(*to);
+            depths.insert(root, 0);
+            kept.push(root);
+            queue.push_back(root);
+        }
+        together = 1;
+        while let Some(at) = queue.pop_front() {
+            let d = depths.get(&at).copied().unwrap_or(0);
+            if d >= depth {
+                continue;
+            }
+            for (to, _) in &near[at] {
+                if depths.contains_key(to) {
+                    continue;
+                }
+                if kept.len() >= limit {
+                    truncated = true;
+                    continue;
+                }
+                depths.insert(*to, d.saturating_add(1));
+                kept.push(*to);
+                queue.push_back(*to);
+            }
+        }
+        if starts.is_empty() {
+            break;
         }
     }
 
@@ -540,10 +639,10 @@ pub fn query(
         .collect();
     edges.sort_by(|a, b| a.id.cmp(&b.id));
 
-    Ok(Graph {
-        focus: g.nodes[root].id.clone(),
+    Graph {
+        focus: focus.map(|root| g.nodes[root].id.clone()),
         nodes,
         edges,
         truncated,
-    })
+    }
 }

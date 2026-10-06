@@ -500,6 +500,11 @@ export const health = {
 export const graph = {
   /** The focus and what is within two steps of it, up to 300 nodes. */
   query: (focus: GraphFocus): Promise<Graph> => data(() => commands.graphQuery(focus, null, null)),
+  /** The whole vault: a tree under every identity, then what no identity reaches. Up to 300 nodes. */
+  overview: (): Promise<Graph> => data(() => commands.graphOverview(null)),
+  /** Discards the prospective account drawn for an email (`contactId`), or brings it back. */
+  setProspectDismissed: (contactId: string, dismissed: boolean): Promise<null> =>
+    data(() => commands.graphProspectSetDismissed(contactId, dismissed)),
 };
 
 export const catalog = {

@@ -102,6 +102,20 @@ pub fn set_identity_claims(
     Ok(())
 }
 
+/// Discards (`at` set) or brings back (`None`) the suggestion to add the
+/// mailbox account behind an email. False if `id` isn't an email.
+pub fn set_mailbox_dismissed(
+    conn: &Connection,
+    id: &str,
+    at: Option<&str>,
+) -> rusqlite::Result<bool> {
+    let changed = conn.execute(
+        "UPDATE contact_point SET mailbox_dismissed_at = ?2 WHERE id = ?1 AND kind = 'email'",
+        params![id, at],
+    )?;
+    Ok(changed > 0)
+}
+
 /// Deletes contact points nothing refers to: no account link, no MFA method,
 /// no identity declaring it, and no label or notes of the user's own.
 pub fn prune_unused(conn: &Connection) -> rusqlite::Result<()> {

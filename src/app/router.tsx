@@ -48,7 +48,14 @@ const pageRoutes = ALL_NAV_ITEMS.map((item) =>
 const newAccountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/accounts/new",
-  component: () => <AccountForm />,
+  // `mailbox` is an email's contact point: the form starts as the account for
+  // that mailbox (the relationship map's "Edit first").
+  validateSearch: (search: Record<string, unknown>): { mailbox?: string } =>
+    typeof search.mailbox === "string" ? { mailbox: search.mailbox } : {},
+  component: function NewAccountRoute() {
+    const { mailbox } = newAccountRoute.useSearch();
+    return <AccountForm key={mailbox ?? "new"} {...(mailbox ? { mailboxId: mailbox } : {})} />;
+  },
 });
 
 const accountRoute = createRoute({

@@ -54,6 +54,7 @@ export const queryKeys = {
   healthIssues: (identityId: string | null, rule: HealthRule | null) =>
     ["health", "issues", identityId ?? "all", rule ?? "all"] as const,
   graph: ["graph"] as const,
+  graphAll: ["graph", "all"] as const,
   graphQuery: (focus: GraphFocus) => ["graph", focus.kind, focus.id] as const,
   catalog: ["catalog"] as const,
   platforms: ["catalog", "platforms"] as const,
@@ -210,12 +211,16 @@ export function useHealthIssues(identityId: string | null, rule: HealthRule | nu
   });
 }
 
-/** The relationship map around `focus`; null waits for one. The last map stays up while the next loads. */
-export function useGraph(focus: GraphFocus | null) {
+/** What the relationship map draws: everything around one record, or the whole vault. */
+export type GraphTarget = GraphFocus | "all";
+
+/** The relationship map for `target`; null waits for one. The last map stays up while the next loads. */
+export function useGraph(target: GraphTarget | null) {
   return useQuery({
-    queryKey: focus ? queryKeys.graphQuery(focus) : queryKeys.graph,
-    queryFn: () => (focus ? graph.query(focus) : null),
-    enabled: focus !== null,
+    queryKey:
+      target === null ? queryKeys.graph : target === "all" ? queryKeys.graphAll : queryKeys.graphQuery(target),
+    queryFn: () => (target === null ? null : target === "all" ? graph.overview() : graph.query(target)),
+    enabled: target !== null,
     placeholderData: keepPreviousData,
   });
 }
