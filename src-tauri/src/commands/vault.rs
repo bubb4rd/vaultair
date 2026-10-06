@@ -95,6 +95,7 @@ async fn create(state: &AppState, request: CreateVaultRequest, demo: bool) -> Ip
     })
     .await?;
     record_recent(state, &info);
+    super::settings::apply_saved(state).await;
     tracing::info!(demo, "vault created");
     if demo {
         // The vault exists either way; if seeding fails it's simply emptier.
@@ -139,6 +140,7 @@ pub async fn vault_unlock(
     let session = state.session.clone();
     let info = blocking(move || session.unlock(&dir, &password)).await?;
     record_recent(&state, &info);
+    super::settings::apply_saved(&state).await;
     Ok(info)
 }
 

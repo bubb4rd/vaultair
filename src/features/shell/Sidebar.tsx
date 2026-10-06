@@ -5,6 +5,7 @@ import { NAV_GROUPS, SETTINGS_ITEM, type NavItem } from "@/app/nav";
 import { useAccounts, useOpenVault } from "@/app/queries";
 import { KeyboardHint } from "@/components/common/KeyboardHint";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { IdentityAvatar } from "@/features/identities/IdentityAvatar";
 import { lockVault } from "@/features/lock/lockVault";
 import { BrandMark } from "./BrandMark";
 import { FavoritesGroup } from "./FavoritesGroup";
@@ -36,6 +37,7 @@ function VaultRow() {
   const openVault = useOpenVault();
   return (
     <div className="flex items-center gap-2 pt-1 pl-2.5">
+      {openVault && <IdentityAvatar name={openVault.name} color={openVault.color} size="xs" />}
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium text-foreground" title={openVault?.path}>
           {openVault?.name ?? "Vault"}

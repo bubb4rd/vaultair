@@ -11,3 +11,4 @@ pub mod mfa;
 pub mod purposes;
 pub mod search;
 pub mod session;
+pub mod settings;

@@ -1,6 +1,6 @@
 # Local data storage
 
-> **Status:** Phase 5. Updated in Phase 14 (backups). Every file Vaultair writes is listed here.
+> **Status:** Phase 5. Updated in Phase 14 (backups) and Phase 15 (password change, settings). Every file Vaultair writes is listed here.
 
 Vaultair never uploads anything. It makes no network connections (enforced at build time by `deny.toml`).
 
@@ -9,14 +9,15 @@ Vaultair never uploads anything. It makes no network connections (enforced at bu
 | Vault folder | Default `%LOCALAPPDATA%\Vaultair\Vaults\<Vault name>\`, or a folder you choose | See rows below | |
 | `vault.vhdr` | Vault folder | No (authenticated) | KDF parameters, random salt, the wrapped (encrypted) data key, creation time, vault id. **No user data.** |
 | `vault.vdb` | Vault folder | Yes: SQLCipher (AES-256 + HMAC-SHA512 per page), plus a second layer on secret fields | Everything you store: accounts, identities, passwords, codes, notes, search index |
+| `vault.vhdr.tmp`, `vault.vhdr.prev` | Vault folder | No (authenticated) | The new and previous header, only while a master password or KDF change is being written. `.prev` opens with the old password, so it is deleted when the change finishes, and any left by a crash is deleted at the next unlock |
 | `.lock` | Vault folder | n/a (empty) | Nothing; locked while the vault is open |
 | Backups | The backup folder you choose in Settings > Backups: `<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup` | Yes: the vault's header and its SQLCipher database, with an HMAC over the whole file | A complete copy of one vault. Opens with the master password the vault had then. A `.vaultair-backup.tmp` file exists only while a backup is being written. See `docs/backup-restore.md` |
 | Backup check copy | `%LOCALAPPDATA%\Vaultair\tmp\verify-<id>.vdb` | Yes: SQLCipher, as in the backup | The database from a backup while it is being checked. Deleted when the check ends; one left by a crash is deleted at the next check |
-| App config | `%LOCALAPPDATA%\Vaultair\config.json` | No | The recent-vaults list: each vault folder path and when it was last opened (at most 10), and whether screen-capture protection is on. Nothing from inside a vault. A missing or unreadable file just means an empty list and protection on |
+| App config | `%LOCALAPPDATA%\Vaultair\config.json` | No | The recent-vaults list: each vault folder path and when it was last opened (at most 10), the screenshot-protection policy, and whether account emails are masked. Nothing from inside a vault: the lock and clipboard settings live in the vault itself. A missing or unreadable file just means an empty list and protection on |
 | Logs | `%LOCALAPPDATA%\Vaultair\logs\vaultair.YYYY-MM-DD.log` (7 days kept) | No | App start, vault created/unlocked/locked, error categories. **Never** passwords, secrets, vault names, usernames, emails or file paths |
 | WebView2 data | `%LOCALAPPDATA%\app.vaultair.desktop\EBWebView\` | No | Browser engine cache. Vaultair doesn't use web storage (ESLint bans it), so no vault data is here |
 
-**The clipboard** isn't a file, but copies leave Vaultair. Every copy is marked to stay out of Windows clipboard history and cloud clipboard, and is cleared after 30 seconds, when the vault locks, and when Vaultair closes (unless you chose "Keep in clipboard", or you've copied something else since). See `docs/security-assumptions.md` for the limits.
+**The clipboard** isn't a file, but copies leave Vaultair. Every copy is marked to stay out of Windows clipboard history and cloud clipboard, and is cleared after 30 seconds (Settings > Security, 10 seconds to 5 minutes), when the vault locks, and when Vaultair closes (unless you chose "Keep in clipboard", or you've copied something else since). See `docs/security-assumptions.md` for the limits.
 
 ## Where not to put a vault
 

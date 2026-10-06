@@ -135,6 +135,40 @@ pub fn open_url(url: &str) -> Result<(), PlatformError> {
     }
 }
 
+/// Opens a folder in File Explorer. Only for folders Vaultair chose itself
+/// (the logs folder); the path must be absolute and an existing directory,
+/// so `ShellExecuteW` can't be pointed at a file or program.
+pub fn open_folder(dir: &std::path::Path) -> Result<(), PlatformError> {
+    use windows::core::{w, HSTRING};
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    if !dir.is_absolute() || !dir.is_dir() {
+        return Err(PlatformError::Os {
+            context: "folder rejected",
+        });
+    }
+    // SAFETY: ShellExecuteW with the "explore" verb on a checked directory;
+    // no parameters or working directory are passed.
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            w!("explore"),
+            &HSTRING::from(dir.as_os_str()),
+            None,
+            None,
+            SW_SHOWNORMAL,
+        )
+    };
+    if result.0 as isize > 32 {
+        Ok(())
+    } else {
+        Err(PlatformError::Os {
+            context: "ShellExecuteW",
+        })
+    }
+}
+
 /// `http://` or `https://`, then only printable ASCII that can't break out
 /// of a command line or look like a path.
 fn is_openable_url(url: &str) -> bool {

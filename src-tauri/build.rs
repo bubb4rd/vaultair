@@ -97,6 +97,14 @@ fn main() {
             "backup_verify",
             "backup_pick_file",
             "backup_restore_to",
+            "settings_get",
+            "settings_update",
+            "vault_profile_update",
+            "vault_change_password",
+            "vault_kdf_check",
+            "vault_strengthen_kdf",
+            "logs_folder",
+            "logs_open",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

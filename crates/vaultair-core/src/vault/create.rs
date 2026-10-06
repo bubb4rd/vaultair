@@ -100,6 +100,7 @@ fn build(
         header,
         paths: paths.clone(),
         name: opts.name.clone(),
+        color: None,
         _lock: lock,
     })
 }

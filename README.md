@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 14 (encrypted backup). Next: Phase 15, settings. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 15 (settings), with Phase 9 (purpose labels) done after it. Next: Phase 15b, Windows Hello quick unlock. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -183,6 +183,17 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - The checked copy of a backup's database goes to `%LOCALAPPDATA%\Vaultair\tmp\` (still encrypted) and is deleted afterwards (`docs/local-data-storage.md`).
 - Not done in Phase 14: scheduled backups, the automatic backup before a schema migration (plan §2.4, needed once migrations ship to released vaults), and the full Backup tab layout, which arrives with the rest of Settings in Phase 15. The UI is tested against mocked IPC; the system file picker and a real backup and restore have not been driven in the running app yet.
 
+## Phase 15 notes
+
+- **Settings** is one page in sections: General, Security, Privacy, Backups, Catalog and About (`src/features/settings/`). Phase 9's purpose labels join it after Backups.
+- **Where each setting lives.** Lock and clipboard timings are in the vault's own `vault_settings` (`service/settings.rs`), so they travel with the vault and a backup. They are applied on every unlock and create, so a vault never runs with the previous one's. Screenshot protection and email masking stay in `config.json`, because they apply while locked. Every change applies at once; nothing needs a restart. The `VAULTAIR_DEV_*` overrides still win in debug builds.
+- **Bounds**, checked in Rust: auto-lock 1–120 minutes or never, clipboard clear 10–300 seconds ("never" isn't offered), reveal auto-hide 5–300 seconds. "Never" for auto-lock needs a confirm. A stored value this build doesn't accept reads as its default.
+- **Vault name and colour.** Renaming changes the display name in `vault_meta`, not the folder: the folder is open and locked while the vault is, and the lock screen lists vaults by folder because `config.json` never holds names from inside a vault. The name follows the same rules as a new vault's, since it names backup files. The colour uses the identity palette, shown on the sidebar avatar. A vault icon (the plan lists one) isn't offered, as with identities.
+- **Change master password and Strengthen key derivation** both re-wrap the same data key (`vault/rekey.rs`, format in `docs/vault-format.md` §8). Argon2 runs outside the session lock; only the header write holds it. The header is replaced with `.prev` kept just until the new header reads back, so a crash at any point leaves a header that opens with the old or the new password. Tests stop the write after each step and check which password opens. The vault stays unlocked, and old backups keep the old password (the dialog says so). Strengthen measures this PC first (`vault_kdf_check`) and only offers more memory or passes; Rust refuses a lower KDF.
+- **Privacy** shows the promises from `docs/privacy-statement-draft.md` and the logs folder, with "Open logs folder" (Explorer on Vaultair's own folder only; `vaultair-platform::windows::open_folder`).
+- New commands: `settings_get`, `settings_update`, `vault_profile_update`, `vault_change_password`, `vault_kdf_check`, `vault_strengthen_kdf`, `logs_folder`, `logs_open`. The plan's `app_config_*` already exist as `capture_policy_set` and `hide_emails_set`.
+- Not done in Phase 15: the purpose labels section (Phase 9), the Windows Hello and tray settings (Phase 15b), and remembering the generator's options. The UI is tested against mocked IPC; the change-password and strengthen flows haven't been driven in the running app yet.
+
 ## Phase 17: Passkeys and login credentials (scoped)
 
 Not started. This is its own phase, after the MVP (Phases 0–16). Phase 7 owns account records, passwords, and MFA metadata, including the existing `hardware_key` method. This phase owns passkeys. It starts only once an account row exists to attach a credential to.
@@ -245,5 +256,10 @@ Cut B is a header change. Today's reader requires exactly one `password` slot an
 
 ## Third-party content
 
+Settings > About lists these too (`src/features/settings/About.tsx`); keep the two in step.
+
+- Platform and game logos come from [Simple Icons](https://simpleicons.org) (CC0). The marks remain their owners' trademarks.
+- The database is [SQLCipher](https://www.zetetic.net/sqlcipher/) by Zetetic (BSD-style licence).
+- The interface typeface is [Geist](https://vercel.com/font) by Vercel (SIL Open Font License 1.1).
 - The relationship map's layout uses [dagre](https://github.com/dagrejs/dagre) (`@dagrejs/dagre`, MIT, pinned).
 - Passphrases use the [EFF large wordlist](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) by the Electronic Frontier Foundation, licensed [CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/). It's embedded unmodified at `crates/vaultair-core/src/generator/eff_large_wordlist.txt`.

@@ -14,6 +14,7 @@ pub mod recent;
 pub mod search;
 pub mod secret;
 pub mod session;
+pub mod settings;
 pub mod vault;
 
 use vaultair_core::vault::OpenVault;

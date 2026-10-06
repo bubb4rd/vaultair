@@ -7,10 +7,11 @@ use super::error::{CorruptPart, VaultError};
 use super::header::VaultHeader;
 use super::layout::VaultPaths;
 use super::lockfile::VaultLock;
-use super::OpenVault;
+use super::{rekey, OpenVault};
 use crate::crypto::keys::{Dek, VaultKeys};
 use crate::crypto::{aead, kdf};
 use crate::db;
+use crate::domain::identity::IdentityColor;
 
 /// Unlocks the vault in `dir`.
 ///
@@ -46,16 +47,17 @@ pub fn open_vault(dir: &Path, password: &SecretString) -> Result<OpenVault, Vaul
     }
     db::migrate::run(&mut conn)?;
 
-    let (meta_id, name): (String, String) = conn
+    let (meta_id, name, color): (String, String, Option<String>) = conn
         .query_row(
-            "SELECT vault_id, display_name FROM vault_meta WHERE id = 'singleton'",
+            "SELECT vault_id, display_name, color FROM vault_meta WHERE id = 'singleton'",
             [],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .map_err(|_| VaultError::Corrupted(CorruptPart::Database))?;
     if meta_id != header.vault_id {
         return Err(VaultError::Corrupted(CorruptPart::Database));
     }
+    rekey::clean_leftovers(&paths);
 
     tracing::info!("vault unlocked");
     Ok(OpenVault {
@@ -64,6 +66,8 @@ pub fn open_vault(dir: &Path, password: &SecretString) -> Result<OpenVault, Vaul
         header,
         paths,
         name,
+        // An unknown colour (from a newer build) shows as no colour.
+        color: color.as_deref().and_then(IdentityColor::parse),
         _lock: lock,
     })
 }
