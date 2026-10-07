@@ -17,8 +17,8 @@ fake = []
 
 # Must match the versions Tauri (wry) uses, so COM interface types are shared.
 [target.'cfg(windows)'.dependencies]
-webview2-com = "=0.38.2"
-windows = { version = "=0.61.3", features = [
+webview2-com = "=0.39.1"
+windows = { version = "=0.62.2", features = [
     # Windows Hello keys (quick unlock, ADR-0005).
     "Foundation",
     "Security_Credentials",
