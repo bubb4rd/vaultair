@@ -61,7 +61,7 @@ function LogsFolder() {
       </div>
       <p className="text-[13px] text-muted-foreground">
         Seven days of app events and error categories. They never hold passwords, secrets, usernames, emails, vault
-        names or file paths.
+        names or the paths of your files.
       </p>
       <div>
         <Button

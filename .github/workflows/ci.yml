@@ -55,7 +55,7 @@ jobs:
       - run: cargo test --workspace --locked
       - name: TS bindings are up to date
         shell: bash
-        run: git diff --exit-code -- src/ipc/bindings.ts || (echo "::error::src/ipc/bindings.ts is stale. Run cargo test -p vaultair and commit it." && exit 1)
+        run: git diff --exit-code -- src/ipc/bindings.ts src-tauri/ipc-surface.snap || (echo "::error::src/ipc/bindings.ts is stale, or src-tauri/ipc-surface.snap was rewritten. Run cargo test -p vaultair and commit bindings.ts; the snapshot only changes on purpose." && exit 1)
 
   supply-chain:
     name: Rust supply chain (cargo-deny)

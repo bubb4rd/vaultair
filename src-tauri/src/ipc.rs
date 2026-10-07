@@ -147,20 +147,123 @@ mod tests {
             .expect("failed to export TS bindings");
     }
 
+    /// The bindings as `builder()` generates them now, written to a scratch
+    /// file. The tests below read these, never `bindings.ts` on disk, which
+    /// `export_bindings` may be rewriting at the same moment.
+    fn generated_bindings() -> String {
+        let dir = tempfile::tempdir().expect("scratch folder");
+        let path = dir.path().join("bindings.ts");
+        builder()
+            .export(export_config(), &path)
+            .expect("failed to export TS bindings");
+        std::fs::read_to_string(&path).expect("generated bindings")
+    }
+
+    /// One command as the bindings call it.
+    struct Call<'a> {
+        name: &'a str,
+        /// What it resolves to, as generated (`VaultInfo`, `string | null`).
+        returns: String,
+    }
+
+    /// A generated type with its doc comments dropped and its whitespace
+    /// collapsed, so it compares the same however it was wrapped.
+    fn squash(ty: &str) -> String {
+        let mut rest = ty;
+        let mut out = String::new();
+        while let Some((before, after)) = rest.split_once("/**") {
+            out.push_str(before);
+            rest = after.split_once("*/").map_or("", |(_, tail)| tail);
+        }
+        out.push_str(rest);
+        out.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
     /// Every command the bindings invoke. tauri-specta writes
-    /// `__TAURI_INVOKE("name"` for a command that returns a `Result` and
-    /// `__TAURI_INVOKE<T>("name"` for one that doesn't.
-    fn invoked(text: &str) -> Vec<&str> {
-        text.split("__TAURI_INVOKE")
-            .skip(1)
-            .filter_map(|rest| {
-                let call = match rest.strip_prefix('<') {
-                    Some(generic) => generic.split_once(">(")?.1,
-                    None => rest.strip_prefix('(')?,
+    /// `typedError<T, IpcError_Serialize>(__TAURI_INVOKE("name"` for a
+    /// command that returns a `Result` and `__TAURI_INVOKE<T>("name"` for
+    /// one that doesn't; `T` can run over several lines.
+    fn calls(text: &str) -> Vec<Call<'_>> {
+        const RESULT_START: &str = "typedError<";
+        const RESULT_END: &str = ", IpcError_Serialize>(";
+        let parts: Vec<&str> = text.split("__TAURI_INVOKE").collect();
+        parts
+            .windows(2)
+            .filter_map(|pair| {
+                let (before, rest) = (pair[0], pair[1]);
+                let (returns, call) = match rest.strip_prefix('<') {
+                    Some(generic) => generic.split_once(">(")?,
+                    None => {
+                        let call = rest.strip_prefix('(')?;
+                        let wrapped = before.strip_suffix(RESULT_END)?;
+                        let at = wrapped.rfind(RESULT_START)? + RESULT_START.len();
+                        (&wrapped[at..], call)
+                    }
                 };
-                call.strip_prefix('"')?.split('"').next()
+                Some(Call {
+                    name: call.strip_prefix('"')?.split('"').next()?,
+                    returns: squash(returns),
+                })
             })
             .collect()
+    }
+
+    /// Every command in `text`, with proof that none was skipped: each
+    /// `__TAURI_INVOKE` except the `import` that defines it is one command.
+    fn all_calls(text: &str) -> Vec<Call<'_>> {
+        let found = calls(text);
+        let sites = text.matches("__TAURI_INVOKE").count() - 1;
+        assert_eq!(
+            found.len(),
+            sites,
+            "a command in the bindings has a shape `calls` doesn't read"
+        );
+        found
+    }
+
+    /// Every command and what it returns, as reviewed. Adding a command, or
+    /// changing what one returns, fails here until `ipc-surface.snap` is
+    /// updated, which puts the change in front of a reviewer as one line:
+    /// a new command returning a bare `string` can't arrive unnoticed.
+    ///
+    /// To accept a change, run this test with `VAULTAIR_UPDATE_IPC_SURFACE=1`
+    /// and commit the file.
+    ///
+    /// It sees return types by name only. A field added to an existing
+    /// response (`password: string` on `AccountDetail`) changes no line
+    /// here; that shows in the `bindings.ts` diff and, for responses built
+    /// from a vault's records, in the canary tests.
+    #[test]
+    fn the_command_surface_is_the_reviewed_one() {
+        const SNAPSHOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/ipc-surface.snap");
+        let bindings = generated_bindings();
+        let mut surface: Vec<String> = all_calls(&bindings)
+            .iter()
+            .map(|c| format!("{} -> {}", c.name, c.returns))
+            .collect();
+        surface.sort_unstable();
+
+        if std::env::var("VAULTAIR_UPDATE_IPC_SURFACE").as_deref() == Ok("1") {
+            std::fs::write(SNAPSHOT, surface.join("\n") + "\n").expect("write ipc-surface.snap");
+        }
+        let reviewed = std::fs::read_to_string(SNAPSHOT).expect("ipc-surface.snap");
+        let reviewed: Vec<&str> = reviewed.lines().map(str::trim_end).collect();
+        let unreviewed: Vec<&String> = surface
+            .iter()
+            .filter(|line| !reviewed.contains(&line.as_str()))
+            .collect();
+        assert!(
+            unreviewed.is_empty(),
+            "not in ipc-surface.snap (a new command, or a new return type): {unreviewed:#?}"
+        );
+        let gone: Vec<&&str> = reviewed
+            .iter()
+            .filter(|line| !surface.iter().any(|s| s == **line))
+            .collect();
+        assert!(
+            gone.is_empty(),
+            "in ipc-surface.snap but no longer generated: {gone:#?}"
+        );
     }
 
     /// A command the webview can call must be listed in `build.rs` (which
@@ -169,16 +272,10 @@ mod tests {
     /// tests can't see that, so this checks every command in the bindings.
     #[test]
     fn every_command_is_allowed() {
-        let bindings = std::fs::read_to_string(BINDINGS_PATH).expect("bindings.ts");
+        let bindings = generated_bindings();
         let build = include_str!("../build.rs");
         let capability = include_str!("../capabilities/main.json");
-        let commands = invoked(&bindings);
-        assert!(
-            commands.len() > 100,
-            "found only {} commands",
-            commands.len()
-        );
-        for cmd in commands {
+        for cmd in all_calls(&bindings).iter().map(|c| c.name) {
             assert!(
                 build.contains(&format!("\"{cmd}\"")),
                 "{cmd} is missing from build.rs"
@@ -200,10 +297,15 @@ mod tests {
         })
     }
 
-    /// The types that carry a secret value to the webview, and the only
-    /// commands allowed to return each. A new command returning one, or a
-    /// DTO that embeds one, fails here: widening how secrets leave Rust has
-    /// to be a decision, not a side effect.
+    /// The three response types that exist to carry a secret value, and the
+    /// only commands allowed to return each. It fails when another command
+    /// returns one of them or another response embeds one, and when a
+    /// core-only type (backup codes, keys, on-disk formats) gets a TS type.
+    ///
+    /// It knows those names and nothing else. It can't tell that some other
+    /// type, a bare `string`, or a new field on an existing response holds
+    /// a secret. `the_command_surface_is_the_reviewed_one` makes a new or
+    /// re-typed command visible; a new field still takes a reviewer.
     #[test]
     fn secret_values_leave_only_through_the_reveal_commands() {
         const EGRESS: &[(&str, &[&str])] = &[
@@ -211,7 +313,7 @@ mod tests {
             ("TotpCodeView", &["totp_current_code"]),
             ("Generated", &["generate_password", "generate_passphrase"]),
         ];
-        let bindings = std::fs::read_to_string(BINDINGS_PATH).expect("bindings.ts");
+        let bindings = generated_bindings();
         let code: Vec<&str> = bindings
             .lines()
             .filter(|l| {
@@ -231,7 +333,7 @@ mod tests {
                 .iter()
                 .filter(|l| names_type(l, ty) && !l.starts_with(&definition))
             {
-                let command = invoked(line);
+                let command: Vec<&str> = calls(line).iter().map(|c| c.name).collect();
                 let returned = line.contains(&format!("typedError<{ty},"))
                     || line.contains(&format!("__TAURI_INVOKE<{ty}>("));
                 assert!(

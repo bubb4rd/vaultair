@@ -397,8 +397,6 @@ export type AccountDetail = {
 	favorite: boolean,
 	archivedAt: string | null,
 	lastVerifiedAt: string | null,
-	/**  When the password was last revealed or copied from Vaultair. */
-	lastUsedAt: string | null,
 	createdAt: string,
 	updatedAt: string,
 	/**
@@ -1121,8 +1119,6 @@ export type MfaView = {
 	method: MfaMethod,
 	enabled: boolean,
 	hasTotp: boolean,
-	totpDigits: number | null,
-	totpPeriod: number | null,
 	backupCodes: BackupCodeSlot[],
 	backupCodesRemaining: number,
 	backupCodesUpdatedAt: string | null,
