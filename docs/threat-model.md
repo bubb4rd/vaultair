@@ -63,7 +63,7 @@ Stated plainly, as the spec requires:
 
 ## Windows Hello unlock (optional, off by default)
 
-Decided in [ADR-0005](adr/0005-quick-unlock.md); format in `docs/vault-format.md` §12. When it is on for a vault, a copy of the vault's data key sits on this PC, wrapped under a key that can only be rebuilt from a Windows Hello signature. The master password stays the root of trust: it alone creates, restores and re-keys a vault, and it is needed to turn this on or off. One exception: for 5 minutes after the master password opens a vault, Hello unlock can be turned on without typing it again (that is the offer Vaultair shows after unlocking).
+Decided in [ADR-0005](adr/0005-quick-unlock.md); format in `docs/vault-format.md` §12. When it is on for a vault, a copy of the vault's data key sits on this PC, wrapped under a key that can only be rebuilt from a Windows Hello signature. The master password stays the root of trust: it alone creates, restores and re-keys a vault, and it is needed to turn this on or off. One exception: for 5 minutes after the master password opens a vault, Hello unlock can be turned on without typing it again (that is the offer Vaultair shows after unlocking; shipped [PR #23](https://github.com/bubb4rd/vaultair/pull/23), verified in the running app 2026-10-07).
 
 What it changes, against each attacker:
 

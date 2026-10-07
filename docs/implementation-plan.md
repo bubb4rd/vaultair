@@ -788,13 +788,14 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
   - `vaultair-platform`: a `QuickUnlockKey` trait (`available`, `enroll`, `sign`, `delete`), `windows/{hello, dpapi}.rs`, and `FakeHello` in `fake.rs`.
   - `vaultair-core`: `vault/device_slot.rs`, an `open_with_dek` split out of `open.rs`, `service/quick_unlock.rs` (policy), and `unlock_quick` in `service/session.rs`.
   - `src-tauri`: `commands/quick_unlock.rs`, plus tray and close-to-tray handling in `lock.rs`.
-  - UI: `LockScreen` (auto Hello prompt, "Use master password" link) and `settings/Security.tsx` (enable, forget this device, tray toggle).
+  - UI: `LockScreen` (auto Hello prompt, "Use master password" link), `settings/Security.tsx` (enable, forget this device, tray toggle), and `shell/HelloOffer.tsx` (post-unlock offer when Hello is available but off).
 - **Behaviors:**
   - The wrapped DEK is kept in `%LOCALAPPDATA%\Vaultair\devices\<vault_id>.qu` (DPAPI plus a Hello-derived key, bound to the password slot). `vault.vhdr` doesn't change.
   - The master password is required on enable, after a Windows restart, after 7 days, after 3 failed or cancelled Hello attempts, after a password change, and for sensitive actions.
   - Non-TPM Hello is allowed with a warning. "Keep running in the tray" is optional, and closing then hides to the tray.
+  - After a master-password unlock, a corner offer can turn Hello on with one prompt while the password is still fresh (5 minutes); otherwise Settings or the offer fall back to asking for the password. "Not now" snoozes until restart; "Don't ask again" sets `helloOfferDismissed` in app config.
 - **Windows crate features:** `Security_Credentials`, `Security_Credentials_UI`, `Security_Cryptography`, `Storage_Streams`, `Foundation`, `Win32_Security_Cryptography`, `Win32_System_SystemInformation`, `Win32_System_TpmBaseServices` (TPM detection); Tauri `tray-icon`.
-- **Commands:** `quick_unlock_status`, `quick_unlock_enable`, `quick_unlock_unlock`, `quick_unlock_forget`, and settings for the tray.
+- **Commands:** `quick_unlock_status`, `quick_unlock_enable`, `quick_unlock_unlock`, `quick_unlock_forget`, `quick_unlock_offer`, `quick_unlock_offer_dismiss`, `quick_unlock_enable_now`, and settings for the tray.
 - **Tests:**
   - A round trip with `FakeHello`.
   - Rejection of a wrong signature, a wrong `vault_id`, a tampered sidecar byte, and a changed password.
@@ -802,7 +803,8 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
   - Canary: DEK bytes never appear in the sidecar, errors or logs; `Zeroizing` and redacted `Debug` on every intermediate value.
   - A DPAPI round trip in CI, and a real-Hello test marked `#[ignore]`.
   - RTL: falls back to the password on cancel, and shows password-only when a rule requires it.
-- **Acceptance:** after one password unlock, relocking (idle, Win+L, sleep) and reopening the app within the same Windows session unlocks with Hello in about 1 s. A restart, 7 days, or a password change asks for the password again.
+  - `HelloOffer.test.tsx` and `enable_after_password` in `quick_unlock.rs` for the offer and fresh-password enable path.
+- **Acceptance:** after one password unlock, relocking (idle, Win+L, sleep) and reopening the app within the same Windows session unlocks with Hello in about 1 s. A restart, 7 days, or a password change asks for the password again. The post-unlock offer behaves as in ADR-0005 decision 4 (amended 2026-10-07); **checked by hand with real Windows Hello (owner, 2026-10-07, [PR #23](https://github.com/bubb4rd/vaultair/pull/23)).**
 - **Risks:** a weak Hello PIN, non-TPM keys, and a change in Windows' signature scheme (falls back to the password and re-enrolls). All are documented in `threat-model.md`.
 
 ### Phase 16: Release hardening (not in the deliverable list, but needed; M)
