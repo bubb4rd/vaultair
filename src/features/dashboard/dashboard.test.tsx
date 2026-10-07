@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { screen, within } from "@testing-library/react";
 import type { AccountSummary, DashboardSummary, IdentityRef } from "@/ipc/client";
 import { setIdentityFilter } from "@/features/dashboard/useIdentityFilter";
+import { setHealthTrendSource, type HealthCounts } from "@/features/dashboard/healthTrend";
 import { renderApp, type RenderOptions } from "@/test/render";
 
 const HOUR = 3_600_000;
@@ -83,6 +84,17 @@ class SizedObserver {
   disconnect() {}
 }
 
+/** Dot counts keyed by column x, so a test can see height and how many columns exist. */
+async function dotColumns(name: RegExp): Promise<Map<string, number>> {
+  const svg = await screen.findByRole("img", { name });
+  const byX = new Map<string, number>();
+  for (const circle of svg.querySelectorAll("circle")) {
+    const x = circle.getAttribute("cx") ?? "";
+    byX.set(x, (byX.get(x) ?? 0) + 1);
+  }
+  return byX;
+}
+
 describe("dashboard", () => {
   let original: typeof ResizeObserver;
   beforeEach(() => {
@@ -92,6 +104,7 @@ describe("dashboard", () => {
   });
   afterEach(() => {
     globalThis.ResizeObserver = original;
+    setHealthTrendSource(null);
   });
 
   it("shows the vault split, MFA coverage and the open issues", async () => {
@@ -113,6 +126,64 @@ describe("dashboard", () => {
     expect(screen.getByText("open issues")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /7 open issues across all active accounts\. No earlier days/ })).toBeInTheDocument();
     expect(screen.getByText(/History builds up from today/)).toBeInTheDocument();
+    // 7 open issues, one recorded day: one dot each, one column. Not a full-height wall.
+    expect(await dotColumns(/7 open issues across all active accounts/)).toEqual(new Map([["6.5", 7]]));
+  });
+
+  it("shortens the snapshot after issues are fixed, and caps a tall day at the grid", async () => {
+    const counts = (missingMfa: number): Partial<DashboardSummary> => ({
+      totalAccounts: 13,
+      weak: 0,
+      reused: 0,
+      missingMfa,
+      missingRecoveryCodes: 0,
+      dormant: 0,
+      needsAttention: [],
+    });
+
+    const { unmount } = await renderApp("/", handlers({ dashboard_summary: () => summary(counts(1)) }));
+    expect(await dotColumns(/1 open issue across all active accounts/)).toEqual(new Map([["6.5", 1]]));
+    unmount();
+
+    await renderApp("/", handlers({ dashboard_summary: () => summary(counts(21)) }));
+    expect(await dotColumns(/21 open issues across all active accounts/)).toEqual(new Map([["6.5", 18]]));
+    expect(screen.getByText(/column stops at 18/)).toBeInTheDocument();
+  });
+
+  it("grows a short history from the left and fills the width only when the days exceed it", async () => {
+    const day = (n: number): HealthCounts => ({
+      weak: n,
+      reused: 0,
+      missingMfa: 0,
+      missingRecoveryCodes: 0,
+      dormant: 0,
+    });
+    setHealthTrendSource(() => [
+      { date: "2020-01-01", counts: day(2) },
+      { date: "2020-02-01", counts: day(40) },
+    ]);
+    const { unmount } = await renderApp("/", handlers());
+    const columns = await dotColumns(/Security health over the last/);
+    // Today is appended, so three recorded days sit on the first three pitches.
+    expect([...columns.keys()]).toEqual(["6.5", "15.5", "24.5"]);
+    const heights = [...columns.values()];
+    expect(Math.min(...heights)).toBeLessThan(Math.max(...heights));
+    expect(Math.max(...heights)).toBeLessThanOrEqual(18);
+    unmount();
+
+    setHealthTrendSource(() =>
+      Array.from({ length: 80 }, (_, i) => {
+        const date = new Date(2020, 0, 1 + i);
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return { date: `${String(date.getFullYear())}-${m}-${d}`, counts: day(i < 40 ? 4 : 30) };
+      }),
+    );
+    await renderApp("/", handlers());
+    const filled = await dotColumns(/Security health over the last/);
+    expect(filled.size).toBe(66);
+    expect(Math.min(...[...filled.keys()].map(Number))).toBe(6.5);
+    expect(Math.max(...[...filled.keys()].map(Number))).toBeGreaterThan(500);
   });
 
   it("groups recent activity by day and lists the open issues beside it", async () => {
