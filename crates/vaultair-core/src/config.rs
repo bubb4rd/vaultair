@@ -87,6 +87,8 @@ pub struct AppConfig {
     pub hide_emails: bool,
     /// Closing the window hides Vaultair to the tray instead of quitting.
     pub keep_in_tray: bool,
+    /// The user asked not to be offered Windows Hello unlock again on this PC.
+    pub hello_offer_dismissed: bool,
 }
 
 impl Default for AppConfig {
@@ -98,6 +100,7 @@ impl Default for AppConfig {
             capture_level: CaptureLevel::Risk,
             hide_emails: false,
             keep_in_tray: false,
+            hello_offer_dismissed: false,
         }
     }
 }
@@ -226,6 +229,14 @@ impl ConfigStore {
         self.update(|c| c.keep_in_tray = enabled);
     }
 
+    pub fn hello_offer_dismissed(&self) -> bool {
+        self.guard().hello_offer_dismissed
+    }
+
+    pub fn set_hello_offer_dismissed(&self, dismissed: bool) {
+        self.update(|c| c.hello_offer_dismissed = dismissed);
+    }
+
     pub fn recent_vaults(&self) -> Vec<RecentVault> {
         self.guard()
             .recent_vaults
@@ -270,6 +281,8 @@ struct StoredConfig {
     hide_emails: bool,
     #[serde(default)]
     keep_in_tray: bool,
+    #[serde(default)]
+    hello_offer_dismissed: bool,
 }
 
 fn policy_from_stored(
@@ -299,6 +312,7 @@ fn read_config(path: &Path) -> AppConfig {
                 capture_level,
                 hide_emails: c.hide_emails,
                 keep_in_tray: c.keep_in_tray,
+                hello_offer_dismissed: c.hello_offer_dismissed,
             }
         }
         Ok(_) => {
@@ -416,7 +430,8 @@ mod tests {
                 "captureMode": "always",
                 "captureLevel": "risk",
                 "hideEmails": false,
-                "keepInTray": false
+                "keepInTray": false,
+                "helloOfferDismissed": false
             })
         );
     }
@@ -510,6 +525,22 @@ mod tests {
         )
         .unwrap();
         assert!(!ConfigStore::load(Some(dir.path().to_path_buf())).keep_in_tray());
+    }
+
+    #[test]
+    fn the_hello_offer_is_made_until_dismissed_and_stays_dismissed() {
+        let (dir, store) = store();
+        assert!(!store.hello_offer_dismissed());
+        store.set_hello_offer_dismissed(true);
+        assert!(ConfigStore::load(Some(dir.path().to_path_buf())).hello_offer_dismissed());
+
+        // A config written before the offer existed still gets it.
+        std::fs::write(
+            dir.path().join(CONFIG_FILE),
+            br#"{"version": 1, "recentVaults": [], "keepInTray": true}"#,
+        )
+        .unwrap();
+        assert!(!ConfigStore::load(Some(dir.path().to_path_buf())).hello_offer_dismissed());
     }
 
     #[test]

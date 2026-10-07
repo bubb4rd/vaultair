@@ -111,6 +111,9 @@ fn main() {
             "quick_unlock_enable",
             "quick_unlock_unlock",
             "quick_unlock_forget",
+            "quick_unlock_offer",
+            "quick_unlock_offer_dismiss",
+            "quick_unlock_enable_now",
             "tray_set",
         ]));
 

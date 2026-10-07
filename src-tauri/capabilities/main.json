@@ -120,6 +120,9 @@
     "allow-quick-unlock-enable",
     "allow-quick-unlock-unlock",
     "allow-quick-unlock-forget",
+    "allow-quick-unlock-offer",
+    "allow-quick-unlock-offer-dismiss",
+    "allow-quick-unlock-enable-now",
     "allow-tray-set"
   ]
 }

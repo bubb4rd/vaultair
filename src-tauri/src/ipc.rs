@@ -112,6 +112,9 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::quick_unlock::quick_unlock_enable,
             commands::quick_unlock::quick_unlock_unlock,
             commands::quick_unlock::quick_unlock_forget,
+            commands::quick_unlock::quick_unlock_offer,
+            commands::quick_unlock::quick_unlock_offer_dismiss,
+            commands::quick_unlock::quick_unlock_enable_now,
             commands::session::tray_set,
         ])
         .events(collect_events![

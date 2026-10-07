@@ -92,6 +92,9 @@ pub enum VaultStatus {
 struct Unlocked {
     vault: OpenVault,
     last_activity: Instant,
+    /// When the master password opened this session. `None` after a quick
+    /// unlock, which proves no password.
+    password_at: Option<Instant>,
 }
 
 pub struct SessionManager {
@@ -131,11 +134,13 @@ impl SessionManager {
         lock(&self.state)
     }
 
-    fn install(&self, vault: OpenVault) -> VaultInfo {
+    fn install(&self, vault: OpenVault, with_password: bool) -> VaultInfo {
         let info = vault.info();
+        let now = self.clock.monotonic();
         let previous = self.guard().replace(Unlocked {
             vault,
-            last_activity: self.clock.monotonic(),
+            last_activity: now,
+            password_at: with_password.then_some(now),
         });
         drop(previous);
         info
@@ -149,14 +154,14 @@ impl SessionManager {
     ) -> Result<VaultInfo, VaultError> {
         self.lock();
         let vault = vault::create_vault(opts, password, self.clock.as_ref())?;
-        Ok(self.install(vault))
+        Ok(self.install(vault, true))
     }
 
     /// Unlocks the vault in `dir`. Locks any open vault first.
     pub fn unlock(&self, dir: &Path, password: &SecretString) -> Result<VaultInfo, VaultError> {
         self.lock();
         let vault = vault::open_vault(dir, password)?;
-        Ok(self.install(vault))
+        Ok(self.install(vault, true))
     }
 
     /// Returns true if a vault was open.
@@ -221,7 +226,14 @@ impl SessionManager {
     ) -> Result<VaultInfo, VaultError> {
         self.lock();
         let vault = vault::open_vault_with_keys(dir, keys, binding)?;
-        Ok(self.install(vault))
+        Ok(self.install(vault, false))
+    }
+
+    /// How long ago the master password opened this session. `None` while
+    /// locked, or when Windows Hello opened it.
+    pub fn password_age(&self) -> Option<Duration> {
+        let at = self.guard().as_ref()?.password_at?;
+        Some(self.clock.monotonic().saturating_duration_since(at))
     }
 
     /// Checks `password` against the open vault. Argon2 runs outside the lock.

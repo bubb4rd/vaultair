@@ -72,3 +72,4 @@ Phase 15b tests:
 - `src-tauri/src/quick_unlock.rs`: the same service through the platform crate's `FakeHello`.
 - `crates/vaultair-platform/src/windows/dpapi.rs`: a real DPAPI round trip, bound to its entropy, refusing changed bytes. `hello.rs` has a real-Hello determinism test, ignored because it needs someone to approve the prompts (`cargo test -p vaultair-platform -- --ignored real_hello`).
 - `src/features/lock/LockScreen.test.tsx`, `src/features/settings/quickUnlock.test.tsx`: the lock screen falls back to the password on cancel and shows only the password when a rule requires it; Settings turns it on and off with the password and warns when there is no TPM.
+- `src/features/shell/HelloOffer.test.tsx`, and the `enable_after_password` tests in `service/quick_unlock.rs`: the offer turns it on with one Hello prompt only while the master password is fresh (5 minutes), never in a session Hello opened or a locked one, and falls back to the password dialog otherwise.

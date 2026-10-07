@@ -41,7 +41,7 @@ const COPY: Record<Kind, { title: string; submit: string; busy: string; done: st
  * the master password, which Rust checks before anything changes. Turning
  * it on then shows the Windows Hello prompt.
  */
-function QuickUnlockDialog({
+export function QuickUnlockDialog({
   kind,
   open,
   path,

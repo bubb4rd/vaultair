@@ -67,6 +67,7 @@ export const queryKeys = {
   backupStatus: ["backup", "status"] as const,
   vaultSettings: ["settings", "vault"] as const,
   quickUnlock: (path: string | null) => ["quickUnlock", path] as const,
+  quickUnlockOffer: ["quickUnlock", "offer"] as const,
 };
 
 /**
@@ -124,7 +125,17 @@ export function useQuickUnlockChanged() {
   return (path: string, status?: QuickUnlockStatus) => {
     if (status) queryClient.setQueryData(queryKeys.quickUnlock(path), status);
     else void queryClient.invalidateQueries({ queryKey: queryKeys.quickUnlock(path) });
+    // Whatever changed, the offer to turn it on has been answered.
+    queryClient.setQueryData(queryKeys.quickUnlockOffer, false);
   };
+}
+
+/**
+ * Whether to offer Windows Hello unlock. Asked once per unlock: Rust says yes
+ * only just after the master password opened a vault that doesn't have it.
+ */
+export function useQuickUnlockOffer() {
+  return useQuery({ queryKey: queryKeys.quickUnlockOffer, queryFn: quickUnlock.offer });
 }
 
 /** After the vault's name, colour or KDF changes: show the fresh `VaultInfo` everywhere. */

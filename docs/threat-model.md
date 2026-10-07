@@ -63,7 +63,7 @@ Stated plainly, as the spec requires:
 
 ## Windows Hello unlock (optional, off by default)
 
-Decided in [ADR-0005](adr/0005-quick-unlock.md); format in `docs/vault-format.md` §12. When it is on for a vault, a copy of the vault's data key sits on this PC, wrapped under a key that can only be rebuilt from a Windows Hello signature. The master password stays the root of trust: it alone creates, restores and re-keys a vault, and it is needed to turn this on or off.
+Decided in [ADR-0005](adr/0005-quick-unlock.md); format in `docs/vault-format.md` §12. When it is on for a vault, a copy of the vault's data key sits on this PC, wrapped under a key that can only be rebuilt from a Windows Hello signature. The master password stays the root of trust: it alone creates, restores and re-keys a vault, and it is needed to turn this on or off. One exception: for 5 minutes after the master password opens a vault, Hello unlock can be turned on without typing it again (that is the offer Vaultair shows after unlocking).
 
 What it changes, against each attacker:
 
@@ -81,6 +81,7 @@ Limits, stated plainly:
 
 - **The restart, 7-day and 3-attempt rules are enforced by Vaultair, not by the key.** They stop someone using Vaultair. Code that reads the slot and gets a Hello approval can unwrap the data key whatever the rules say. The rules can't be faked into letting Vaultair itself skip the password: the record of the last password unlock carries a MAC made with the vault's own key, and a forged one is refused.
 - **Windows Hello is only as strong as its weakest sign-in option.** A 4-digit PIN on a PC with a TPM is protected by the TPM's lockout. On a PC with no TPM the Hello key is protected by software only; Vaultair says so before you turn this on, and allows it.
+- **For 5 minutes after you type the master password, turning this on takes only a Hello approval.** Someone who reaches your unlocked vault in that time and knows your Hello PIN can turn it on, and then unlock with that PIN until Windows restarts or 7 days pass. After the 5 minutes, or in a session Hello opened, they would need the master password. Settings > Security shows whether it is on, and "Forget this device" turns it off.
 - **Restart detection uses the uptime.** With Windows Fast Startup, "Shut down" does not reset it, so only "Restart" (or a full shutdown) brings the password back early. The 7-day rule still applies.
 - **Turning it off deletes the Hello key**, which makes any copy of the slot useless. If that deletion fails, an old copy of the slot plus a Hello approval on this PC would still open the data key, because the data key does not change on a password change. "Rotate encryption key" (not in the MVP) is the full answer.
 - **A restored copy of a vault** has the same vault id. If it also has the same master password and KDF, the slot opens it too. It is the same vault on the same PC.
