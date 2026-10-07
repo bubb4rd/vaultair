@@ -107,8 +107,13 @@ pub enum HelloError {
 /// them from a worker thread.
 pub trait QuickUnlockKey: Send + Sync {
     fn available(&self) -> HelloAvailability;
-    /// Creates the key, replacing one with the same name.
-    fn enroll(&self, name: &str) -> Result<(), HelloError>;
+    /// Creates the key, replacing one with the same name, and signs
+    /// `challenge` with it: one prompt for both.
+    fn enroll(
+        &self,
+        name: &str,
+        challenge: &[u8],
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, HelloError>;
     fn sign(&self, name: &str, challenge: &[u8])
         -> Result<zeroize::Zeroizing<Vec<u8>>, HelloError>;
     /// Deletes the key. Deleting one that isn't there is not an error.

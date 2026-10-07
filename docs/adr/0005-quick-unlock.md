@@ -50,5 +50,5 @@ Options considered, against a stolen laptop, malware running as the user, a shar
   - The failure count (3 in a row) is stored in the slot without a MAC: nothing can be authenticated before the DEK is known. Editing it buys more Hello prompts, not an unlock.
   - Closing to the tray locks the vault, as quitting did. Decision 9's "same lock rules" is read as "no weaker than before".
   - "Change or turn off quick unlock" (decision 4) covers turning it on and "Forget this device"; both take the master password. The tray switch does not.
-  - The lock screen asks for Hello by itself once per vault when Vaultair is in front, but not straight after a manual lock.
+  - The lock screen never opens Windows Hello on its own. The user clicks "Unlock with Windows Hello". After 3 failed or cancelled attempts the password form warns that Windows Hello is disabled until the master password is entered.
 - Residual risks: a weak Hello PIN lowers protection on a stolen laptop to that PIN plus TPM lockout, and non-TPM Hello keys are software-protected. Both are mitigated by the enrollment warnings and the restart and 7-day password rules.

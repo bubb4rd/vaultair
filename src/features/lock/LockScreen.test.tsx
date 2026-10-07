@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axeViolations } from "@/test/axe";
@@ -10,24 +10,19 @@ const CANCELLED = {
   code: "quick_unlock_cancelled",
   message: "Windows Hello was cancelled. Enter your master password instead.",
 };
-
-/** Whether Vaultair's window is the one in front, as far as the page can tell. */
-function windowInFront(inFront: boolean) {
-  return vi.spyOn(document, "hasFocus").mockReturnValue(inFront);
-}
+const HELLO_DISABLED = "Windows Hello is now disabled. Your master password is required.";
 
 describe("lock screen with Windows Hello", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("asks for Windows Hello on its own and unlocks", async () => {
-    windowInFront(true);
+  it("waits for a click before asking Windows Hello", async () => {
+    const user = userEvent.setup();
     const { calls } = await renderApp("/", {
       unlocked: false,
       recents: [recent("Main")],
       handlers: { quick_unlock_status: () => HELLO_READY, quick_unlock_unlock: () => TEST_VAULT },
     });
+    const hello = await screen.findByRole("button", { name: "Unlock with Windows Hello" });
+    expect(calls.some((c) => c.cmd === "quick_unlock_unlock")).toBe(false);
+    await user.click(hello);
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument();
     expect(calls.filter((c) => c.cmd === "quick_unlock_unlock").map((c) => c.args)).toEqual([
       { path: "C:\\Vaults\\Main" },
@@ -36,7 +31,6 @@ describe("lock screen with Windows Hello", () => {
   });
 
   it("falls back to the password when the prompt is cancelled", async () => {
-    windowInFront(true);
     const user = userEvent.setup();
     const { calls } = await renderApp("/", {
       unlocked: false,
@@ -49,7 +43,10 @@ describe("lock screen with Windows Hello", () => {
         vault_unlock: () => TEST_VAULT,
       },
     });
-    expect(await screen.findByText("Windows Hello was cancelled.")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Unlock with Windows Hello" }));
+    const cancelled = await screen.findByText("Windows Hello was cancelled.");
+    expect(cancelled).toHaveClass("text-center");
+    expect(screen.getByRole("button", { name: "Use master password" }).parentElement).toHaveClass("items-center");
     // Hello is still on offer, and nothing asked a second time on its own.
     expect(screen.getByRole("button", { name: "Unlock with Windows Hello" })).toBeEnabled();
     expect(calls.filter((c) => c.cmd === "quick_unlock_unlock")).toHaveLength(1);
@@ -63,10 +60,8 @@ describe("lock screen with Windows Hello", () => {
   it.each([
     ["restarted", /Windows restarted/],
     ["expired", /7 days/],
-    ["tooManyAttempts", /3 times in a row/],
     ["helloUnavailable", /isn't available right now/],
   ])("shows only the password when a rule requires it (%s)", async (passwordRequired, note) => {
-    windowInFront(true);
     const { calls } = await renderApp("/", {
       unlocked: false,
       recents: [recent("Main")],
@@ -79,8 +74,22 @@ describe("lock screen with Windows Hello", () => {
     expect(calls.some((c) => c.cmd === "quick_unlock_unlock")).toBe(false);
   });
 
+  it("warns that Windows Hello is disabled after three attempts", async () => {
+    const { calls } = await renderApp("/", {
+      unlocked: false,
+      recents: [recent("Main")],
+      handlers: { quick_unlock_status: () => ({ ...HELLO_READY, passwordRequired: "tooManyAttempts" }) },
+    });
+    const input = await screen.findByLabelText("Master password");
+    expect(screen.getByRole("status")).toHaveTextContent(HELLO_DISABLED);
+    expect(screen.queryByText(/didn't go through|3 times in a row/)).not.toBeInTheDocument();
+    expect(input).toHaveAccessibleDescription(HELLO_DISABLED);
+    expect(screen.queryByRole("button", { name: /Windows Hello/ })).not.toBeInTheDocument();
+    expect(calls.some((c) => c.cmd === "quick_unlock_unlock")).toBe(false);
+  });
+
   it("switches to the password when Rust says it is needed after all", async () => {
-    windowInFront(true);
+    const user = userEvent.setup();
     await renderApp("/", {
       unlocked: false,
       recents: [recent("Main")],
@@ -94,47 +103,50 @@ describe("lock screen with Windows Hello", () => {
         },
       },
     });
+    await user.click(await screen.findByRole("button", { name: "Unlock with Windows Hello" }));
     expect(await screen.findByText("Enter your master password to unlock this vault.")).toBeInTheDocument();
     expect(screen.getByLabelText("Master password")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Unlock with Windows Hello" })).not.toBeInTheDocument();
   });
 
-  it("doesn't prompt straight after a manual lock", async () => {
-    windowInFront(true);
+  it("drops the Hello failure text once three attempts require the password", async () => {
     const user = userEvent.setup();
-    const { calls } = await renderApp("/", {
+    let attempts = 0;
+    await renderApp("/", {
       unlocked: false,
       recents: [recent("Main")],
       handlers: {
-        session_take_lock_notice: () => ({ reason: "manual" }),
-        quick_unlock_status: () => HELLO_READY,
-        quick_unlock_unlock: () => TEST_VAULT,
+        quick_unlock_status: () =>
+          attempts === 0 ? HELLO_READY : { ...HELLO_READY, passwordRequired: "tooManyAttempts" },
+        quick_unlock_unlock: () => {
+          attempts += 1;
+          throw {
+            code: "quick_unlock_failed",
+            message: "Windows Hello couldn't confirm it's you. Enter your master password instead.",
+          };
+        },
       },
     });
-    const hello = await screen.findByRole("button", { name: "Unlock with Windows Hello" });
-    expect(calls.some((c) => c.cmd === "quick_unlock_unlock")).toBe(false);
-    await user.click(hello);
-    expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Unlock with Windows Hello" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(HELLO_DISABLED);
+    expect(screen.queryByText(/couldn't confirm|didn't go through/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Master password")).toBeInTheDocument();
   });
 
-  it("waits until the window is in front before prompting", async () => {
-    const focus = windowInFront(false);
+  it("doesn't ask for Windows Hello when the window comes to the front", async () => {
     const { calls } = await renderApp("/", {
       unlocked: false,
       recents: [recent("Main")],
       handlers: { quick_unlock_status: () => HELLO_READY, quick_unlock_unlock: () => TEST_VAULT },
     });
     await screen.findByRole("button", { name: "Unlock with Windows Hello" });
-    expect(calls.some((c) => c.cmd === "quick_unlock_unlock")).toBe(false);
-
-    focus.mockReturnValue(true);
     window.dispatchEvent(new Event("focus"));
-    expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument();
-    expect(calls.filter((c) => c.cmd === "quick_unlock_unlock")).toHaveLength(1);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(calls.some((c) => c.cmd === "quick_unlock_unlock")).toBe(false);
+    expect(screen.getByRole("button", { name: "Unlock with Windows Hello" })).toBeEnabled();
   });
 
   it("offers Windows Hello again from the password form", async () => {
-    windowInFront(false);
     const user = userEvent.setup();
     await renderApp("/", {
       unlocked: false,
@@ -149,7 +161,6 @@ describe("lock screen with Windows Hello", () => {
   });
 
   it("has no axe violations", async () => {
-    windowInFront(false);
     const { container } = await renderApp("/", {
       unlocked: false,
       recents: [recent("Main")],
@@ -200,7 +211,7 @@ describe("lock screen", () => {
       handlers: { vault_unlock: () => TEST_VAULT },
     });
     expect(await screen.findByRole("heading", { level: 1, name: "Main" })).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Master password"), "orbit lantern cactus mosaic");
+    await user.type(await screen.findByLabelText("Master password"), "orbit lantern cactus mosaic");
     await user.click(screen.getByRole("button", { name: "Unlock" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument();
     expect(calls.find((c) => c.cmd === "vault_unlock")?.args).toEqual({

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ClockCounterClockwiseIcon,
@@ -6,6 +6,7 @@ import {
   FolderOpenIcon,
   LockSimpleIcon,
   PlusIcon,
+  WarningIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { queryKeys, useQuickUnlock, useRecentVaults } from "@/app/queries";
@@ -18,7 +19,6 @@ import {
   recentVaults,
   toIpcError,
   vault,
-  type LockNotice,
   type RecentVault,
   type VaultInfo,
 } from "@/ipc/client";
@@ -28,7 +28,7 @@ import { BrandMark } from "@/features/shell/BrandMark";
 import { DragBar } from "@/features/shell/DragBar";
 import { toast } from "@/features/toast/toast";
 import { lockoutSeconds } from "./backoff";
-import { PASSWORD_REASON_TEXT, windowIsInFront } from "./hello";
+import { PASSWORD_REASON_TEXT } from "./hello";
 import { showLockNotice } from "./lockNotice";
 
 interface LockScreenProps {
@@ -52,13 +52,10 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
   const [failures, setFailures] = useState(0);
   const [waitSeconds, setWaitSeconds] = useState(0);
   const [restoreOpen, setRestoreOpen] = useState(false);
-  // `undefined` until Rust has said why the vault locked (or that it has nothing to say).
-  const [notice, setNotice] = useState<LockNotice | null | undefined>(undefined);
   const [preferPassword, setPreferPassword] = useState(false);
   const [helloPending, setHelloPending] = useState(false);
   const [helloCancelled, setHelloCancelled] = useState(false);
   const [helloFallback, setHelloFallback] = useState<string | null>(null);
-  const autoPrompted = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timer = useRef<number | undefined>(undefined);
   const waiting = waitSeconds > 0;
@@ -72,13 +69,7 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
 
   // Say why the vault just locked (button, Ctrl+L, idle, Windows lock, sleep).
   useEffect(() => {
-    let live = true;
-    void showLockNotice().then((n) => {
-      if (live) setNotice(n);
-    });
-    return () => {
-      live = false;
-    };
+    void showLockNotice();
   }, []);
 
   /** Disables the form for `seconds`, counting down once a second. */
@@ -107,51 +98,33 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
   const checkingHello = available && current !== null && quickQuery.isPending;
   const helloReady = quick?.enabled === true && quick.passwordRequired === null;
   const showHello = helloReady && !preferPassword;
-  const passwordNote =
-    helloFallback ?? (quick?.enabled && quick.passwordRequired ? PASSWORD_REASON_TEXT[quick.passwordRequired] : null);
+  const passwordRequired = quick?.enabled ? quick.passwordRequired : null;
+  // Three failed or cancelled Hello attempts: the password form, with a warning.
+  // The "didn't go through" explanation stays off this screen.
+  const helloDisabled = passwordRequired === "tooManyAttempts";
+  const passwordNote = helloDisabled
+    ? null
+    : (helloFallback ?? (passwordRequired ? PASSWORD_REASON_TEXT[passwordRequired] : null));
 
-  const unlockWithHello = useCallback(
-    async (path: string) => {
-      setHelloPending(true);
-      setHelloCancelled(false);
-      setHelloFallback(null);
-      try {
-        onUnlocked(await quickUnlock.unlock(path));
-      } catch (err) {
-        const ipc = toIpcError(err);
-        setHelloPending(false);
-        // A cancelled or failed attempt counts toward the limit of 3.
-        void queryClient.invalidateQueries({ queryKey: queryKeys.quickUnlock(path) });
-        if (ipc.code === "quick_unlock_cancelled") {
-          setHelloCancelled(true);
-        } else {
-          setPreferPassword(true);
-          setHelloFallback(ipc.message);
-        }
+  async function unlockWithHello(path: string) {
+    setHelloPending(true);
+    setHelloCancelled(false);
+    setHelloFallback(null);
+    try {
+      onUnlocked(await quickUnlock.unlock(path));
+    } catch (err) {
+      const ipc = toIpcError(err);
+      setHelloPending(false);
+      // A cancelled or failed attempt counts toward the limit of 3.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.quickUnlock(path) });
+      if (ipc.code === "quick_unlock_cancelled") {
+        setHelloCancelled(true);
+      } else {
+        setPreferPassword(true);
+        setHelloFallback(ipc.message);
       }
-    },
-    [onUnlocked, queryClient],
-  );
-
-  // Ask for Windows Hello without a click, once per vault, when the lock
-  // screen is in front. Not right after the user locked on purpose: a prompt
-  // straight after Ctrl+L would be in the way.
-  useEffect(() => {
-    if (!showHello || current === null || notice === undefined || notice?.reason === "manual") return;
-    const path = current;
-    const prompt = () => {
-      if (autoPrompted.current === path || !windowIsInFront()) return;
-      autoPrompted.current = path;
-      void unlockWithHello(path);
-    };
-    prompt();
-    window.addEventListener("focus", prompt);
-    document.addEventListener("visibilitychange", prompt);
-    return () => {
-      window.removeEventListener("focus", prompt);
-      document.removeEventListener("visibilitychange", prompt);
-    };
-  }, [showHello, current, notice, unlockWithHello]);
+    }
+  }
 
   function select(path: string) {
     setPicked(path);
@@ -212,6 +185,7 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
   }
 
   const inputId = "unlock-password";
+  const helloDisabledId = `${inputId}-hello-disabled`;
   const shownError = waiting ? `Too many incorrect attempts. Try again in ${String(waitSeconds)} s.` : error;
 
   return (
@@ -249,7 +223,7 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
               ) : checkingHello ? (
                 <div aria-hidden="true" className="h-24" />
               ) : showHello ? (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col items-center gap-4">
                   <Button
                     type="button"
                     size="lg"
@@ -260,15 +234,17 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
                     <FingerprintIcon aria-hidden="true" />
                     {helloPending ? "Waiting for Windows Hello…" : "Unlock with Windows Hello"}
                   </Button>
-                  <div aria-live="polite" className="-mt-2 empty:hidden">
-                    {helloCancelled && <p className="text-[13px] text-muted-foreground">Windows Hello was cancelled.</p>}
+                  <div aria-live="polite" className="-mt-2 w-full text-center empty:hidden">
+                    {helloCancelled && (
+                      <p className="text-center text-[13px] text-muted-foreground">Windows Hello was cancelled.</p>
+                    )}
                   </div>
+                  <span className="text-center text-[13px] text-muted-foreground">or</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     disabled={helloPending}
-                    className="self-start"
                     onClick={() => {
                       setPreferPassword(true);
                     }}
@@ -283,6 +259,18 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
                   aria-label="Unlock vault"
                   className="flex flex-col gap-4"
                 >
+                  {helloDisabled && (
+                    <div
+                      id={helloDisabledId}
+                      role="status"
+                      className="flex gap-3 rounded-lg border border-status-warning/40 bg-status-warning/8 p-3"
+                    >
+                      <WarningIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-status-warning" />
+                      <p className="text-[13px] font-medium text-status-warning">
+                        {PASSWORD_REASON_TEXT.tooManyAttempts}
+                      </p>
+                    </div>
+                  )}
                   {passwordNote && (
                     <p id={`${inputId}-note`} className="text-[13px] text-muted-foreground">
                       {passwordNote}
@@ -297,7 +285,11 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
                       disabled={pending || waiting}
                       aria-invalid={shownError ? true : undefined}
                       aria-describedby={
-                        [describedBy(inputId, { error: Boolean(shownError) }), passwordNote && `${inputId}-note`]
+                        [
+                          describedBy(inputId, { error: Boolean(shownError) }),
+                          passwordNote && `${inputId}-note`,
+                          helloDisabled && helloDisabledId,
+                        ]
                           .filter(Boolean)
                           .join(" ") || undefined
                       }
@@ -319,7 +311,7 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
                       variant="ghost"
                       size="sm"
                       disabled={pending}
-                      className="self-start"
+                      className="self-center"
                       onClick={() => {
                         setPreferPassword(false);
                         setHelloFallback(null);

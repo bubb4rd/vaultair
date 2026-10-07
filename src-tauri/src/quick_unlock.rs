@@ -81,8 +81,12 @@ impl QuickUnlockDevice for HelloDevice {
         self.system.has_tpm()
     }
 
-    fn enroll(&self, key_name: &str) -> Result<(), DeviceError> {
-        self.key.enroll(key_name).map_err(device_error)
+    fn enroll(
+        &self,
+        key_name: &str,
+        challenge: &[u8; CHALLENGE_LEN],
+    ) -> Result<Zeroizing<Vec<u8>>, DeviceError> {
+        self.key.enroll(key_name, challenge).map_err(device_error)
     }
 
     fn sign(
@@ -135,7 +139,7 @@ mod unsupported {
         fn available(&self) -> HelloAvailability {
             HelloAvailability::Unsupported
         }
-        fn enroll(&self, _: &str) -> Result<(), HelloError> {
+        fn enroll(&self, _: &str, _: &[u8]) -> Result<Zeroizing<Vec<u8>>, HelloError> {
             Err(FAILED)
         }
         fn sign(&self, _: &str, _: &[u8]) -> Result<Zeroizing<Vec<u8>>, HelloError> {

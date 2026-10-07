@@ -97,8 +97,14 @@ pub enum DeviceError {
 pub trait QuickUnlockDevice: Send + Sync {
     fn hello(&self) -> HelloState;
     fn has_tpm(&self) -> bool;
-    /// Creates the key, replacing one of the same name. Shows a Hello prompt.
-    fn enroll(&self, key_name: &str) -> Result<(), DeviceError>;
+    /// Creates the key, replacing one of the same name, and signs
+    /// `challenge` with it under the one Hello approval that takes. Asking
+    /// for the signature separately would prompt a second time.
+    fn enroll(
+        &self,
+        key_name: &str,
+        challenge: &[u8; CHALLENGE_LEN],
+    ) -> Result<Zeroizing<Vec<u8>>, DeviceError>;
     /// Signs `challenge` with the key. The same challenge always gives the
     /// same signature. Shows a Hello prompt.
     fn sign(
@@ -322,16 +328,20 @@ impl QuickUnlock {
         let name = key_name(&header.vault_id);
 
         let _gate = self.gate();
-        self.device.enroll(&name)?;
-        let sealed = self.seal(&header, &binding, &keys, &name).and_then(|slot| {
-            // A password change that landed meanwhile would void the slot.
-            let unchanged = session.with_vault(|v| Ok::<_, VaultError>(v.header() == &header))?;
-            if !unchanged {
-                return Err(VaultError::Io(std::io::ErrorKind::Interrupted).into());
-            }
-            self.save(&slot)?;
-            Ok(slot)
-        });
+        let challenge = DeviceSlot::new_challenge().map_err(|_| QuickUnlockError::Failed)?;
+        let signature = self.device.enroll(&name, &challenge)?;
+        let sealed = self
+            .seal(&header, &binding, &keys, &challenge, &signature)
+            .and_then(|slot| {
+                // A password change that landed meanwhile would void the slot.
+                let unchanged =
+                    session.with_vault(|v| Ok::<_, VaultError>(v.header() == &header))?;
+                if !unchanged {
+                    return Err(VaultError::Io(std::io::ErrorKind::Interrupted).into());
+                }
+                self.save(&slot)?;
+                Ok(slot)
+            });
         match sealed {
             Ok(slot) => {
                 tracing::info!(
@@ -352,18 +362,16 @@ impl QuickUnlock {
         header: &VaultHeader,
         binding: &Binding,
         keys: &VaultKeys,
-        name: &str,
+        challenge: &[u8; CHALLENGE_LEN],
+        signature: &[u8],
     ) -> Result<DeviceSlot, QuickUnlockError> {
-        let challenge = DeviceSlot::new_challenge().map_err(|_| QuickUnlockError::Failed)?;
-        // Windows reuses the approval just given, so this doesn't prompt again.
-        let signature = self.device.sign(name, &challenge)?;
         let slot = DeviceSlot::seal(
             &header.vault_id,
             binding,
             keys.dek(),
             keys.device_policy_key(),
-            &challenge,
-            &signature,
+            challenge,
+            signature,
             PolicyRecord {
                 last_password_at: self.now(),
                 boot_at: self.boot_at().unwrap_or_default(),
@@ -371,7 +379,7 @@ impl QuickUnlock {
         )
         .map_err(|_| QuickUnlockError::Failed)?;
         // What was just written must open again, or it is no use later.
-        slot.open(binding, &signature)
+        slot.open(binding, signature)
             .map_err(|_| QuickUnlockError::Failed)?;
         Ok(slot)
     }
@@ -572,6 +580,17 @@ mod tests {
             }
         }
 
+        fn signature(secret: &[u8; 32], challenge: &[u8; CHALLENGE_LEN]) -> Zeroizing<Vec<u8>> {
+            let mut signature = Zeroizing::new(Vec::with_capacity(256));
+            for block in 0u8..8 {
+                let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(secret).unwrap();
+                mac.update(&[block]);
+                mac.update(challenge);
+                signature.extend_from_slice(&mac.finalize().into_bytes());
+            }
+            signature
+        }
+
         fn mask(entropy: &[u8], len: usize) -> Vec<u8> {
             entropy.iter().copied().cycle().take(len).collect()
         }
@@ -586,13 +605,18 @@ mod tests {
             true
         }
 
-        fn enroll(&self, key_name: &str) -> Result<(), DeviceError> {
+        fn enroll(
+            &self,
+            key_name: &str,
+            challenge: &[u8; CHALLENGE_LEN],
+        ) -> Result<Zeroizing<Vec<u8>>, DeviceError> {
             self.prompt()?;
+            let secret = rng::bytes::<32>().unwrap();
             self.keys
                 .lock()
                 .unwrap()
-                .insert(key_name.to_owned(), rng::bytes::<32>().unwrap());
-            Ok(())
+                .insert(key_name.to_owned(), secret);
+            Ok(Self::signature(&secret, challenge))
         }
 
         fn sign(
@@ -607,14 +631,7 @@ mod tests {
                 .get(key_name)
                 .ok_or(DeviceError::KeyMissing)?;
             self.prompt()?;
-            let mut signature = Zeroizing::new(Vec::with_capacity(256));
-            for block in 0u8..8 {
-                let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(&secret).unwrap();
-                mac.update(&[block]);
-                mac.update(challenge);
-                signature.extend_from_slice(&mac.finalize().into_bytes());
-            }
-            Ok(signature)
+            Ok(Self::signature(&secret, challenge))
         }
 
         fn delete_key(&self, key_name: &str) -> Result<(), DeviceError> {
@@ -755,9 +772,8 @@ mod tests {
             }
         );
         assert!(h.quick.enabled_for_open_vault(&h.session));
-        // Creating the key and the first signature. (Windows shows one
-        // prompt for the two; the fake counts each call.)
-        assert_eq!(h.device.prompts(), 2);
+        // Creating the key and its first signature take one approval.
+        assert_eq!(h.device.prompts(), 1);
 
         assert!(h.session.lock());
         let info = h.unlock().unwrap();

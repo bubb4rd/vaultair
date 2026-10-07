@@ -196,19 +196,30 @@ impl QuickUnlockKey for FakeHello {
         *lock(&self.availability)
     }
 
-    fn enroll(&self, name: &str) -> Result<(), HelloError> {
+    fn enroll(&self, name: &str, challenge: &[u8]) -> Result<Zeroizing<Vec<u8>>, HelloError> {
         self.prompt()?;
         // `RandomState` is seeded from the OS, which is random enough here.
         let secret = std::collections::hash_map::RandomState::new()
             .build_hasher()
             .finish();
         lock(&self.keys).insert(name.to_owned(), secret);
-        Ok(())
+        Ok(fake_signature(secret, challenge))
     }
 
     fn sign(&self, name: &str, challenge: &[u8]) -> Result<Zeroizing<Vec<u8>>, HelloError> {
         let secret = *lock(&self.keys).get(name).ok_or(HelloError::KeyNotFound)?;
         self.prompt()?;
+        Ok(fake_signature(secret, challenge))
+    }
+
+    fn delete(&self, name: &str) -> Result<(), HelloError> {
+        lock(&self.keys).remove(name);
+        Ok(())
+    }
+}
+
+fn fake_signature(secret: u64, challenge: &[u8]) -> Zeroizing<Vec<u8>> {
+    {
         let mut state = secret;
         let mut signature = Zeroizing::new(Vec::with_capacity(256));
         for i in 0..256usize {
@@ -225,12 +236,7 @@ impl QuickUnlockKey for FakeHello {
             z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
             signature.push((z ^ (z >> 31)).to_le_bytes()[0]);
         }
-        Ok(signature)
-    }
-
-    fn delete(&self, name: &str) -> Result<(), HelloError> {
-        lock(&self.keys).remove(name);
-        Ok(())
+        signature
     }
 }
 
@@ -318,15 +324,15 @@ mod tests {
             hello.sign("k", &[7; 32]).err(),
             Some(HelloError::KeyNotFound)
         );
-        hello.enroll("k").unwrap();
-        let first = hello.sign("k", &[7; 32]).unwrap();
+        // Creating the key signs under the same prompt.
+        let first = hello.enroll("k", &[7; 32]).unwrap();
+        assert_eq!(hello.prompts(), 1);
         assert_eq!(first.len(), 256);
         assert_eq!(*first, *hello.sign("k", &[7; 32]).unwrap());
         assert_ne!(*first, *hello.sign("k", &[8; 32]).unwrap());
 
         // A new key under the same name signs differently.
-        hello.enroll("k").unwrap();
-        assert_ne!(*first, *hello.sign("k", &[7; 32]).unwrap());
+        assert_ne!(*first, *hello.enroll("k", &[7; 32]).unwrap());
 
         hello.set_cancel(true);
         assert_eq!(hello.sign("k", &[7; 32]).err(), Some(HelloError::Cancelled));
