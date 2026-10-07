@@ -4,8 +4,12 @@ import {
   ClockCounterClockwiseIcon,
   FingerprintIcon,
   FolderOpenIcon,
-  LockSimpleIcon,
+  GameControllerIcon,
+  HeartbeatIcon,
+  LifebuoyIcon,
+  LockKeyIcon,
   PlusIcon,
+  UserCircleIcon,
   WarningIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -30,6 +34,7 @@ import { toast } from "@/features/toast/toast";
 import { lockoutSeconds } from "./backoff";
 import { PASSWORD_REASON_TEXT } from "./hello";
 import { showLockNotice } from "./lockNotice";
+import lockBackdrop from "./lock-backdrop.webp";
 
 interface LockScreenProps {
   /** A vault folder to preselect, e.g. one just picked from onboarding. */
@@ -40,6 +45,28 @@ interface LockScreenProps {
 
 function folderName(path: string) {
   return path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? path;
+}
+
+/** The onboarding enter animation: one short fade and lift. Reduced motion removes it (globals.css). */
+const ENTER = "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out fill-mode-both";
+
+/** What the vault holds, for the decorative card on the hero panel. All four exist. */
+const FEATURES = [
+  { icon: UserCircleIcon, label: "Identities" },
+  { icon: GameControllerIcon, label: "Accounts" },
+  { icon: LifebuoyIcon, label: "Recovery" },
+  { icon: HeartbeatIcon, label: "Health" },
+];
+
+/** A hairline with a word in it, between the two ways to unlock. */
+function OrDivider() {
+  return (
+    <div aria-hidden="true" className="flex w-full items-center gap-3 text-[12px] text-subtle-foreground">
+      <span className="h-px flex-1 bg-border" />
+      or
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
 }
 
 export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: LockScreenProps) {
@@ -197,209 +224,268 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
         </span>
       </DragBar>
 
-      <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-[380px] flex-col gap-8 px-6 pt-[12vh] pb-12">
-          {current ? (
-            <>
-              <div className="flex flex-col items-start gap-4">
-                <div className="grid size-10 place-items-center rounded-lg border border-border-strong bg-card text-muted-foreground">
-                  <LockSimpleIcon aria-hidden="true" className="size-5" />
-                </div>
-                <div className="w-full min-w-0 space-y-1">
-                  <h1 className="text-xl font-semibold tracking-[-0.015em] break-words">
-                    {currentEntry?.name ?? folderName(current)}
-                  </h1>
-                  <p className="truncate font-mono text-xs text-subtle-foreground select-text" title={current}>
-                    {current}
-                  </p>
-                </div>
-              </div>
-
-              {!available ? (
-                <p role="status" className="text-[13px] text-muted-foreground">
-                  This vault&apos;s folder can&apos;t be found. It may have been moved, renamed or deleted, or it may be
-                  on a drive that isn&apos;t connected.
-                </p>
-              ) : checkingHello ? (
-                <div aria-hidden="true" className="h-24" />
-              ) : showHello ? (
-                <div className="flex flex-col items-center gap-4">
-                  <Button
-                    type="button"
-                    size="lg"
-                    disabled={helloPending}
-                    className="w-full"
-                    onClick={() => void unlockWithHello(current)}
-                  >
-                    <FingerprintIcon aria-hidden="true" />
-                    {helloPending ? "Waiting for Windows Hello…" : "Unlock with Windows Hello"}
-                  </Button>
-                  <div aria-live="polite" className="-mt-2 w-full text-center empty:hidden">
-                    {helloCancelled && (
-                      <p className="text-center text-[13px] text-muted-foreground">Windows Hello was cancelled.</p>
-                    )}
-                  </div>
-                  <span className="text-center text-[13px] text-muted-foreground">or</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={helloPending}
-                    onClick={() => {
-                      setPreferPassword(true);
-                    }}
-                  >
-                    Use master password
-                  </Button>
-                </div>
-              ) : (
-                <form
-                  onSubmit={(e) => void unlock(e)}
-                  noValidate
-                  aria-label="Unlock vault"
-                  className="flex flex-col gap-4"
-                >
-                  {helloDisabled && (
-                    <div
-                      id={helloDisabledId}
-                      role="status"
-                      className="flex gap-3 rounded-lg border border-status-warning/40 bg-status-warning/8 p-3"
-                    >
-                      <WarningIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-status-warning" />
-                      <p className="text-[13px] font-medium text-status-warning">
-                        {PASSWORD_REASON_TEXT.tooManyAttempts}
-                      </p>
-                    </div>
-                  )}
-                  {passwordNote && (
-                    <p id={`${inputId}-note`} className="text-[13px] text-muted-foreground">
-                      {passwordNote}
+      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
+        <main className="min-h-0 overflow-y-auto">
+          <div className="mx-auto flex min-h-full w-full max-w-[444px] flex-col px-8 pb-6">
+            <div className={cn("my-auto flex flex-col gap-8 py-10", ENTER)}>
+              {current ? (
+                <>
+                  <div className="min-w-0 space-y-1.5">
+                    <h1 className="text-2xl font-semibold tracking-[-0.02em] break-words">
+                      {currentEntry?.name ?? folderName(current)}
+                    </h1>
+                    <p className="truncate font-mono text-xs text-subtle-foreground select-text" title={current}>
+                      {current}
                     </p>
-                  )}
-                  <Field id={inputId} label="Master password">
-                    <PasswordInput
-                      id={inputId}
-                      ref={inputRef}
-                      autoFocus
-                      value={password}
-                      disabled={pending || waiting}
-                      aria-invalid={shownError ? true : undefined}
-                      aria-describedby={
-                        [
-                          describedBy(inputId, { error: Boolean(shownError) }),
-                          passwordNote && `${inputId}-note`,
-                          helloDisabled && helloDisabledId,
-                        ]
-                          .filter(Boolean)
-                          .join(" ") || undefined
-                      }
-                      onChange={(e) => {
-                        setPassword(e.target.value);
-                        if (error) setError(null);
-                      }}
-                    />
-                  </Field>
-                  <div aria-live="polite" className="-mt-2 empty:hidden">
-                    {shownError && <FieldError id={`${inputId}-error`}>{shownError}</FieldError>}
                   </div>
-                  <Button type="submit" size="lg" disabled={pending || waiting} className="w-full">
-                    {pending ? "Unlocking…" : "Unlock"}
-                  </Button>
-                  {helloReady && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={pending}
-                      className="self-center"
-                      onClick={() => {
-                        setPreferPassword(false);
-                        setHelloFallback(null);
-                        setError(null);
-                      }}
-                    >
-                      <FingerprintIcon aria-hidden="true" />
-                      Use Windows Hello
-                    </Button>
-                  )}
-                </form>
-              )}
-            </>
-          ) : (
-            <div className="space-y-1">
-              <h1 className="text-xl font-semibold tracking-[-0.015em]">Open a vault</h1>
-              <p className="text-muted-foreground">Choose a vault folder on this PC, or create a new vault.</p>
-              {error && <FieldError>{error}</FieldError>}
-            </div>
-          )}
 
-          {others.length > 0 && (
-            <section aria-labelledby="recent-vaults" className="flex flex-col gap-2">
-              <h2 id="recent-vaults" className="text-xs font-medium text-subtle-foreground">
-                Other vaults
-              </h2>
-              <ul className="flex flex-col gap-0.5">
-                {others.map((r) => (
-                  <li key={r.path} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        select(r.path);
-                      }}
-                      className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring"
+                  {!available ? (
+                    <p role="status" className="text-[13px] text-muted-foreground">
+                      This vault&apos;s folder can&apos;t be found. It may have been moved, renamed or deleted, or it
+                      may be on a drive that isn&apos;t connected.
+                    </p>
+                  ) : checkingHello ? (
+                    <div aria-hidden="true" className="h-24" />
+                  ) : showHello ? (
+                    <div className="flex flex-col items-center gap-4">
+                      <Button
+                        type="button"
+                        size="lg"
+                        disabled={helloPending}
+                        className="w-full"
+                        onClick={() => void unlockWithHello(current)}
+                      >
+                        <FingerprintIcon aria-hidden="true" />
+                        {helloPending ? "Waiting for Windows Hello…" : "Unlock with Windows Hello"}
+                      </Button>
+                      <div aria-live="polite" className="-mt-2 w-full text-center empty:hidden">
+                        {helloCancelled && (
+                          <p className="text-center text-[13px] text-muted-foreground">Windows Hello was cancelled.</p>
+                        )}
+                      </div>
+                      <OrDivider />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={helloPending}
+                        onClick={() => {
+                          setPreferPassword(true);
+                        }}
+                      >
+                        Use master password
+                      </Button>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={(e) => void unlock(e)}
+                      noValidate
+                      aria-label="Unlock vault"
+                      className="flex flex-col gap-4"
                     >
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cn(
-                            "block truncate text-[13px] font-medium",
-                            !r.available && "text-muted-foreground",
-                          )}
+                      {helloDisabled && (
+                        <div
+                          id={helloDisabledId}
+                          role="status"
+                          className="flex gap-3 rounded-lg border border-status-warning/40 bg-status-warning/8 p-3"
                         >
-                          {r.name}
-                        </span>
-                        <span className="block truncate font-mono text-[11px] text-subtle-foreground">{r.path}</span>
-                      </span>
-                      {!r.available && <StatusBadge status="unknown" label="Not found" />}
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${r.name} from this list`}
-                      title="Remove from list. The vault itself is not deleted."
-                      onClick={() => void forget(r)}
-                      className="grid size-7 shrink-0 place-items-center rounded-md text-subtle-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-                    >
-                      <XIcon aria-hidden="true" className="size-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+                          <WarningIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-status-warning" />
+                          <p className="text-[13px] font-medium text-status-warning">
+                            {PASSWORD_REASON_TEXT.tooManyAttempts}
+                          </p>
+                        </div>
+                      )}
+                      {passwordNote && (
+                        <p id={`${inputId}-note`} className="text-[13px] text-muted-foreground">
+                          {passwordNote}
+                        </p>
+                      )}
+                      <Field id={inputId} label="Master password">
+                        <PasswordInput
+                          id={inputId}
+                          ref={inputRef}
+                          autoFocus
+                          value={password}
+                          disabled={pending || waiting}
+                          aria-invalid={shownError ? true : undefined}
+                          aria-describedby={
+                            [
+                              describedBy(inputId, { error: Boolean(shownError) }),
+                              passwordNote && `${inputId}-note`,
+                              helloDisabled && helloDisabledId,
+                            ]
+                              .filter(Boolean)
+                              .join(" ") || undefined
+                          }
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            if (error) setError(null);
+                          }}
+                        />
+                      </Field>
+                      <div aria-live="polite" className="-mt-2 empty:hidden">
+                        {shownError && <FieldError id={`${inputId}-error`}>{shownError}</FieldError>}
+                      </div>
+                      <Button type="submit" size="lg" disabled={pending || waiting} className="w-full">
+                        {pending ? "Unlocking…" : "Unlock"}
+                      </Button>
+                      {helloReady && (
+                        <>
+                          <OrDivider />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={pending}
+                            className="self-center"
+                            onClick={() => {
+                              setPreferPassword(false);
+                              setHelloFallback(null);
+                              setError(null);
+                            }}
+                          >
+                            <FingerprintIcon aria-hidden="true" />
+                            Use Windows Hello
+                          </Button>
+                        </>
+                      )}
+                    </form>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <h1 className="text-2xl font-semibold tracking-[-0.02em]">Open a vault</h1>
+                  <p className="text-muted-foreground">Choose a vault folder on this PC, or create a new vault.</p>
+                  {error && <FieldError>{error}</FieldError>}
+                </div>
+              )}
 
-          <div className="flex flex-wrap gap-2 border-t border-border pt-5">
-            <Button type="button" variant="ghost" size="sm" onClick={() => void openOther()}>
-              <FolderOpenIcon aria-hidden="true" />
-              Open a different vault
-            </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={onCreateNew}>
-              <PlusIcon aria-hidden="true" />
-              Create a new vault
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setRestoreOpen(true);
-              }}
-            >
-              <ClockCounterClockwiseIcon aria-hidden="true" />
-              Restore a backup
-            </Button>
+              {others.length > 0 && (
+                <section aria-labelledby="recent-vaults" className="flex flex-col gap-2">
+                  <h2 id="recent-vaults" className="text-xs font-medium text-subtle-foreground">
+                    Other vaults
+                  </h2>
+                  <ul className="flex flex-col gap-0.5">
+                    {others.map((r) => (
+                      <li key={r.path} className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            select(r.path);
+                          }}
+                          className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={cn(
+                                "block truncate text-[13px] font-medium",
+                                !r.available && "text-muted-foreground",
+                              )}
+                            >
+                              {r.name}
+                            </span>
+                            <span className="block truncate font-mono text-[11px] text-subtle-foreground">
+                              {r.path}
+                            </span>
+                          </span>
+                          {!r.available && <StatusBadge status="unknown" label="Not found" />}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${r.name} from this list`}
+                          title="Remove from list. The vault itself is not deleted."
+                          onClick={() => void forget(r)}
+                          className="grid size-7 shrink-0 place-items-center rounded-md text-subtle-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          <XIcon aria-hidden="true" className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
+
+            {/* Pinned to the bottom of the column. Stacked so the three never wrap into an uneven row. */}
+            <div className="border-t border-border pt-4">
+              <div className="-ml-2 flex flex-col items-start gap-0.5">
+                <Button type="button" variant="ghost" size="sm" onClick={() => void openOther()}>
+                  <FolderOpenIcon aria-hidden="true" />
+                  Open a different vault
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={onCreateNew}>
+                  <PlusIcon aria-hidden="true" />
+                  Create a new vault
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setRestoreOpen(true);
+                  }}
+                >
+                  <ClockCounterClockwiseIcon aria-hidden="true" />
+                  Restore a backup
+                </Button>
+              </div>
+            </div>
           </div>
           <RestoreDialog lockScreen open={restoreOpen} onOpenChange={setRestoreOpen} onRestored={select} />
+        </main>
+
+        {/* Decorative: the backdrop, one card saying what the vault is, and a tagline.
+            Hidden from assistive tech; the form column carries everything that matters. */}
+        <div
+          aria-hidden="true"
+          data-testid="lock-hero"
+          className={cn(
+            "relative mr-4 mb-4 hidden overflow-hidden rounded-xl border border-border bg-[#111111] md:block",
+            "animate-in fade-in zoom-in-95 duration-500 ease-out fill-mode-both",
+          )}
+        >
+          <img
+            src={lockBackdrop}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 size-full object-cover object-right"
+          />
+          <div className="absolute inset-0 bg-linear-to-t from-[#111111]/90 via-transparent to-transparent" />
+          <div
+            className={cn(
+              "absolute top-[34%] -left-8 w-[min(420px,calc(100%+24px))] rounded-xl border border-border-strong bg-popover/85 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md",
+              "animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 ease-out fill-mode-both",
+            )}
+          >
+            {/* The heading starts inside the panel; the chip row runs under the cut edge. */}
+            <div className="flex items-start gap-3">
+              <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-border-strong bg-card text-brand">
+                <LockKeyIcon className="size-5" />
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-[13px] font-semibold">Encrypted on this PC</p>
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  Argon2id and SQLCipher. No account, no server, no network connection.
+                </p>
+              </div>
+            </div>
+            <ul className="mt-3.5 flex flex-nowrap gap-1.5 border-t border-border pt-3.5">
+              {FEATURES.map(({ icon: Icon, label }) => (
+                <li
+                  key={label}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] font-medium text-muted-foreground"
+                >
+                  <Icon className="size-3.5 text-subtle-foreground" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="absolute bottom-7 left-7 max-w-[440px] text-[22px] leading-tight font-semibold tracking-[-0.02em]">
+            Every identity, one encrypted vault.
+          </p>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
