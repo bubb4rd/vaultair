@@ -333,7 +333,8 @@ describe("lock screen", () => {
     expect(hero).toHaveAttribute("aria-hidden", "true");
     const img = hero.querySelector("img");
     expect(img).toHaveAttribute("alt", "");
-    expect(img?.getAttribute("src")).toMatch(/vault-hero/);
+    expect(img?.getAttribute("src")).toMatch(/lock-backdrop/);
+    expect(hero).toHaveTextContent("Encrypted on this PC");
   });
 
   it("has no axe violations", async () => {

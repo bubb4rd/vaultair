@@ -4,7 +4,12 @@ import {
   ClockCounterClockwiseIcon,
   FingerprintIcon,
   FolderOpenIcon,
+  GameControllerIcon,
+  HeartbeatIcon,
+  LifebuoyIcon,
+  LockKeyIcon,
   PlusIcon,
+  UserCircleIcon,
   WarningIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -29,7 +34,7 @@ import { toast } from "@/features/toast/toast";
 import { lockoutSeconds } from "./backoff";
 import { PASSWORD_REASON_TEXT } from "./hello";
 import { showLockNotice } from "./lockNotice";
-import vaultHero from "./vault-hero.webp";
+import lockBackdrop from "./lock-backdrop.webp";
 
 interface LockScreenProps {
   /** A vault folder to preselect, e.g. one just picked from onboarding. */
@@ -44,6 +49,14 @@ function folderName(path: string) {
 
 /** The onboarding enter animation: one short fade and lift. Reduced motion removes it (globals.css). */
 const ENTER = "animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out fill-mode-both";
+
+/** What the vault holds, for the decorative card on the hero panel. All four exist. */
+const FEATURES = [
+  { icon: UserCircleIcon, label: "Identities" },
+  { icon: GameControllerIcon, label: "Accounts" },
+  { icon: LifebuoyIcon, label: "Recovery" },
+  { icon: HeartbeatIcon, label: "Health" },
+];
 
 /** A hairline with a word in it, between the two ways to unlock. */
 function OrDivider() {
@@ -421,17 +434,56 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
           <RestoreDialog lockScreen open={restoreOpen} onOpenChange={setRestoreOpen} onRestored={select} />
         </main>
 
-        {/* The render's light-blue background is part of the image, so the panel
-            carries the same colour and the picture covers it edge to edge. */}
+        {/* Decorative: the backdrop, one card saying what the vault is, and a tagline.
+            Hidden from assistive tech; the form column carries everything that matters. */}
         <div
           aria-hidden="true"
           data-testid="lock-hero"
           className={cn(
-            "relative mr-4 mb-4 hidden overflow-hidden rounded-xl bg-[#c8e5f6] md:block",
+            "relative mr-4 mb-4 hidden overflow-hidden rounded-xl border border-border bg-[#111111] md:block",
             "animate-in fade-in zoom-in-95 duration-500 ease-out fill-mode-both",
           )}
         >
-          <img src={vaultHero} alt="" draggable={false} className="absolute inset-0 size-full object-cover object-center" />
+          <img
+            src={lockBackdrop}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 size-full object-cover object-right"
+          />
+          <div className="absolute inset-0 bg-linear-to-t from-[#111111]/90 via-transparent to-transparent" />
+          <div
+            className={cn(
+              "absolute top-[34%] -left-14 w-[min(420px,calc(100%+24px))] rounded-xl border border-border-strong bg-popover/85 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md",
+              "animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 ease-out fill-mode-both",
+            )}
+          >
+            {/* The heading starts inside the panel; the chip row runs under the cut edge. */}
+            <div className="flex items-start gap-3">
+              <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-border-strong bg-card text-brand">
+                <LockKeyIcon className="size-5" />
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-[13px] font-semibold">Encrypted on this PC</p>
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  Argon2id and SQLCipher. No account, no server, no network connection.
+                </p>
+              </div>
+            </div>
+            <ul className="mt-3.5 flex flex-nowrap gap-1.5 border-t border-border pt-3.5">
+              {FEATURES.map(({ icon: Icon, label }) => (
+                <li
+                  key={label}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px] font-medium text-muted-foreground"
+                >
+                  <Icon className="size-3.5 text-subtle-foreground" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="absolute bottom-7 left-7 max-w-[440px] text-[22px] leading-tight font-semibold tracking-[-0.02em]">
+            Every identity, one encrypted vault.
+          </p>
         </div>
       </div>
     </div>
