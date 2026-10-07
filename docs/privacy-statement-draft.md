@@ -31,7 +31,7 @@ The full list, including the WebView2 browser-engine cache, is in `docs/local-da
 - **Cloud-synced folders.** If you put your vault or your backups in a folder synced by OneDrive, Dropbox, Google Drive, iCloud or Box, that service uploads a copy of the encrypted files. Vaultair warns you when the folder you choose looks synced. The check goes by folder names and can miss one.
 - **Your browser.** "Open login page" on an account hands that page's address to your default browser, and the browser connects to the site. Vaultair itself still connects to nothing, and it never fills in or sends a username or password.
 - **The clipboard.** While a copied value is on the clipboard, any program running as you can read it, and a clipboard manager from another company may keep it. See `docs/security-assumptions.md`.
-- **WebView2.** Vaultair draws its window with Microsoft Edge WebView2, part of Windows. Its diagnostic data is governed by your Windows privacy settings, not by Vaultair. Vaultair loads no web pages, only its own bundled interface.
+- **WebView2.** Vaultair draws its window with Microsoft Edge WebView2, part of Windows. Its diagnostic data is governed by your Windows privacy settings, not by Vaultair. Vaultair loads no web pages, only its own bundled interface. Vaultair's installer is configured to carry the WebView2 runtime installer inside it (`offlineInstaller`), so installing needs no download; no installer has been built yet. Once WebView2 is on a PC, Microsoft's own updater keeps it up to date, as for every app that uses it. That is Windows' network use, not Vaultair's.
 - **Your PC.** Malware running as you, or someone with your unlocked PC, can see what you see. See `docs/threat-model.md`.
 
 ## Onboarding copy derived from this file

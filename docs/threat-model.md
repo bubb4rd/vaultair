@@ -6,7 +6,9 @@
 
 A local-first Windows app that stores account, identity and recovery information for people with many gaming and online accounts, in an encrypted vault on their own disk. There is no Vaultair account and no server, and the app makes no network connections: it contains no network client (`deny.toml` fails the build if one is added) and its window may only load its own bundled pages.
 
-Two things outside the app do touch the network. "Open in browser" hands a stored web address to your default browser. And the installer, as configured today (`webviewInstallMode: downloadBootstrapper`), downloads Microsoft's WebView2 runtime on a PC that doesn't already have it.
+One thing outside the app touches the network at your request: "Open in browser" hands a stored web address to your default browser.
+
+Installing is configured not to. `tauri.conf.json` sets `webviewInstallMode` to `offlineInstaller`, which puts Microsoft's full WebView2 runtime installer inside Vaultair's installer (making it roughly 130 MB larger), so a PC without WebView2 gets it with no download; `scripts/check-release-config.mjs` fails CI if that setting is changed. No installer has been built yet, so this describes the configuration, not an install that was observed. Two things stay true and are not Vaultair's doing: Tauri's bundler downloads that runtime installer from Microsoft on the build machine when the installer is built, and once WebView2 is on a PC it keeps itself up to date through Microsoft's own updater, as it does for every app that uses it. That is how WebView2 gets its security fixes, which is why a frozen copy of the runtime was not chosen.
 
 ## Assets
 

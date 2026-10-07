@@ -33,6 +33,12 @@ if (security.dangerousRemoteDomainIpcAccess) fail("dangerousRemoteDomainIpcAcces
 if (conf.app?.withGlobalTauri !== false) fail("app.withGlobalTauri must be false");
 if ((conf.app?.windows ?? []).length !== 0) fail("windows are created in Rust (window.rs), not tauri.conf.json");
 if (conf.plugins?.updater) fail("no updater in the MVP (ADR-0004)");
+// The installer must carry WebView2 itself. A bootstrapper mode makes it download the
+// runtime on a PC without one, which is a network connection at install time.
+const webviewInstall = conf.bundle?.windows?.webviewInstallMode?.type;
+if (webviewInstall !== "offlineInstaller") {
+  fail(`bundle.windows.webviewInstallMode must be offlineInstaller (found ${webviewInstall ?? "none, which defaults to a download"})`);
+}
 
 const cargo = read("src-tauri/Cargo.toml");
 const tauriLine = cargo.split("\n").find((l) => /^tauri\s*=/.test(l)) ?? "";
