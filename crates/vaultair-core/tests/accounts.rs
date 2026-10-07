@@ -613,7 +613,16 @@ fn mfa_totp_backup_codes_and_recovery() {
     .unwrap();
     let m = &d.mfa[0];
     assert!(m.has_totp && m.has_recovery_instructions);
-    assert_eq!((m.totp_digits, m.totp_period), (Some(6), Some(30)));
+    // The settings are stored for generating codes; the page is not sent them.
+    let stored: (Option<u8>, Option<u32>) = v
+        .conn()
+        .query_row(
+            "SELECT totp_digits, totp_period FROM mfa_method WHERE id = ?1",
+            [&m.id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(stored, (Some(6), Some(30)));
     let summary =
         &accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0];
     assert!(summary.mfa_enabled);
@@ -996,6 +1005,18 @@ fn sensitive_notes_suggest_moving_account_details() {
     ));
 }
 
+/// When the password was last revealed or copied, as stored. It is not sent
+/// to the page; it feeds the last activity.
+fn last_used(v: &OpenVault, id: &str) -> Option<String> {
+    v.conn()
+        .query_row(
+            "SELECT last_used_at FROM account WHERE id = ?1",
+            [id],
+            |r| r.get(0),
+        )
+        .unwrap()
+}
+
 /// Last activity is the latest of the last edit, "Mark verified" and the
 /// last use of the password from Vaultair; the list turns it into Active,
 /// Stale or Dormant. Starring or viewing doesn't count.
@@ -1009,7 +1030,7 @@ fn last_activity_follows_edits_verification_and_password_use() {
     let a = accounts::create(&mut v, &clock, &a_in).unwrap();
     let created = a.last_activity_at.clone();
     assert_eq!(created, a.updated_at);
-    assert_eq!(a.last_used_at, None);
+    assert_eq!(last_used(&v, &a.id), None);
 
     let day = Duration::from_secs(86_400);
     clock.advance(day);
@@ -1028,7 +1049,7 @@ fn last_activity_follows_edits_verification_and_password_use() {
     accounts::reveal(&v, &clock, &SecretRef::AccountPassword { id: a.id.clone() }).unwrap();
     let used = accounts::get(&v, &a.id).unwrap();
     assert!(used.last_activity_at > verified.last_activity_at);
-    assert_eq!(Some(&used.last_activity_at), used.last_used_at.as_ref());
+    assert_eq!(Some(&used.last_activity_at), last_used(&v, &a.id).as_ref());
     assert_eq!(used.updated_at, a.updated_at, "using it isn't an edit");
     let summary =
         &accounts::list(&v, &SystemClock, Default::default(), Default::default()).unwrap()[0];

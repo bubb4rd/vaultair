@@ -82,7 +82,6 @@ const DETAIL: AccountDetail = {
   favorite: false,
   archivedAt: null,
   lastVerifiedAt: null,
-  lastUsedAt: null,
   createdAt: "2026-09-01T10:00:00Z",
   updatedAt: "2026-09-20T10:00:00Z",
   // Relative to now, so the account reads as Active whenever the tests run.
@@ -95,8 +94,6 @@ const DETAIL: AccountDetail = {
       method: "authenticator_app",
       enabled: true,
       hasTotp: true,
-      totpDigits: 6,
-      totpPeriod: 30,
       backupCodes: [
         { index: 0, used: false },
         { index: 1, used: true },
