@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phases 0 to 15b are built: every MVP feature is in the app. Phase 16 (release hardening) has done the final documentation pass, the threat-model review and secret-flow audit, the dependency audits, and `SECURITY.md`. Still to do before a release: the installer, the code-signing decision and the end-to-end smoke test. Until then Vaultair runs from a source build (see Development). Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phases 0 to 15b are built: every MVP feature is in the app. Phase 16 (release hardening) has done the final documentation pass, the threat-model review and secret-flow audit, the dependency audits, and `SECURITY.md`. Still to do before a release: the installer and the end-to-end smoke test, and a code-signing certificate before any public release (ADR-0004 decision 14). Until then Vaultair runs from a source build (see Development). Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 To report a security problem, see [`SECURITY.md`](SECURITY.md).
@@ -125,7 +125,7 @@ The notes below are a log. Each section records what was true when that phase la
 - **Rename** reindexes every account with the label, archived ones included, so search finds them by the new name only.
 - **Colors** are the identity palette (`PurposeColor`), never a status color. `PurposeBadge` (a dot in the label's color, then the name) is how the account table, cards, compact list and account page show a purpose. A label without a color gets an outlined dot.
 - **Reordering** is by Move up and Move down buttons, so it works from the keyboard; focus stays on the moved label. `purpose_reorder` takes every id in the new order and refuses anything else.
-- **Still open:** "Shared household" (ADR-0004) isn't decided, so it isn't a built-in; anyone who wants it can add it as a custom label. "Smurf" is custom-only (ADR-0004 decision 1).
+- **Not built-ins:** "Shared household" and "Smurf" are custom-only (ADR-0004); anyone who wants one can add it as a custom label. "Shared household" was still undecided when this phase landed and was settled in Phase 16.
 - Not done in Phase 9: the identity page's account rows, the dashboard's recent accounts, sidebar favorites, Ctrl+K results and map nodes still show the purpose as plain text (they don't carry the purpose id, or fold it into a longer line). The UI is tested against mocked IPC and has not been driven in the running app.
 
 ## Phase 10 notes
@@ -224,6 +224,7 @@ The notes below are a log. Each section records what was true when that phase la
 ## Phase 16 notes
 
 - **Documentation pass.** Every doc in the plan's §7 table was checked against the code and corrected where it had drifted. `docs/future-extension-sync-checklist.md` is new.
+- **Decided in this phase (ADR-0004):** "Shared household" is not a built-in purpose label, and code signing follows decision 14 (unsigned for the private beta, a certificate before any public release).
 - **No installer yet.** `tauri.conf.json` has an NSIS bundle section, but no installer has been built or tested, so there are no install instructions. Run Vaultair from a source build.
 - **Still open from earlier phases** (each checked against the code in this pass):
   - The automatic backup before a schema migration (plan §2.4). `db/migrate.rs` runs migrations without one. It is needed once migrations ship to released vaults.
@@ -231,7 +232,6 @@ The notes below are a log. Each section records what was true when that phase la
   - Clearing a copied value after a crash (Phase 5). A crash or a killed process before the timeout leaves the value on the clipboard.
   - The lint rule against putting reveal results in query cache keys (Phase 7).
   - The `platform_connection` table from V1 is still unused: nothing writes or reads it.
-  - "Shared household" as a purpose label is still undecided (ADR-0004), so it is not a built-in.
   - The demo-vault step of onboarding still says "Sample accounts to explore arrive in a later version" (`src/features/onboarding/steps.tsx`), though `vault_create_demo` seeds a demo vault with sample accounts (`vaultair_core::demo`).
 
 ## Phase 17: Passkeys and login credentials (scoped)

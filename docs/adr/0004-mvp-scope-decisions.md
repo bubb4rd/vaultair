@@ -31,7 +31,9 @@
 
 ## Still open
 
-- **"Shared household" purpose label.** Some platforms prohibit account sharing. Decide before Phase 9 (purpose labels) whether it's a built-in or custom-only.
+Nothing.
+
+- ~~**"Shared household" purpose label.** Some platforms prohibit account sharing. Decide before Phase 9 (purpose labels) whether it's a built-in or custom-only.~~ **Decided (project owner, Phase 16): not a built-in.** Like "Smurf" (decision 1), it is custom-only: anyone who wants it can add it as a custom label. This matches what Phase 9 shipped, so no vault or migration changes.
 
 ## Also recorded (plan §9 recommendations, adopted with the defaults)
 
@@ -56,4 +58,5 @@ The decisions stand. Where the code differs from the table, or adds to it:
 - **Decision 6.** Screenshot protection has three settings: Always on (the default), Off, and Custom, which hides the window only while an account at or below a chosen health rating is open.
 - **Decision 11.** These are the defaults. Settings > Security changes them: auto-lock 1 to 120 minutes or never, clipboard clear 10 to 300 seconds, reveal 5 to 300 seconds.
 - **Decision 19.** "High-severity health issues" is a weak or reused password (`health/rules.rs`).
-- **"Shared household"** was not decided before Phase 9. It is not a built-in, and is still open.
+- **Decision 14.** Confirmed by the project owner in Phase 16: unsigned for the private beta, and a certificate (OV/EV or Azure Trusted Signing) before any public release.
+- **"Shared household"** was not decided before Phase 9, which shipped without it. Decided in Phase 16: it stays out of the built-ins (see "Still open" above).
