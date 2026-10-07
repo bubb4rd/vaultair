@@ -929,7 +929,7 @@ Legend: D# = your deliverable number. Complexity: S / M / L. Every phase's accep
 - Invalid imports → in the MVP this means an invalid or tampered backup file and an unknown-version vault (Phases 3 and 14). Real import parsers come in Phase 2 of the roadmap.
 - Import/export warnings → covered once CSV is built; for the MVP, a test asserts that no CSV export command is registered.
 
-**CI (windows-latest):** fmt, clippy `-D warnings`, `cargo test`, `cargo deny` (advisories, licenses, network-crate bans), `cargo audit`, `npm run lint && typecheck && test`, and a release-config check (CSP has no `unsafe-eval`/`unsafe-inline` for script, devtools off).
+**CI (windows-latest):** fmt, clippy `-D warnings`, `cargo test`, `cargo deny` (RustSec advisories, licenses, network-crate bans; it reads the same database as `cargo audit`, so there is no separate `cargo audit` step), `npm audit`, `npm run lint && typecheck && test`, and a release-config check (CSP has no `unsafe-eval`/`unsafe-inline` for script, devtools off).
 
 ---
 
