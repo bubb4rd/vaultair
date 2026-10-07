@@ -163,6 +163,22 @@
   ::selection {
     background: color-mix(in srgb, var(--brand) 35%, transparent);
   }
+
+  /* Full-height column scroll (main pane, sidebar nav, lock/onboarding): still
+     scrollable, no gutter bar. Nested max-height panes and overflow-auto regions
+     keep the native scrollbar. */
+  main .min-h-0.flex-1.overflow-y-auto,
+  main.min-h-0.flex-1.overflow-y-auto,
+  main.min-h-0.overflow-y-auto,
+  aside nav.min-h-0.flex-1.overflow-y-auto {
+    scrollbar-width: none;
+  }
+  main .min-h-0.flex-1.overflow-y-auto::-webkit-scrollbar,
+  main.min-h-0.flex-1.overflow-y-auto::-webkit-scrollbar,
+  main.min-h-0.overflow-y-auto::-webkit-scrollbar,
+  aside nav.min-h-0.flex-1.overflow-y-auto::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Motion: short state transitions app-wide; onboarding adds step enter animations.
