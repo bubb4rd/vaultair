@@ -1,6 +1,16 @@
-# Vaultair
+<p align="center">
+  <a href="https://github.com/bubb4rd/vaultair">
+    <img src="src-tauri/icons/icon.png" alt="Vaultair" width="128" height="128">
+  </a>
+</p>
 
-[![CI](https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml/badge.svg)](https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml)
+<h1 align="center">Vaultair</h1>
+
+<p align="center">
+  <a href="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml">
+    <img src="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+</p>
 
 **Vaultair** is a local-first, encrypted workspace for Windows. It helps you manage gaming and online identities—accounts, logins, recovery codes, MFA, and how they connect—in one vault on your own disk. There is no cloud account and no network traffic from the app.
 
