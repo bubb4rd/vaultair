@@ -55,7 +55,7 @@ The threat model says plainly that Vaultair does not protect against these, so t
 - Traces of keys or secrets in memory. Wiping is best-effort, and the places it can't reach are listed.
 - Third-party clipboard managers that ignore the "don't record" markers, any program reading the clipboard while a value is on it, and a crash before the clear.
 - A revealed secret staying on screen until it auto-hides or the vault locks.
-- Copying by hand out of a field you can type in (a secret being typed with its eye icon on, or sensitive notes or recovery steps opened for editing): that is an ordinary Windows copy, not marked and not cleared. A hand copy of a secret Vaultair is showing is protected like the Copy button, so getting one past that is worth a report.
+- Copying by hand out of a field you can type in (a secret being typed with its eye icon on, or sensitive notes or recovery steps opened for editing): that is an ordinary Windows copy, not marked and not cleared. A secret Vaultair is showing is a different matter: it is not selectable text, and the design is that a copy, cut or drag that reaches one anyway is stopped and either sent through the protected path or dropped. That second layer has been tested only in a test DOM, not in the real window, so if you can get a shown secret onto the clipboard by hand without those protections, that is worth a report.
 - Guessing a weak master password offline from stolen vault files or a backup, and old backups still opening with the old master password after a change.
 - No recovery of a lost master password. That is by design.
 - The vault header showing that a file is a Vaultair vault, when it was created and its key derivation settings, and a backup's file name showing the vault's name and the backup's date.

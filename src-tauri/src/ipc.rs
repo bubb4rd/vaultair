@@ -243,7 +243,7 @@ mod tests {
             .collect();
         surface.sort_unstable();
 
-        if std::env::var_os("VAULTAIR_UPDATE_IPC_SURFACE").is_some() {
+        if std::env::var("VAULTAIR_UPDATE_IPC_SURFACE").as_deref() == Ok("1") {
             std::fs::write(SNAPSHOT, surface.join("\n") + "\n").expect("write ipc-surface.snap");
         }
         let reviewed = std::fs::read_to_string(SNAPSHOT).expect("ipc-surface.snap");

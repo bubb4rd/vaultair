@@ -67,8 +67,11 @@ function onDragStart(event: DragEvent) {
 /**
  * While `copy` is set, a hand copy or cut of the text in `ref` runs it
  * instead of reaching the clipboard directly, and the text can't be dragged
- * out of the window. Pass `null` while the value is
- * masked: there is nothing to protect, and dots shouldn't copy a secret.
+ * out of the window. Pass `null` while the value is masked: there is nothing
+ * to protect, and dots shouldn't copy a secret.
+ *
+ * A backstop: shown secrets are `user-select: none` (globals.css), so a
+ * selection isn't expected to reach one in the app.
  */
 export function useProtectedCopy(ref: RefObject<Element | null>, copy: (() => void) | null) {
   const latest = useRef(copy);

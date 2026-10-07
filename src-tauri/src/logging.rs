@@ -168,6 +168,21 @@ mod tests {
                 "thing.rs",
             ),
             (r"\\CANARYUSER-PC\share\x.rs", "x.rs"),
+            // A git dependency isn't under the registry: file name only.
+            (
+                r"C:\Users\CANARYUSER\.cargo\git\checkouts\tauri-9f8e7d6c5b4a3210\1a2b3c4\core\src\lib.rs",
+                "lib.rs",
+            ),
+            // A user called "registry" with a "src" folder is not the registry
+            // layout; the real one further along still wins.
+            (
+                r"C:\Users\registry\src\CANARYUSER\vendored\thing\lib.rs",
+                "vendored/thing/lib.rs",
+            ),
+            (
+                r"C:\Users\registry\src\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde-1.0.229\src\lib.rs",
+                "serde-1.0.229/src/lib.rs",
+            ),
             (r"C:\Users\CANARYUSER\.cargo\registry\src", "src"),
             // Vaultair's own files are relative to the workspace already.
             (r"src-tauri\src\lock.rs", "src-tauri/src/lock.rs"),
