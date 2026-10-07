@@ -351,8 +351,6 @@ pub struct MfaView {
     pub method: crate::domain::mfa::MfaMethod,
     pub enabled: bool,
     pub has_totp: bool,
-    pub totp_digits: Option<u8>,
-    pub totp_period: Option<u32>,
     pub backup_codes: Vec<BackupCodeSlot>,
     pub backup_codes_remaining: u32,
     pub backup_codes_updated_at: Option<String>,
@@ -403,8 +401,6 @@ pub struct AccountDetail {
     pub favorite: bool,
     pub archived_at: Option<String>,
     pub last_verified_at: Option<String>,
-    /// When the password was last revealed or copied from Vaultair.
-    pub last_used_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     /// The latest of the last edit, "Mark verified" and the last use of the
@@ -506,6 +502,30 @@ mod tests {
         assert!(!format!("{input:?}").contains("CANARY"));
         let unchanged: SecretUpdate = serde_json::from_str(r#"{"op":"unchanged"}"#).unwrap();
         assert_eq!(unchanged, SecretUpdate::Unchanged);
+    }
+
+    /// The two reveal responses serialize their value (that is their job)
+    /// and print nothing of it.
+    #[test]
+    fn reveal_responses_never_print_their_value() {
+        let revealed = RevealedSecret {
+            value: "CANARY7F3A".into(),
+        };
+        assert_eq!(format!("{revealed:?}"), "RevealedSecret([redacted])");
+        assert_eq!(
+            serde_json::to_value(&revealed).unwrap(),
+            serde_json::json!({ "value": "CANARY7F3A" })
+        );
+
+        let code = TotpCodeView {
+            code: "CANARY7F3A".into(),
+            seconds_remaining: 17,
+            period: 30,
+        };
+        let debug = format!("{code:?} {code:#?}");
+        assert!(!debug.contains("CANARY"), "{debug}");
+        assert!(debug.contains("[redacted]"));
+        assert_eq!(serde_json::to_value(&code).unwrap()["code"], "CANARY7F3A");
     }
 
     #[test]

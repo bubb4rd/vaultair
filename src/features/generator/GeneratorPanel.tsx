@@ -227,7 +227,7 @@ function OutputPanel({ gen }: { gen: Generator }) {
           <FieldError>{generatorErrorMessage(error)}</FieldError>
         </div>
       ) : (
-        <GeneratedValue value={result?.value ?? null} className="min-h-14" />
+        <GeneratedValue value={result?.value ?? null} label={kind} className="min-h-14" />
       )}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
         <StrengthRow result={result} kind={settings.mode} />

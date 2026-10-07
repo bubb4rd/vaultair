@@ -34,3 +34,14 @@ SQLCipher needs a real random-access file, and the KDF parameters and wrapped ke
 - Pre-unlock, only the header is readable, and it contains no user data.
 
 Full detail: `docs/implementation-plan.md` §2.4.
+
+## As built (checked in Phase 16)
+
+The decision stands. Where the code differs from the list above:
+
+- **Key slots did not avoid a format change.** The header has the `key_slots` array, but the v1 reader accepts exactly one slot, of kind `password`, and refuses anything else as a damaged header. A second slot needs a new `format_version` so that older builds say "too new" (`docs/vault-format.md` §2). Windows Hello unlock did not use a header slot at all: it is a device file outside the vault ([ADR-0005](0005-quick-unlock.md)).
+- **Atomic writes** are `std::fs::rename` after `sync_all`, which on Windows is `MoveFileExW(MOVEFILE_REPLACE_EXISTING)`. `MOVEFILE_WRITE_THROUGH` is not set: it would need `unsafe`, which `vaultair-core` forbids.
+- **The automatic backup before a schema migration is not built.** Migrations run without one. It is needed once migrations ship to released vaults.
+- **Transient files:** `vault.vhdr.tmp` during any header write, and `vault.vhdr.prev` during a password or KDF change.
+- **The cloud-folder warning** also covers Box.
+- **The CI check** blocks `*.vdb`, `*.vhdr`, `*.vhdr.*` and `*.vaultair-backup`, except the golden fixtures under `tests-fixtures/`.

@@ -12,12 +12,13 @@ use vaultair_core::crypto::kdf::KdfParams;
 use vaultair_core::domain::account::{
     AccountInput, AccountStatus, AccountType, CustomFieldInput, CustomFieldType, SecretUpdate,
 };
-use vaultair_core::domain::catalog::GameProfileInput;
+use vaultair_core::domain::catalog::{GameProfileFilter, GameProfileInput};
 use vaultair_core::domain::identity::IdentityInput;
 use vaultair_core::domain::mfa::{MfaInput, MfaMethod};
 use vaultair_core::domain::search::{SavedViewInput, SearchHit};
 use vaultair_core::search::{AccountFilter, AccountSort, SortKey, StatusFilter, ViewSpec};
-use vaultair_core::service::{accounts, catalog, identities, mfa, search};
+use vaultair_core::service::{accounts, backup, catalog, graph, identities, mfa, search, settings};
+use vaultair_core::vault::location::CloudRoots;
 use vaultair_core::vault::{create_vault, CreateOptions, OpenVault};
 use vaultair_core::AppError;
 
@@ -242,6 +243,85 @@ fn secrets_are_never_indexed_or_found() {
             assert!(!row.contains(secret), "{secret} in the search index: {row}");
         }
     }
+}
+
+/// The responses the account canary (`tests/accounts.rs`) doesn't reach:
+/// search hits, saved views, identities and their overview, contact points,
+/// the catalog, game profiles, the whole-vault map, the vault's own facts,
+/// its settings and its backup status. None of them carries a secret.
+#[test]
+fn no_lookup_or_listing_response_carries_a_secret() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut v = new_vault(dir.path(), &SystemClock);
+    let c = &SystemClock;
+    let me = identities::create(&mut v, c, &identity("Main", Some("me@example.com"))).unwrap();
+    let mut a = input("Canary holder");
+    a.identity_id = Some(me.id.clone());
+    a.username = Some("plainuser".into());
+    a.email = Some("me@example.com".into());
+    a.recovery_email = Some("backup@example.com".into());
+    a.platform_id = Some(STEAM.into());
+    a.password = set(&format!("{CANARY}-password"));
+    a.sensitive_notes = set(&format!("Password: {CANARY}-notes"));
+    a.custom_fields = vec![CustomFieldInput {
+        id: None,
+        label: "PIN".into(),
+        field_type: CustomFieldType::Secret,
+        value: None,
+        secret: set(&format!("{CANARY}-field")),
+    }];
+    let a = accounts::create(&mut v, c, &a).unwrap();
+    let mut method = totp();
+    method.recovery_instructions = set(&format!("{CANARY}-recovery"));
+    let with_mfa = mfa::upsert(&mut v, c, &a.id, &method).unwrap();
+    let codes = format!("{CANARY}-code-1\n{CANARY}-code-2");
+    mfa::set_backup_codes(&mut v, c, &with_mfa.mfa[0].id, Some(&codes)).unwrap();
+    catalog::create_profile(&mut v, c, &a.id, &profile("plainuser#1")).unwrap();
+    let view = SavedViewInput {
+        name: "Canary view".into(),
+        spec: ViewSpec {
+            v: 1,
+            filter: text("plainuser"),
+            sort: AccountSort::default(),
+        },
+    };
+    search::create_view(&mut v, c, &view).unwrap();
+
+    let found = search::search(&v, "plainuser", 20).unwrap();
+    assert!(found.len() >= 2, "sanity: the account and its profile");
+    let now = c.now_utc();
+    let responses = [
+        serde_json::to_string(&found),
+        serde_json::to_string(&search::views(&v).unwrap()),
+        serde_json::to_string(&identities::list(&v, false).unwrap()),
+        serde_json::to_string(&identities::refs(&v).unwrap()),
+        serde_json::to_string(&identities::get(&v, &me.id).unwrap()),
+        serde_json::to_string(&identities::overview(&v, &me.id).unwrap()),
+        serde_json::to_string(&identities::contacts(&v).unwrap()),
+        serde_json::to_string(&catalog::platforms(&v).unwrap()),
+        serde_json::to_string(&catalog::games(&v).unwrap()),
+        serde_json::to_string(&catalog::profiles(&v, &GameProfileFilter::default()).unwrap()),
+        serde_json::to_string(&graph::overview(&v, None).unwrap()),
+        serde_json::to_string(&v.info()),
+        serde_json::to_string(&v.integrity_check().unwrap()),
+        serde_json::to_string(&settings::load(v.conn()).unwrap()),
+        serde_json::to_string(&backup::status(&v, &CloudRoots::default(), now).unwrap()),
+    ]
+    .map(Result::unwrap);
+
+    for json in &responses {
+        for secret in [CANARY, TOTP_KEY] {
+            assert!(!json.contains(secret), "{secret} in a response: {json}");
+        }
+    }
+    assert!(
+        responses.iter().filter(|j| j.contains("plainuser")).count() >= 3,
+        "sanity: usernames and gamertags are in these responses"
+    );
+    assert!(
+        responses.iter().any(|j| j.contains("backup@example.com")),
+        "sanity: recovery contacts are in these responses"
+    );
 }
 
 // ---- Matching ----------------------------------------------------------------------

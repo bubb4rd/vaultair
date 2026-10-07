@@ -1,9 +1,10 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CopyIcon, EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
 import { useSessionConfig } from "@/app/queries";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { copySecret, copyToClipboard } from "@/features/clipboard/copy";
+import { useProtectedCopy } from "@/features/clipboard/protectedCopy";
 import { toast } from "@/features/toast/toast";
 import { secrets, toIpcError, type SecretRef } from "@/ipc/client";
 import { cn } from "@/lib/utils";
@@ -143,7 +144,8 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
  * - Show: Rust decrypts it; the value lives only in this component's state,
  *   hides itself after `revealHideSecs`, and is dropped on unmount.
  * - Copy: Rust decrypts and writes the clipboard itself; the value never
- *   reaches the page.
+ *   reaches the page. Copying the shown value by hand (select, Ctrl+C) is
+ *   sent the same way, so it gets the same protections.
  */
 export function SecretField({
   label,
@@ -194,6 +196,9 @@ export function SecretField({
   const value = revealed?.value ?? null;
   const secondsLeft = revealed?.secondsLeft ?? 0;
   const shown = value !== null;
+  // Selecting the shown value and pressing Ctrl+C copies like the Copy button.
+  const valueRef = useRef<HTMLSpanElement>(null);
+  useProtectedCopy(valueRef, shown ? () => void copySecret(target, copyLabel ?? label) : null);
   return (
     <FieldRow
       label={label}
@@ -213,6 +218,7 @@ export function SecretField({
       <span className="flex flex-col gap-1">
         <span
           id={valueId}
+          ref={valueRef}
           data-testid="secret-value"
           className={cn(
             "font-mono tracking-wide",

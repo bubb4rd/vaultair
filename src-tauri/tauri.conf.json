@@ -59,7 +59,7 @@
     "category": "Utility",
     "shortDescription": "Local encrypted vault for gaming and online identities",
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": { "type": "offlineInstaller" }
     }
   }
 }

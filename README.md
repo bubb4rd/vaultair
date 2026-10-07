@@ -2,8 +2,10 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 15b (Windows Hello quick unlock, tray, and the post-unlock Hello offer) is done and checked by hand with real Windows Hello, including the offer ([PR #23](https://github.com/bubb4rd/vaultair/pull/23)). Next: Phase 16, release hardening. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phases 0 to 15b are built: every MVP feature is in the app. Phase 16 (release hardening) has done the final documentation pass, the threat-model review and secret-flow audit, the dependency audits, and `SECURITY.md`. Still to do before a release: the installer and the end-to-end smoke test, and a code-signing certificate before any public release (ADR-0004 decision 14). Until then Vaultair runs from a source build (see Development). Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
+
+To report a security problem, see [`SECURITY.md`](SECURITY.md).
 
 ## Docs
 
@@ -20,7 +22,9 @@ A local-first, encrypted Windows workspace for people who manage several gaming 
 | [`docs/forgot-master-password.md`](docs/forgot-master-password.md) | Why there is no recovery, and what to do instead |
 | [`docs/backup-restore.md`](docs/backup-restore.md) | Making, checking and restoring encrypted backups |
 | [`docs/threat-model.md`](docs/threat-model.md) | What Vaultair does and does not protect against (draft) |
+| [`docs/future-extension-sync-checklist.md`](docs/future-extension-sync-checklist.md) | What must be true before any sync, browser extension, autofill or breach check is built |
 | [`docs/adr/`](docs/adr) | Architecture decision records |
+| [`SECURITY.md`](SECURITY.md) | How to report a vulnerability |
 
 ## Prerequisites (Windows)
 
@@ -59,6 +63,10 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
   ```
 - `ui-ux-pro-max` (`.claude/skills/`) handles implementation: palettes, type, components, UX checks, dashboards and tables.
 - The inspo MCP provides visual references.
+
+## Phase notes
+
+The notes below are a log. Each section records what was true when that phase landed, including what it left for later, and later phases closed many of those gaps. For the app as it is now, read the docs in the table above; "Phase 16 notes" lists what is still open.
 
 ## Phase 0 notes
 
@@ -118,7 +126,7 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - **Rename** reindexes every account with the label, archived ones included, so search finds them by the new name only.
 - **Colors** are the identity palette (`PurposeColor`), never a status color. `PurposeBadge` (a dot in the label's color, then the name) is how the account table, cards, compact list and account page show a purpose. A label without a color gets an outlined dot.
 - **Reordering** is by Move up and Move down buttons, so it works from the keyboard; focus stays on the moved label. `purpose_reorder` takes every id in the new order and refuses anything else.
-- **Still open:** "Shared household" (ADR-0004) isn't decided, so it isn't a built-in; anyone who wants it can add it as a custom label. "Smurf" is custom-only (ADR-0004 decision 1).
+- **Not built-ins:** "Shared household" and "Smurf" are custom-only (ADR-0004); anyone who wants one can add it as a custom label. "Shared household" was still undecided when this phase landed and was settled in Phase 16.
 - Not done in Phase 9: the identity page's account rows, the dashboard's recent accounts, sidebar favorites, Ctrl+K results and map nodes still show the purpose as plain text (they don't carry the purpose id, or fold it into a longer line). The UI is tested against mocked IPC and has not been driven in the running app.
 
 ## Phase 10 notes
@@ -200,7 +208,7 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 
 ## Phase 15b notes
 
-- **Windows Hello unlock** is opt-in, per vault and per PC (Settings > Security > Windows Hello), decided in [ADR-0005](docs/adr/0005-quick-unlock.md). Turning it on takes the master password and one Hello prompt. After that the lock screen offers "Unlock with Windows Hello", and asks for it by itself once per vault when Vaultair is in front, except straight after a manual lock.
+- **Windows Hello unlock** is opt-in, per vault and per PC (Settings > Security > Windows Hello), decided in [ADR-0005](docs/adr/0005-quick-unlock.md). Turning it on takes the master password and one Hello prompt. After that the lock screen offers "Unlock with Windows Hello". It never opens the Hello prompt by itself: you click the button, and "Use master password" is beside it.
 - **The master password is still asked for** after Windows restarts, more than 7 days after it was last typed, after 3 Hello attempts in a row that failed or were cancelled, after the password or KDF changes, to turn Hello unlock on or off, and to set auto-lock to "never" while it is on. The lock screen says which rule applies. Change password, Strengthen key derivation and Restore already took it.
 - **How it works.** Hello holds a key named `Vaultair-<vault_id>` that never leaves it. Its signature over a random challenge is the same every time; HKDF over the signature gives the key that wraps the vault's data key. The wrapped key is the device slot, `%LOCALAPPDATA%\Vaultair\devices\<vault_id>.qu`, wrapped again with DPAPI. It is not in `vault.vhdr`, so the vault format stays v1 and nothing travels with the vault or its backups. Format: `docs/vault-format.md` §12.
 - **Where the code is.** `vaultair-core`: `vault/device_slot.rs` (format and crypto), `service/quick_unlock.rs` (the rules and the enable, unlock and forget steps, against a `QuickUnlockDevice` port), and `open_vault` split so a vault can open from keys (`open_vault_with_keys`). `vaultair-platform`: `QuickUnlockKey`, `DeviceProtection` and `SystemInfo`, with `windows/{hello,dpapi,sysinfo}.rs` and fakes. `src-tauri`: `quick_unlock.rs` (the adapter) and `commands/quick_unlock.rs`.
@@ -214,6 +222,22 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - **Checked by hand with real Windows Hello (owner, 2026-10-07):** the prompt opens in front of the window, and denying it three times shows the warning and asks for the master password. The owner reported the other checks on the list as good: unlock after relock (idle, Win+L, sleep) and after reopening the app, the password asked for after a Windows restart, a password change turning it off, and the tray menu. The automated tests still use in-memory Hello; `cargo test -p vaultair-platform -- --ignored real_hello` (3 prompts) is the one that uses the real thing.
 - **The offer** (added 2026-10-07, merged as [PR #23](https://github.com/bubb4rd/vaultair/pull/23)): just after the master password opens a vault that doesn't have Hello unlock, on a PC where Hello is set up, a small card appears in the bottom-right corner (`src/features/shell/HelloOffer.tsx`). **Turn on** goes straight to the Windows Hello prompt, with no password field: the password was typed a moment ago, so Rust accepts it for 5 minutes (`PASSWORD_FRESH_SECS`; `quick_unlock_enable_now`). After that, or in a session Hello opened, the same button opens the usual dialog and asks for it. **Not now** hides the card until Vaultair restarts; **Don't ask again** hides it for good on this PC (`helloOfferDismissed` in `config.json`). Settings > Security still turns it on either way, with the password. No offer for a demo vault. This amends ADR-0005 decision 4, and the trade-off is in `docs/threat-model.md`. Automated tests use mocked IPC and in-memory Hello; **checked by hand with real Windows Hello (owner, 2026-10-07):** the card after a password unlock, one-prompt **Turn on**, **Not now**, **Don't ask again**, password fallback when the password is no longer fresh or the session was opened with Hello, and no offer on the demo vault.
 
+## Phase 16 notes
+
+- **Documentation pass.** Every doc in the plan's §7 table was checked against the code and corrected where it had drifted. `docs/future-extension-sync-checklist.md` is new.
+- **Decided in this phase (ADR-0004):** "Shared household" is not a built-in purpose label, and code signing follows decision 14 (unsigned for the private beta, a certificate before any public release).
+- **No installer yet.** `tauri.conf.json` has an NSIS bundle section, but no installer has been built or tested, so there are no install instructions. Run Vaultair from a source build. The section sets `webviewInstallMode` to `offlineInstaller` (project owner, 2026-10-07): the installer will carry Microsoft's WebView2 runtime installer inside it, about 130 MB, so installing makes no network connection even on a PC without WebView2. A bootstrapper mode would download it at install time; the release-config check refuses one. The bundler fetches that runtime installer on the build machine, and an installed WebView2 is updated by Microsoft's updater, not by Vaultair.
+- **Decided by the project owner, 2026-10-07:** a shown secret is copied only with its Copy button and stays non-selectable text (ADR-0004, "As built"); and the repository is public. `SECURITY.md` names GitHub private vulnerability reporting as the way to report; that route needs the repository to be public with private vulnerability reporting turned on, and both were done on 2026-10-07.
+- **Secret-flow audit and its review** (`docs/threat-model.md`, `docs/security-assumptions.md`). Closed by it: the logs hold no path from your PC or the build PC (a framework error is logged as its kind, a crash by its place in the source); a copy, cut or drag whose selection touches a shown secret is intercepted and sent through the protected clipboard path or dropped (a backstop: shown secrets are not selectable text, and this is tested in the test DOM only); a shown backup code hides itself like other revealed values; every command's return type is held in a reviewed list (`src-tauri/ipc-surface.snap`; update it with `VAULTAIR_UPDATE_IPC_SURFACE=1 cargo test -p vaultair the_command_surface`). Left as documented limits: a hand copy out of an editable field is an ordinary Windows copy, backup file names show the vault's name, and idle lock can come up to 15 s late.
+- **Still open from earlier phases** (each checked against the code in this pass):
+  - The automatic backup before a schema migration (plan §2.4). `db/migrate.rs` runs migrations without one. It is needed once migrations ship to released vaults.
+  - Scheduled backups. Backups are made when you press the button.
+  - Clearing a copied value after a crash (Phase 5). A crash or a killed process before the timeout leaves the value on the clipboard.
+  - The lint rule against putting reveal results in query cache keys (Phase 7).
+  - The `platform_connection` table from V1 is still unused: nothing writes or reads it.
+  - A manual check for the owner, in the running app: with a secret shown, try to select it with the mouse, with a double and a triple click and with Ctrl+A, then press Ctrl+C and look at Win+V. Do it on each guarded field (password, hidden custom field, setup key, recovery steps, sensitive notes, a backup code, the TOTP code) and on the generator. Expected: nothing selects; if something does, the copy is either protected like the Copy button or nothing is copied.
+  - The demo-vault step of onboarding still says "Sample accounts to explore arrive in a later version" (`src/features/onboarding/steps.tsx`), though `vault_create_demo` seeds a demo vault with sample accounts (`vaultair_core::demo`).
+
 ## Phase 17: Passkeys and login credentials (scoped)
 
 Not started. This is its own phase, after the MVP (Phases 0–16). Phase 7 owns account records, passwords, and MFA metadata, including the existing `hardware_key` method. This phase owns passkeys. It starts only once an account row exists to attach a credential to.
@@ -224,7 +248,7 @@ A passkey is a FIDO2/WebAuthn credential: a relying-party id, a credential id, a
 
 **Cut A — account login credentials.** Vaultair stores passkeys for the user's own sites and apps, and can create or assert one when Windows asks, while the vault is unlocked and the user approves that site. This is the login support.
 
-**Cut B — vault unlock.** A second header key slot, `kind: "windows-hello"`, wraps the same DEK. Windows Hello (PIN or biometric) unwraps it. The master password still creates the vault, still restores a backup, and still changes the password. Hello never replaces it. The slot is wiped on password change and on DEK rotation, and a reboot requires the master password again (the quick-unlock rules already in the implementation plan, §5).
+**Cut B — vault unlock.** A second header key slot, `kind: "windows-hello"`, wraps the same DEK. Windows Hello (PIN or biometric) unwraps it. The master password still creates the vault, still restores a backup, and still changes the password. Hello never replaces it. The slot is wiped on password change and on DEK rotation, and a reboot requires the master password again (the quick-unlock rules already in the implementation plan, §5). Since this was written, Phase 15b shipped Windows Hello unlock as a device slot outside the header ([ADR-0005](docs/adr/0005-quick-unlock.md), which keeps `key_slots` for slots that travel with the vault), so Cut B as written is superseded unless the owner reopens it.
 
 ### How a site login works
 

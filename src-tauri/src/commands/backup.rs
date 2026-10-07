@@ -123,7 +123,7 @@ fn pick_file(_owner: isize) -> Result<Option<PathBuf>, AppError> {
     })
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RestoreBackupRequest {
     pub backup_path: String,
@@ -134,6 +134,16 @@ pub struct RestoreBackupRequest {
     pub name: String,
     /// The master password the vault had when the backup was made.
     pub password: String,
+}
+
+/// Written out so the master password can never be formatted into a log line
+/// or a panic message. The paths and the name stay out too.
+impl std::fmt::Debug for RestoreBackupRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RestoreBackupRequest")
+            .field("password", &"[redacted]")
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, specta::Type)]
@@ -180,4 +190,26 @@ pub async fn backup_restore_to(
         .config
         .record_recent(&path, &SystemClock.now_rfc3339());
     Ok(RestoredVault { path })
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    /// The request as the webview sends it. Nothing that formats it (a log
+    /// line, a panic message) may show the master password or the paths.
+    #[test]
+    fn restore_request_never_prints_the_master_password() {
+        let request: RestoreBackupRequest = serde_json::from_str(
+            r#"{"backupPath":"D:/Backups/CANARYUSER-20261005-070809.vaultair-backup",
+                "location":null,"name":"CANARYUSER restored",
+                "password":"CANARY7F3A master password"}"#,
+        )
+        .unwrap();
+        let debug = format!("{request:?} {request:#?}");
+        assert!(!debug.contains("CANARY"), "{debug}");
+        assert!(debug.contains("[redacted]"));
+    }
 }

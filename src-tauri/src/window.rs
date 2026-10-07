@@ -63,7 +63,10 @@ fn harden_webview(window: &tauri::WebviewWindow) {
         }
     });
     if let Err(err) = result {
-        tracing::error!(error = %err, "could not access webview for hardening");
+        tracing::error!(
+            kind = %crate::logging::error_kind(&err),
+            "could not access webview for hardening"
+        );
     }
 }
 

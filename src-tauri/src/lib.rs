@@ -37,7 +37,10 @@ pub fn run() {
             app.manage(state);
 
             if let Err(err) = tray::create(app.handle(), keep_in_tray) {
-                tracing::warn!(error = %err, "could not create the tray icon");
+                tracing::warn!(
+                    kind = %logging::error_kind(&err),
+                    "could not create the tray icon"
+                );
             }
             let handle = app.handle().clone();
             window.on_window_event(move |event| {
@@ -54,7 +57,7 @@ pub fn run() {
     let app = match app {
         Ok(app) => app,
         Err(err) => {
-            tracing::error!(error = %err, "tauri failed to start");
+            tracing::error!(kind = %logging::error_kind(&err), "tauri failed to start");
             std::process::exit(1);
         }
     };

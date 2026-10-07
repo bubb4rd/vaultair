@@ -27,3 +27,13 @@ Vaultair is a local-first, Windows-first encrypted workspace for people who mana
 - The frontend cannot use browser storage, `fetch`, or `console` in release; ESLint and Vite settings enforce this.
 
 Full detail: `docs/implementation-plan.md` §1.
+
+## As built (checked in Phase 16)
+
+The decision stands. Where the code differs from the list above:
+
+- **Plugins:** `single-instance` only. `tauri-plugin-dialog` was dropped because it depends on `tauri-plugin-fs`; the folder and file pickers are native code in `vaultair-platform`. `window-state` was not added. The tray icon is Tauri's own `tray-icon` feature.
+- **`deny.toml`** bans the network client crates and the `http`, `updater`, `shell` and `fs` plugins. It does not list `store` or `log`. `scripts/check-release-config.mjs` refuses their permissions in the capability file instead, with `opener` and `clipboard-manager`.
+- **Frontend:** TanStack Router, Query and Virtual are used. TanStack Table, Zustand, react-hook-form and zod are not dependencies: there is no table, store, form or schema library, and Rust validates. Icons are Phosphor.
+- **Trust boundary:** three response types carry a secret value to the UI, not one: `RevealedSecret`, `TotpCodeView` (the current TOTP code) and `Generated` (a new password). `src-tauri/src/ipc.rs` pins which commands may return them and holds a reviewed list of every command's return type. A shown secret is not selectable text (`user-select: none` on the page); as a backstop, a copy, cut or drag whose selection touches one is intercepted in the page and sent through the same Rust clipboard path as the Copy button or dropped. The backstop is tested in the test DOM only.
+- **`vaultair-platform`** also holds the Windows Hello, DPAPI and TPM code for quick unlock (ADR-0005), and the native pickers.

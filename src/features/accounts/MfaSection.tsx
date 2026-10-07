@@ -24,6 +24,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { NativeSelect, Textarea } from "@/components/ui/textarea";
 import { copySecret } from "@/features/clipboard/copy";
+import { useProtectedCopy } from "@/features/clipboard/protectedCopy";
 import { toast } from "@/features/toast/toast";
 import {
   mfa,
@@ -95,6 +96,8 @@ function TotpCode({ method }: { method: MfaView }) {
   );
 
   const shown = code !== null;
+  const codeRef = useRef<HTMLSpanElement>(null);
+  useProtectedCopy(codeRef, shown ? () => void copySecret({ kind: "totpCode", id: method.id }, "Code") : null);
   return (
     <FieldRow
       label="Current code"
@@ -132,7 +135,7 @@ function TotpCode({ method }: { method: MfaView }) {
     >
       {shown ? (
         <span className="flex items-baseline gap-3">
-          <span className="font-mono text-[15px] tracking-widest" aria-label={code.code}>
+          <span ref={codeRef} className="font-mono text-[15px] tracking-widest" aria-label={code.code}>
             {groupDigits(code.code)}
           </span>
           <span className="text-xs text-subtle-foreground">changes in {code.secondsRemaining}s</span>
@@ -150,12 +153,34 @@ function BackupCodeRow({ methodId, index, used, onUpdated }: {
   used: boolean;
   onUpdated: (d: AccountDetail) => void;
 }) {
+  const config = useSessionConfig();
+  const hideAfter = config.data?.revealHideSecs ?? DEFAULT_REVEAL_SECS;
   const [value, setValue] = useState<string | null>(null);
   const n = String(index + 1);
+
+  // A shown code hides itself after `revealHideSecs`, like every other
+  // revealed secret.
+  useEffect(() => {
+    if (value === null) return;
+    const t = setTimeout(() => {
+      setValue(null);
+    }, hideAfter * 1000);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [value, hideAfter]);
+
+  const valueRef = useRef<HTMLSpanElement>(null);
+  useProtectedCopy(
+    valueRef,
+    value !== null ? () => void copySecret({ kind: "backupCode", id: methodId, index }, `Backup code ${n}`) : null,
+  );
+
   return (
     <li className="flex items-center gap-3 border-b border-border py-1.5 last:border-b-0">
       <span className="w-14 shrink-0 text-xs text-subtle-foreground">Code {n}</span>
       <span
+        ref={valueRef}
         className={`min-w-0 flex-1 font-mono text-[13px] ${used ? "text-subtle-foreground line-through" : value ? "" : "text-muted-foreground"}`}
       >
         {value ?? "••••••••"}

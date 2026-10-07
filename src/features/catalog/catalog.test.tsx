@@ -150,7 +150,6 @@ const DETAIL: AccountDetail = {
   favorite: false,
   archivedAt: null,
   lastVerifiedAt: null,
-  lastUsedAt: null,
   createdAt: "2026-09-01T10:00:00Z",
   updatedAt: "2026-09-20T10:00:00Z",
   // Relative to now, so the account reads as Active whenever the tests run.

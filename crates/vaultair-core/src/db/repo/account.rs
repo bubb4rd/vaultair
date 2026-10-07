@@ -435,7 +435,7 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
                     a.last_verified_at, a.created_at, a.updated_at, a.identity_id, i.name,
                     CASE WHEN a.login_url IS NULL THEN pl.default_login_url END,
                     a.platform_id, pl.name, pl.icon, a.game_id, g.name, g.icon,
-                    a.sensitive_notes_hints, a.last_used_at,
+                    a.sensitive_notes_hints,
                     max(a.updated_at, COALESCE(a.last_verified_at, ''), COALESCE(a.last_used_at, ''))
              FROM account a JOIN purpose_label p ON p.id = a.purpose_id
              LEFT JOIN identity i ON i.id = a.identity_id
@@ -479,8 +479,7 @@ pub fn detail(conn: &Connection, id: &str) -> rusqlite::Result<Option<AccountDet
                     favorite: r.get(19)?,
                     archived_at: r.get(20)?,
                     last_verified_at: r.get(21)?,
-                    last_used_at: r.get(34)?,
-                    last_activity_at: r.get(35)?,
+                    last_activity_at: r.get(34)?,
                     created_at: r.get(22)?,
                     updated_at: r.get(23)?,
                     tags: Vec::new(),

@@ -1,6 +1,6 @@
 # Vaultair design system
 
-> **Status:** Phase 13 (relationship map). Tokens live in `src/styles/globals.css`; this file records why they are what they are.
+> **Status:** Final for the MVP (Phase 16). The colour tokens, the status system and the sizes and limits named here (sidebar, column widths, map nodes, toast timings) were checked against the code; the contrast ratios were not re-measured. Tokens live in `src/styles/globals.css`; this file records why they are what they are.
 
 ## Design read
 
@@ -124,7 +124,7 @@ Plain and specific. Say what will appear and how it gets there. No hype verbs, n
 
 **No-recovery acknowledgement**: styled as a danger on purpose, as the one irreversible fact in setup. The panel uses a High-risk border and 8% tint, a bold red "There is no way to recover a forgotten master password" line with a shield-warning icon, the statement in foreground text, and a red checkbox. It reads as a warning without relying on color: the icon and wording carry it too.
 
-**Copy**: plain and honest. Nothing claims a feature that isn't built: demo vaults say sample data arrives later, the lockout says "Try again in 5 s". The source texts are `docs/privacy-statement-draft.md` and `docs/forgot-master-password.md`.
+**Copy**: plain and honest. Nothing should claim a feature that isn't built, or deny one that is; the lockout says "Try again in 5 s". (One line is out of date: the demo-vault step still says sample accounts "arrive in a later version", and they are seeded now.) The source texts are `docs/privacy-statement-draft.md` and `docs/forgot-master-password.md`.
 
 ## Known issue
 
