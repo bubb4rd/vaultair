@@ -62,7 +62,7 @@ pub async fn vault_kdf_calibrate() -> IpcResult<KdfParams> {
     blocking(|| kdf::calibrate(kdf::CALIBRATE_TARGET).map_err(VaultError::from)).await
 }
 
-#[derive(Debug, Deserialize, specta::Type)]
+#[derive(Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVaultRequest {
     pub name: String,
@@ -70,6 +70,17 @@ pub struct CreateVaultRequest {
     pub location: Option<String>,
     pub kdf: KdfParams,
     pub password: String,
+}
+
+/// Written out so the master password can never be formatted into a log line
+/// or a panic message. The name and location stay out too: they are a path.
+impl std::fmt::Debug for CreateVaultRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreateVaultRequest")
+            .field("kdf", &self.kdf)
+            .field("password", &"[redacted]")
+            .finish_non_exhaustive()
+    }
 }
 
 async fn create(state: &AppState, request: CreateVaultRequest, demo: bool) -> IpcResult<VaultInfo> {
@@ -285,4 +296,26 @@ fn pick_folder(
     _initial: Option<&Path>,
 ) -> Result<Option<PathBuf>, VaultError> {
     Err(VaultError::Io(std::io::ErrorKind::Unsupported))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    /// The request as the webview sends it. Nothing that formats it (a log
+    /// line, a panic message) may show the master password or where the
+    /// vault goes.
+    #[test]
+    fn create_request_never_prints_the_master_password() {
+        let request: CreateVaultRequest = serde_json::from_str(
+            r#"{"name":"CANARYUSER vault","location":"C:/Users/CANARYUSER/Vaults",
+                "kdf":{"mKib":65536,"t":3,"p":4},"password":"CANARY7F3A master password"}"#,
+        )
+        .unwrap();
+        let debug = format!("{request:?} {request:#?}");
+        assert!(!debug.contains("CANARY"), "{debug}");
+        assert!(debug.contains("[redacted]") && debug.contains("65536"));
+    }
 }

@@ -48,8 +48,76 @@ pub fn init() -> Option<WorkerGuard> {
 /// Logs where a panic happened, never its payload: a payload can be built
 /// from formatted values that include user data.
 fn install_panic_hook() {
-    std::panic::set_hook(Box::new(|info| match info.location() {
+    std::panic::set_hook(Box::new(log_panic));
+}
+
+fn log_panic(info: &std::panic::PanicHookInfo<'_>) {
+    match info.location() {
         Some(loc) => tracing::error!(file = loc.file(), line = loc.line(), "panic"),
         None => tracing::error!("panic at unknown location"),
-    }));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::io::Write;
+    use std::panic::PanicHookInfo;
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A panic message is built from whatever the failing code had in hand,
+    /// so it can hold a secret or a username. The log gets the place only.
+    #[test]
+    fn a_panic_is_logged_by_place_never_by_message() {
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .finish();
+
+        // Only this thread's panic goes through the hook under test; any
+        // other test that fails meanwhile still prints as usual.
+        let me = std::thread::current().id();
+        let previous: Arc<dyn Fn(&PanicHookInfo<'_>) + Send + Sync> =
+            Arc::from(std::panic::take_hook());
+        let fallback = previous.clone();
+        std::panic::set_hook(Box::new(move |info| {
+            if std::thread::current().id() == me {
+                log_panic(info);
+            } else {
+                fallback(info);
+            }
+        }));
+        let result = tracing::subscriber::with_default(subscriber, || {
+            std::panic::catch_unwind(|| {
+                panic!("password CANARY7F3A for {}", "CANARYUSER@example.com")
+            })
+        });
+        std::panic::set_hook(Box::new(move |info| previous(info)));
+
+        assert!(result.is_err());
+        let logs = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        assert!(
+            logs.contains("panic") && logs.contains("logging.rs"),
+            "{logs}"
+        );
+        assert!(!logs.contains("CANARY"), "{logs}");
+    }
 }

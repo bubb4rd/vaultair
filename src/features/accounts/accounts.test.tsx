@@ -372,6 +372,35 @@ describe("account detail", () => {
     expect(within(dialog).getByRole("button", { name: "Mark unused" })).toBeInTheDocument();
   });
 
+  it("shows a backup code on request and hides it again after the reveal time", async () => {
+    const user = userEvent.setup();
+    const { calls } = await renderApp(
+      "/accounts/a1",
+      withAccounts({
+        session_config_get: () => ({ ...DEFAULT_SESSION_CONFIG, revealHideSecs: 1 }),
+        secret_reveal: () => ({ value: "ABCD-1234" }),
+      }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Manage" }));
+    const dialog = await screen.findByRole("dialog", { name: "Backup codes" });
+    expect(calls.some((c) => c.cmd === "secret_reveal")).toBe(false);
+
+    await user.click(within(dialog).getByRole("button", { name: "Show code 1" }));
+    expect(await within(dialog).findByText("ABCD-1234")).toBeInTheDocument();
+    expect(calls).toContainEqual({
+      cmd: "secret_reveal",
+      args: { target: { kind: "backupCode", id: "m1", index: 0 } },
+    });
+
+    await waitFor(
+      () => {
+        expect(within(dialog).queryByText("ABCD-1234")).not.toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+    expect(within(dialog).getByRole("button", { name: "Show code 1" })).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("shows the current TOTP code with its countdown", async () => {
     const user = userEvent.setup();
     const { calls } = await renderApp(
