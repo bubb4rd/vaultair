@@ -11,8 +11,10 @@ const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel"] as co
  * Mounted only while unlocked. Renders nothing.
  *
  * Throttled with a trailing ping: activity inside an interval is reported
- * when the interval ends, so the idle deadline is never more than one
- * interval early.
+ * when the interval ends. Rust then counts from that report, so the vault
+ * can lock up to one interval later than the setting says after the last
+ * movement, and never earlier (the shortest timeout is far longer than an
+ * interval).
  */
 export function ActivityTracker() {
   useEffect(() => {

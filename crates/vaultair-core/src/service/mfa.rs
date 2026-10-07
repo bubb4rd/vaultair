@@ -73,8 +73,6 @@ pub(crate) fn views(
                     })
                     .collect(),
                 has_totp: row.totp_secret_enc.is_some(),
-                totp_digits: row.totp_secret_enc.as_ref().and(row.totp_digits),
-                totp_period: row.totp_secret_enc.as_ref().and(row.totp_period),
                 has_recovery_instructions: row.recovery_instructions_enc.is_some(),
                 id: row.id.clone(),
                 method: row.method,

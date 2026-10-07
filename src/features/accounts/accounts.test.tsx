@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DEFAULT_SORT, EMPTY_FILTER, type AccountDetail, type AccountFilter, type AccountSummary, type PurposeView } from "@/ipc/client";
 import { PAGE_PATHS } from "@/app/nav";
@@ -82,7 +82,6 @@ const DETAIL: AccountDetail = {
   favorite: false,
   archivedAt: null,
   lastVerifiedAt: null,
-  lastUsedAt: null,
   createdAt: "2026-09-01T10:00:00Z",
   updatedAt: "2026-09-20T10:00:00Z",
   // Relative to now, so the account reads as Active whenever the tests run.
@@ -95,8 +94,6 @@ const DETAIL: AccountDetail = {
       method: "authenticator_app",
       enabled: true,
       hasTotp: true,
-      totpDigits: 6,
-      totpPeriod: 30,
       backupCodes: [
         { index: 0, used: false },
         { index: 1, used: true },
@@ -290,6 +287,77 @@ describe("account detail", () => {
     await waitFor(() => {
       expect(document.querySelector('[data-toast-id="clipboard"]')).toHaveTextContent("Password copied");
     });
+  });
+
+  it("sends a hand copy of a shown password through Rust, like the Copy button", async () => {
+    const user = userEvent.setup();
+    const { calls } = await renderApp(
+      "/accounts/a1",
+      withAccounts({
+        secret_reveal: () => ({ value: "correct horse 42" }),
+        clipboard_copy_secret: () => ({ clearAfterSecs: 30 }),
+      }),
+    );
+    await user.click(await screen.findByRole("button", { name: "Show password" }));
+    const shown = await screen.findByText("correct horse 42");
+
+    // Select part of the value and copy: the webview's own copy is stopped ...
+    const text = shown.firstChild as Text;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 7);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    expect(fireEvent.copy(shown)).toBe(false);
+    // ... and Rust copies the whole value, with the usual countdown.
+    await waitFor(() => {
+      expect(calls).toContainEqual({
+        cmd: "clipboard_copy_secret",
+        args: { target: { kind: "accountPassword", id: "a1" } },
+      });
+    });
+    await waitFor(() => {
+      expect(document.querySelector('[data-toast-id="clipboard"]')).toHaveTextContent("Password copied");
+    });
+
+    // Dragging the selection out of the window is stopped too.
+    expect(fireEvent.dragStart(shown)).toBe(false);
+
+    // Cut is treated the same.
+    const before = calls.filter((c) => c.cmd === "clipboard_copy_secret").length;
+    expect(fireEvent.cut(shown)).toBe(false);
+    await waitFor(() => {
+      expect(calls.filter((c) => c.cmd === "clipboard_copy_secret")).toHaveLength(before + 1);
+    });
+  });
+
+  it("copies nothing when a selection runs past a shown secret, and leaves other text alone", async () => {
+    const user = userEvent.setup();
+    const { calls } = await renderApp(
+      "/accounts/a1",
+      withAccounts({
+        secret_reveal: () => ({ value: "correct horse 42" }),
+        clipboard_copy_secret: () => ({ clearAfterSecs: 30 }),
+      }),
+    );
+    // Nothing shown yet: an ordinary copy is not interfered with.
+    const notes = await screen.findByText("Main library");
+    window.getSelection()?.selectAllChildren(notes);
+    expect(fireEvent.copy(notes)).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    await screen.findByText("correct horse 42");
+    // Text that isn't a secret still copies normally while one is shown.
+    window.getSelection()?.selectAllChildren(notes);
+    expect(fireEvent.copy(notes)).toBe(true);
+
+    // Select all: the secret would ride along, so the copy is refused.
+    window.getSelection()?.selectAllChildren(document.body);
+    expect(fireEvent.copy(document.body)).toBe(false);
+    await waitFor(() => {
+      expect(document.querySelector('[data-toast-id="clipboard"]')).toHaveTextContent("Nothing was copied");
+    });
+    expect(calls.some((c) => c.cmd === "clipboard_copy_secret")).toBe(false);
   });
 
   it("forgets a revealed value when the page is left", async () => {

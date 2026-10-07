@@ -55,11 +55,12 @@ The threat model says plainly that Vaultair does not protect against these, so t
 - Traces of keys or secrets in memory. Wiping is best-effort, and the places it can't reach are listed.
 - Third-party clipboard managers that ignore the "don't record" markers, any program reading the clipboard while a value is on it, and a crash before the clear.
 - A revealed secret staying on screen until it auto-hides or the vault locks.
+- Copying by hand out of a field you can type in (a secret being typed with its eye icon on, or sensitive notes or recovery steps opened for editing): that is an ordinary Windows copy, not marked and not cleared. A secret Vaultair is showing is a different matter: it is not selectable text, and the design is that a copy, cut or drag that reaches one anyway is stopped and either sent through the protected path or dropped. That second layer has been tested only in a test DOM, not in the real window, so if you can get a shown secret onto the clipboard by hand without those protections, that is worth a report.
 - Guessing a weak master password offline from stolen vault files or a backup, and old backups still opening with the old master password after a change.
 - No recovery of a lost master password. That is by design.
-- The vault header showing that a file is a Vaultair vault, when it was created and its key derivation settings.
+- The vault header showing that a file is a Vaultair vault, when it was created and its key derivation settings, and a backup's file name showing the vault's name and the backup's date.
 - Windows Hello unlock's documented limits: the restart, 7-day and 3-attempt rules are enforced by Vaultair and not by the key, the failed-attempt count can be edited, malware can raise a Hello prompt and hope it's approved, a short Hello PIN or a PC without a TPM weakens it, and for 5 minutes after the master password is typed it can be turned on with a Hello approval alone.
-- The lock screen's wait after wrong passwords being cosmetic, and idle lock coming up to 15 seconds early.
+- The lock screen's wait after wrong passwords being cosmetic, and idle lock coming up to 15 seconds late (it is counted from the last activity the app reported; it never comes early).
 - WebView2's own behaviour, and encrypted files leaving the machine when a vault or backup is kept in a cloud-synced folder.
 
 If you can go further than a documented limit allows, or show that one of these is worse than the docs say, that is worth reporting.

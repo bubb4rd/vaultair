@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { SegmentedGroup, SegmentedItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
+import { copyToClipboard } from "@/features/clipboard/copy";
+import { useProtectedCopy } from "@/features/clipboard/protectedCopy";
 import { StrengthSegments, strengthLabel } from "@/features/onboarding/StrengthMeter";
 import type { Generated } from "@/ipc/client";
 import { cn } from "@/lib/utils";
@@ -36,11 +38,24 @@ export function ModeSwitch({
 /**
  * The value in mono, digits and symbols in the accent so they're easy to
  * tell from letters when typing it by hand. Wraps anywhere: 128 characters
- * have no word breaks.
+ * have no word breaks. Copying it by hand goes through Rust like the Copy
+ * button: kept out of clipboard history and cleared.
  */
-export function GeneratedValue({ value, className }: { value: string | null; className?: string }) {
+export function GeneratedValue({
+  value,
+  label,
+  className,
+}: {
+  value: string | null;
+  /** What the copy toast calls it: "Password" or "Passphrase". */
+  label: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useProtectedCopy(ref, value ? () => void copyToClipboard(value, label) : null);
   return (
     <p
+      ref={ref}
       data-testid="generated-value"
       className={cn("font-mono text-[17px] leading-7 break-all text-foreground", className)}
     >
