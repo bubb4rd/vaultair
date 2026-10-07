@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { PAGE_PATHS } from "@/app/nav";
+import { PAGE_PATHS, getNavLabel } from "@/app/nav";
 import {
   ArchiveIcon,
   ArrowCounterClockwiseIcon,
@@ -277,11 +277,14 @@ function Detail({ account }: { account: AccountDetail }) {
   }
 
   const hasGameDetails = Boolean(account.region ?? account.playerId ?? account.displayName ?? account.publisher);
+  const parent = account.archivedAt
+    ? { label: getNavLabel(PAGE_PATHS.archived), to: PAGE_PATHS.archived }
+    : { label: getNavLabel(PAGE_PATHS.accounts), to: PAGE_PATHS.accounts };
 
   return (
     <>
       <PageHeader
-        title={account.title}
+        crumbs={[{ label: "Vault", to: "/" }, parent, { label: account.title }]}
         actions={
           <div className="flex items-center gap-1">
             <Tooltip>
@@ -511,11 +514,16 @@ function Detail({ account }: { account: AccountDetail }) {
 
 export function AccountDetailPage({ accountId }: { accountId: string }) {
   const account = useAccount(accountId);
-  if (account.isPending) return <PageHeader title="Account" />;
+  const fallbackCrumbs = [
+    { label: "Vault", to: "/" },
+    { label: getNavLabel(PAGE_PATHS.accounts), to: PAGE_PATHS.accounts },
+    { label: "Account" },
+  ];
+  if (account.isPending || !account.data) return <PageHeader crumbs={fallbackCrumbs} />;
   if (account.isError) {
     return (
       <>
-        <PageHeader title="Account" />
+        <PageHeader crumbs={fallbackCrumbs} />
         <div className="px-6">
           <EmptyState icon={KeyIcon} title="Account not found" description="It may have been deleted.">
             <Button asChild variant="outline" size="sm">
@@ -528,3 +536,4 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
   }
   return <Detail account={account.data} />;
 }
+

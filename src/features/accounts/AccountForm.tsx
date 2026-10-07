@@ -1,6 +1,6 @@
 import { useRef, useState, type SubmitEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { PAGE_PATHS } from "@/app/nav";
+import { PAGE_PATHS, getNavLabel } from "@/app/nav";
 import { ArrowCounterClockwiseIcon, KeyIcon, PasswordIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import {
   useAccount,
@@ -1042,10 +1042,35 @@ export function AccountForm({
     body = <Form key={accountId ?? "new"} initial={initial} existing={editing ? (existing.data ?? null) : null} />;
   }
 
+  let headerCrumbs;
+  if (editing && existing.data) {
+    const parent = existing.data.archivedAt
+      ? { label: getNavLabel(PAGE_PATHS.archived), to: PAGE_PATHS.archived }
+      : { label: getNavLabel(PAGE_PATHS.accounts), to: PAGE_PATHS.accounts };
+    headerCrumbs = [
+      { label: "Vault", to: "/" },
+      parent,
+      {
+        label: existing.data.title,
+        to: "/accounts/$accountId",
+        params: { accountId: existing.data.id },
+        truncate: true,
+      },
+      { label: "Edit" },
+    ];
+  } else {
+    headerCrumbs = [
+      { label: "Vault", to: "/" },
+      { label: getNavLabel(PAGE_PATHS.accounts), to: PAGE_PATHS.accounts },
+      { label: "New account" },
+    ];
+  }
+
   return (
     <>
-      <PageHeader title={editing && existing.data ? `Edit ${existing.data.title}` : title} />
+      <PageHeader crumbs={headerCrumbs} />
       {body}
     </>
   );
 }
+
