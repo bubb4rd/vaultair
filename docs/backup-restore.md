@@ -1,6 +1,6 @@
 # Backup and restore
 
-> **Status:** Phase 14. Phase 15 adds the password-change caveat to the Settings copy. Format details: [`vault-format.md`](vault-format.md) §11.
+> **Status:** Final for the MVP (Phase 16), checked against the code. Format details: [`vault-format.md`](vault-format.md) §11.
 
 A backup is one file, `<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup`, holding a whole vault: its header and its encrypted database. The date and time in the name are UTC.
 
@@ -47,6 +47,8 @@ Only a backup of the vault that is open can be checked this way, because the key
 A restore **always makes a new vault folder**. It never writes over a vault: the folder must be new or empty. The restored vault is named after its folder and is added to the list on the lock screen. From Settings, the vault you have open is not touched.
 
 The same checks as "Check a backup" run before the restored vault's header is written. If any fail, or the password is wrong, the new folder is removed and nothing is left behind.
+
+The restored vault is a copy of the same vault: it keeps the original's vault id, its master password as of the backup, and its key-derivation settings. So "Check a backup" in either copy accepts backups made from the other.
 
 To replace a damaged vault: restore to a new name, open the restored vault and confirm it has what you expect, then delete the old vault's folder yourself.
 
