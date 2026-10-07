@@ -11,88 +11,134 @@
     <img src="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
 </p>
+Vaultair is an encrypted, local-first Windows app for managing gaming and online accounts. Keep passwords, recovery codes, MFA, and the connections between your identities in one vault on your own disk.
 
-**Vaultair** is a local-first, encrypted workspace for Windows. It helps you manage gaming and online identities—accounts, logins, recovery codes, MFA, and how they connect—in one vault on your own disk. There is no cloud account and no network traffic from the app.
+No cloud account. No network traffic from the app.
 
-> **Status:** MVP features (Phases 0–15b) are implemented. Release hardening (Phase 16) is largely done; an installer, full smoke test, and code signing for public release are still open. Run Vaultair from a source build until installers ship. See [`docs/phase-notes.md`](docs/phase-notes.md) for the build log and open items.
+## Project status
+
+The MVP is implemented. Release hardening is mostly complete, but the installer, full smoke test, and code signing are still pending.
+
+For now, build and run Vaultair from source. See [the development log](docs/phase-notes.md) for completed work and remaining release tasks.
 
 ## Features
 
-- **Encrypted vault on disk** — SQLCipher database, Argon2id key derivation, encrypted backups with integrity checks
-- **Accounts and identities** — platforms, games, purposes, favorites, archives, and a built-in catalog
-- **Secrets and MFA** — passwords, TOTP, backup codes, generator (passwords and EFF passphrases), reveal with auto-hide
-- **Search and views** — full-text search (secrets never indexed), filters, saved views, bulk actions
-- **Security health** — weak/reused passwords, missing MFA, dormant accounts, and fix shortcuts
-- **Relationship map** — see how identities, emails, accounts, and platforms connect
-- **Windows integration** — idle/session lock, protected clipboard, optional capture protection, Windows Hello quick unlock, system tray
+- Encrypted storage — SQLCipher database, Argon2id key derivation, and encrypted backups with integrity checks.
+- Account organization — group accounts by platform, game, or purpose; mark favorites and archive unused accounts.
+- Passwords and MFA — store passwords, TOTP, and backup codes; generate passwords and EFF passphrases; reveal secrets with automatic hiding.
+- Search and saved views — full-text search, filters, saved views, and bulk actions. Secrets are never indexed.
+- Security checks — find weak or reused passwords, accounts without MFA, and dormant accounts, with shortcuts to address them.
+- Relationship map — see how identities, email addresses, accounts, and platforms connect.
+- Windows integration — idle and session locking, protected clipboard, optional capture protection, Windows Hello quick unlock, and system tray support.
 
-Autofill, sync, and browser extensions are intentionally out of scope for the MVP ([ADR-0004](docs/adr/0004-mvp-scope-decisions.md)).
+Autofill, sync, and browser extensions are outside the MVP scope. See [the scope decisions](docs/adr/0004-mvp-scope-decisions.md).
 
-## Quick start (development)
+## Build and run
 
-Vaultair is **Windows-only** today. You need Rust (MSVC), Node.js LTS, WebView2, and [Strawberry Perl](https://strawberryperl.com/) on `PATH` for the vendored SQLCipher build (see [Prerequisites](#prerequisites-windows) below).
+Vaultair currently supports Windows only.
+
+### Prerequisites
+
+| Tool | Notes |
+| --- | --- |
+| Rust stable | Install through [rustup](https://rustup.rs/) using the `x86_64-pc-windows-msvc` toolchain. |
+| Visual Studio 2022 Build Tools | Install the “Desktop development with C++” workload. |
+| Node.js LTS and npm | Required for the frontend and build tooling. |
+| WebView2 runtime | Required to run the app. |
+| [Strawberry Perl](https://strawberryperl.com/) | Must be on `PATH` for the vendored OpenSSL/SQLCipher build. Git’s MSYS Perl does not work. |
+
+Install Strawberry Perl with:
+
+```powershell
+winget install StrawberryPerl.StrawberryPerl
+```
+
+### Run in development
+
+From the repository root:
 
 ```powershell
 npm install
 npm run tauri dev
 ```
 
-Release binary (no installer bundle):
+### Build a release executable
 
 ```powershell
 npx tauri build --no-bundle
-# → target\release\vaultair.exe
 ```
 
-## Prerequisites (Windows)
-
-| Tool | Notes |
-|---|---|
-| Rust stable, `x86_64-pc-windows-msvc` | via [rustup](https://rustup.rs/) |
-| MSVC Build Tools (VS 2022, “Desktop development with C++”) | |
-| Node.js LTS + npm | |
-| WebView2 runtime | included on Windows 10/11 |
-| **Strawberry Perl** | `winget install StrawberryPerl.StrawberryPerl` — required for vendored OpenSSL/SQLCipher; Git’s MSYS Perl does not work |
+The executable is written to `target\release\vaultair.exe`. This does not create an installer.
 
 ## Development
 
+### Tests and checks
+
 ```powershell
-npm run tauri dev              # app with hot reload
-cargo test --workspace         # Rust tests (regenerates src/ipc/bindings.ts when needed)
-npm test -- --run              # frontend tests
-npm run lint; npm run typecheck
+# Rust tests
+cargo test --workspace
+
+# Frontend tests
+npm test -- --run
+
+# Lint and type checks
+npm run lint
+npm run typecheck
+
+# Release configuration
 npm run check:release-config
-cargo deny check               # cargo install cargo-deny --locked
-npx tauri build --no-bundle
+
+# Dependency and license checks
+cargo deny check
 ```
 
-After changing IPC commands, run `cargo test -p vaultair` and commit any updates to `src/ipc/bindings.ts`. CI runs fmt, clippy, tests, dependency and license checks, and a guard against committing vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`).
+Install `cargo-deny` if needed:
+
+```powershell
+cargo install cargo-deny --locked
+```
+
+After changing IPC commands, run:
+
+```powershell
+cargo test -p vaultair
+```
+
+Commit any generated changes to `src/ipc/bindings.ts`.
+
+CI runs formatting, Clippy, tests, dependency checks, and license checks. It also checks for accidentally committed vault files: `*.vdb`, `*.vhdr`, and `*.vaultair-backup`.
 
 ## Documentation
 
-| Doc | Description |
-|---|---|
-| [`docs/product-spec.md`](docs/product-spec.md) | Product specification |
-| [`docs/architecture.md`](docs/architecture.md) | Layers and security baseline |
-| [`docs/vault-format.md`](docs/vault-format.md) | On-disk vault format |
-| [`docs/backup-restore.md`](docs/backup-restore.md) | Encrypted backups |
-| [`docs/threat-model.md`](docs/threat-model.md) | Threat model (draft) |
-| [`docs/implementation-plan.md`](docs/implementation-plan.md) | Phased build plan |
-| [`docs/phase-notes.md`](docs/phase-notes.md) | Phase-by-phase implementation log |
-| [`SECURITY.md`](SECURITY.md) | Reporting vulnerabilities |
+| Document | Covers |
+| --- | --- |
+| [Product specification](docs/product-spec.md) | Product requirements and scope |
+| [Architecture](docs/architecture.md) | Application layers and security baseline |
+| [Vault format](docs/vault-format.md) | On-disk storage format |
+| [Backup and restore](docs/backup-restore.md) | Encrypted backups |
+| [Threat model](docs/threat-model.md) | Security assumptions and threats; currently a draft |
+| [Implementation plan](docs/implementation-plan.md) | Phased development plan |
+| [Development log](docs/phase-notes.md) | Implementation progress and open tasks |
+| [Security policy](SECURITY.md) | How to report vulnerabilities |
 
 ## Security
 
-Please report security issues through [GitHub private vulnerability reporting](https://github.com/bubb4rd/vaultair/security/advisories/new) as described in [`SECURITY.md`](SECURITY.md). Do not open public issues for vulnerabilities.
+Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/bubb4rd/vaultair/security/advisories/new).
+
+Do not open public issues for security vulnerabilities. See [SECURITY.md](SECURITY.md) for reporting details.
 
 ## License
 
-Source in this repository is **proprietary** (all rights reserved). Third-party components retain their own licenses; see Settings → About in the app and [Third-party content](#third-party-content) below.
+The source code in this repository is proprietary. All rights reserved.
+
+Third-party components retain their own licenses. See the list below and Settings → About in the app.
 
 ## Third-party content
 
-- Platform and game logos: [Simple Icons](https://simpleicons.org) (CC0); trademarks belong to their owners
-- Database: [SQLCipher](https://www.zetetic.net/sqlcipher/) (BSD-style)
-- UI font: [Geist](https://vercel.com/font) (SIL OFL 1.1)
-- Graph layout: [@dagrejs/dagre](https://github.com/dagrejs/dagre) (MIT)
-- Passphrase wordlist: [EFF large wordlist](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) ([CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/))
+| Component | License / attribution |
+| --- | --- |
+| Platform and game logos from [Simple Icons](https://simpleicons.org) | CC0; trademarks belong to their respective owners |
+| [SQLCipher](https://www.zetetic.net/sqlcipher/) | BSD-style |
+| [Geist](https://vercel.com/font) UI font | SIL OFL 1.1 |
+| [@dagrejs/dagre](https://github.com/dagrejs/dagre) graph layout | MIT |
+| [EFF large wordlist](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) | [CC BY 3.0 US](https://creativecommons.org/licenses/by/3.0/us/) |
