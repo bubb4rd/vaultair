@@ -326,6 +326,16 @@ describe("lock screen", () => {
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
   });
 
+  it("shows the vault render as a decorative hero panel beside the form", async () => {
+    await renderApp("/", { unlocked: false, recents: [recent("Main")] });
+    await screen.findByRole("heading", { level: 1, name: "Main" });
+    const hero = screen.getByTestId("lock-hero");
+    expect(hero).toHaveAttribute("aria-hidden", "true");
+    const img = hero.querySelector("img");
+    expect(img).toHaveAttribute("alt", "");
+    expect(img?.getAttribute("src")).toMatch(/vault-hero/);
+  });
+
   it("has no axe violations", async () => {
     const { container } = await renderApp("/", { unlocked: false, recents: [recent("Main"), recent("Alts")] });
     await screen.findByRole("heading", { level: 1, name: "Main" });
