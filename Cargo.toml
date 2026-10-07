@@ -5,7 +5,7 @@ members = ["crates/vaultair-core", "crates/vaultair-platform", "src-tauri"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.89" # File::try_lock (vault .lock file)
+rust-version = "1.90" # Tauri 2.12; our own floor is 1.89 for File::try_lock (vault .lock file)
 license = "LicenseRef-Proprietary"
 publish = false
 

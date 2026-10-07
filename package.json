@@ -29,7 +29,7 @@
     "@tanstack/react-query": "5.103.2",
     "@tanstack/react-router": "1.170.39",
     "@tanstack/react-virtual": "3.14.13",
-    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/api": "2.12.1",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
@@ -42,7 +42,7 @@
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@tailwindcss/vite": "4.3.3",
-    "@tauri-apps/cli": "2.11.5",
+    "@tauri-apps/cli": "2.12.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",

@@ -9,10 +9,9 @@ all-features = true
 version = 2
 yanked = "deny"
 # Vulnerabilities always fail. "Unmaintained" only fails for crates we depend on directly:
-# as of 2026-10-06 the transitive ones are `paste` (compile-time macro, via specta, which has
-# no newer release) and `unic-*` (via tauri-utils 2.9 -> urlpattern 0.3). tauri-utils 2.10
-# drops `unic-*` but needs Rust 1.90 and belongs to the next Tauri minor, so it waits for
-# that upgrade. None of them has a known vulnerability.
+# as of 2026-10-07 the only transitive one is `paste` (compile-time macro, via specta, which
+# has no newer release). It has no known vulnerability. The `unic-*` crates went away with
+# Tauri 2.12 (tauri-utils 2.10 -> urlpattern 0.6).
 # `cargo audit` reads the whole lockfile and also lists `glib` (unsound) and
 # `proc-macro-error` (unmaintained). Both are GTK crates for Linux and are not in the
 # Windows graph checked here (see [graph].targets).

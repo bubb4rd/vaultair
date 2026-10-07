@@ -142,7 +142,7 @@ fn watch_prompt(done: &AtomicBool) {
 
 fn open(name: &str) -> Result<KeyCredential, HelloError> {
     let result = KeyCredentialManager::OpenAsync(&HSTRING::from(name))
-        .and_then(|op| op.get())
+        .and_then(|op| op.join())
         .map_err(failed("OpenAsync"))?;
     check(result.Status().map_err(failed("open status"))?, "open")?;
     result.Credential().map_err(failed("Credential"))
@@ -152,7 +152,7 @@ fn sign_with(key: &KeyCredential, challenge: &[u8]) -> Result<Zeroizing<Vec<u8>>
     let data = CryptographicBuffer::CreateFromByteArray(challenge).map_err(failed("challenge"))?;
     let result = key
         .RequestSignAsync(&data)
-        .and_then(|op| op.get())
+        .and_then(|op| op.join())
         .map_err(failed("RequestSignAsync"))?;
     check(result.Status().map_err(failed("sign status"))?, "sign")?;
 
@@ -168,7 +168,7 @@ fn sign_with(key: &KeyCredential, challenge: &[u8]) -> Result<Zeroizing<Vec<u8>>
 
 impl QuickUnlockKey for WindowsHello {
     fn available(&self) -> HelloAvailability {
-        match KeyCredentialManager::IsSupportedAsync().and_then(|op| op.get()) {
+        match KeyCredentialManager::IsSupportedAsync().and_then(|op| op.join()) {
             Ok(true) => HelloAvailability::Available,
             Ok(false) => HelloAvailability::NotSetUp,
             Err(_) => HelloAvailability::Unsupported,
@@ -181,7 +181,7 @@ impl QuickUnlockKey for WindowsHello {
             &HSTRING::from(name),
             KeyCredentialCreationOption::ReplaceExisting,
         )
-        .and_then(|op| op.get())
+        .and_then(|op| op.join())
         .map_err(failed("RequestCreateAsync"))?;
         check(result.Status().map_err(failed("create status"))?, "create")?;
         // Sign with the credential the create call returned. Windows lets
@@ -199,7 +199,7 @@ impl QuickUnlockKey for WindowsHello {
 
     fn delete(&self, name: &str) -> Result<(), HelloError> {
         // Fails when there is no such key, which is the state asked for.
-        let _ = KeyCredentialManager::DeleteAsync(&HSTRING::from(name)).and_then(|op| op.get());
+        let _ = KeyCredentialManager::DeleteAsync(&HSTRING::from(name)).and_then(|op| op.join());
         Ok(())
     }
 }
