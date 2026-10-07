@@ -453,7 +453,7 @@ export function LockScreen({ initialPath = null, onUnlocked, onCreateNew }: Lock
           <div className="absolute inset-0 bg-linear-to-t from-[#111111]/90 via-transparent to-transparent" />
           <div
             className={cn(
-              "absolute top-[34%] -left-14 w-[min(420px,calc(100%+24px))] rounded-xl border border-border-strong bg-popover/85 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md",
+              "absolute top-[34%] -left-8 w-[min(420px,calc(100%+24px))] rounded-xl border border-border-strong bg-popover/85 p-4 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] backdrop-blur-md",
               "animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 ease-out fill-mode-both",
             )}
           >
