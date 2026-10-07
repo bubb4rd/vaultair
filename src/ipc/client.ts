@@ -377,6 +377,15 @@ export const quickUnlock = {
   /** Shows a Windows Hello prompt. */
   unlock: (path: string): Promise<VaultInfo> => unwrap(() => commands.quickUnlockUnlock(path)),
   forget: (password: string): Promise<QuickUnlockStatus> => data(() => commands.quickUnlockForget(password)),
+  /** Whether to offer turning it on now: the master password just opened a vault without it. */
+  offer: (): Promise<boolean> => data(() => commands.quickUnlockOffer()),
+  /** Declines the offer until Vaultair restarts, or with `forever` for good on this PC. */
+  dismissOffer: (forever: boolean): Promise<void> => call(() => commands.quickUnlockOfferDismiss(forever)),
+  /**
+   * Turns it on without retyping a master password typed a moment ago. Shows a Windows Hello
+   * prompt. Rejects with `quick_unlock_password_required` once the password is no longer fresh.
+   */
+  enableNow: (): Promise<QuickUnlockStatus> => data(() => commands.quickUnlockEnableNow()),
 };
 
 /** The open vault's settings, its name and colour, and its master password. */

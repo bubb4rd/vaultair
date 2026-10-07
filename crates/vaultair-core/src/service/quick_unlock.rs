@@ -43,6 +43,15 @@ pub const MAX_FAILURES: u8 = 3;
 /// The start of the Windows session is worked out as now minus the uptime,
 /// so two readings of the same session differ a little.
 pub const BOOT_TOLERANCE_SECS: i64 = 120;
+/// Quick unlock can be turned on without typing the master password again
+/// for this long after it opened the session.
+pub const PASSWORD_FRESH_SECS: u64 = 5 * 60;
+
+fn password_is_fresh(session: &SessionManager) -> bool {
+    session
+        .password_age()
+        .is_some_and(|age| age.as_secs() <= PASSWORD_FRESH_SECS)
+}
 
 /// The name of a vault's Hello key. Hello rejects `/` in names.
 pub fn key_name(vault_id: &str) -> String {
@@ -324,21 +333,64 @@ impl QuickUnlock {
         // Argon2, outside the session lock.
         let keys =
             VaultKeys::derive(vault::unwrap_dek(&header, password)?).map_err(VaultError::from)?;
-        let binding = header_binding(&header);
+        self.enroll(session, &header, Some(&keys))
+    }
+
+    /// Whether [`Self::enable_after_password`] would go ahead: Hello is set
+    /// up, quick unlock is off for the open vault, and the master password
+    /// opened this session a moment ago. The UI offers it only then.
+    pub fn can_offer(&self, session: &SessionManager) -> bool {
+        self.device.hello() == HelloState::Available
+            && self.devices_dir.is_some()
+            && password_is_fresh(session)
+            && !self.enabled_for_open_vault(session)
+    }
+
+    /// Turns quick unlock on for the open vault without asking for the
+    /// master password again, because it was typed to open this session
+    /// within [`PASSWORD_FRESH_SECS`]. Later than that, or after a Hello
+    /// unlock: `PasswordRequired`, and the UI asks for it ([`Self::enable`]).
+    /// One Hello prompt.
+    pub fn enable_after_password(
+        &self,
+        session: &SessionManager,
+    ) -> Result<QuickUnlockStatus, QuickUnlockError> {
+        if self.device.hello() != HelloState::Available || self.devices_dir.is_none() {
+            return Err(QuickUnlockError::Unavailable);
+        }
+        if !password_is_fresh(session) {
+            return Err(QuickUnlockError::PasswordRequired);
+        }
+        let header = session.with_vault(|v| Ok::<_, VaultError>(v.header().clone()))?;
+        self.enroll(session, &header, None)
+    }
+
+    /// Creates the Hello key (one prompt) and writes the slot for `header`.
+    /// `keys` come from the password just checked; without them the open
+    /// session's own are used.
+    fn enroll(
+        &self,
+        session: &SessionManager,
+        header: &VaultHeader,
+        keys: Option<&VaultKeys>,
+    ) -> Result<QuickUnlockStatus, QuickUnlockError> {
+        let binding = header_binding(header);
         let name = key_name(&header.vault_id);
 
         let _gate = self.gate();
         let challenge = DeviceSlot::new_challenge().map_err(|_| QuickUnlockError::Failed)?;
         let signature = self.device.enroll(&name, &challenge)?;
-        let sealed = self
-            .seal(&header, &binding, &keys, &challenge, &signature)
-            .and_then(|slot| {
-                // A password change that landed meanwhile would void the slot.
-                let unchanged =
-                    session.with_vault(|v| Ok::<_, VaultError>(v.header() == &header))?;
-                if !unchanged {
+        let sealed = session
+            .with_vault(|v| {
+                // A password change that landed meanwhile would void the slot,
+                // and a lock while the prompt was up ends the offer.
+                if v.header() != header {
                     return Err(VaultError::Io(std::io::ErrorKind::Interrupted).into());
                 }
+                let keys = keys.unwrap_or_else(|| v.keys());
+                self.seal(header, &binding, keys, &challenge, &signature)
+            })
+            .and_then(|slot| {
                 self.save(&slot)?;
                 Ok(slot)
             });
@@ -794,6 +846,82 @@ mod tests {
         );
         assert_eq!(h.device.prompts(), 0);
         assert!(!h.slot_file().exists());
+    }
+
+    #[test]
+    fn it_turns_on_without_retyping_a_password_just_typed() {
+        let h = Harness::new();
+        assert!(h.quick.can_offer(&h.session));
+        let status = h.quick.enable_after_password(&h.session).unwrap();
+        assert!(status.enabled);
+        assert_eq!(status.password_required, None);
+        assert_eq!(h.device.prompts(), 1);
+        assert!(!h.quick.can_offer(&h.session), "nothing left to offer");
+
+        // The slot opens the vault like one made with the password dialog.
+        assert!(h.session.lock());
+        assert!(h.unlock().is_ok());
+        assert!(h.session.integrity_check().unwrap().ok);
+    }
+
+    #[test]
+    fn a_password_typed_a_while_ago_is_asked_for_again() {
+        let h = Harness::new();
+        h.clock.advance(Duration::from_secs(PASSWORD_FRESH_SECS));
+        assert!(h.quick.can_offer(&h.session));
+        h.clock.advance(Duration::from_secs(1));
+
+        assert!(!h.quick.can_offer(&h.session));
+        assert_eq!(
+            h.quick.enable_after_password(&h.session).err(),
+            Some(QuickUnlockError::PasswordRequired)
+        );
+        assert_eq!(h.device.prompts(), 0, "no Hello prompt is shown");
+        assert!(!h.slot_file().exists());
+        // The password dialog still works.
+        assert!(h.quick.enable(&h.session, &pw(PASSWORD)).is_ok());
+    }
+
+    #[test]
+    fn a_session_hello_opened_cannot_turn_it_on_without_the_password() {
+        let h = Harness::enabled();
+        h.unlock().unwrap();
+        // The slot went missing while the vault was open.
+        fs::remove_file(h.slot_file()).unwrap();
+        let prompts = h.device.prompts();
+
+        assert!(!h.quick.can_offer(&h.session));
+        assert_eq!(
+            h.quick.enable_after_password(&h.session).err(),
+            Some(QuickUnlockError::PasswordRequired)
+        );
+        assert_eq!(h.device.prompts(), prompts);
+        assert!(!h.slot_file().exists());
+    }
+
+    #[test]
+    fn a_locked_vault_is_offered_nothing() {
+        let h = Harness::new();
+        assert!(h.session.lock());
+        assert!(!h.quick.can_offer(&h.session));
+        assert_eq!(
+            h.quick.enable_after_password(&h.session).err(),
+            Some(QuickUnlockError::PasswordRequired)
+        );
+        assert_eq!(h.device.prompts(), 0);
+    }
+
+    #[test]
+    fn a_cancelled_one_click_enrollment_leaves_nothing_behind() {
+        let h = Harness::new();
+        h.device.cancel.store(true, Ordering::SeqCst);
+        assert_eq!(
+            h.quick.enable_after_password(&h.session).err(),
+            Some(QuickUnlockError::Cancelled)
+        );
+        assert!(!h.slot_file().exists());
+        assert!(h.device.keys.lock().unwrap().is_empty());
+        assert!(h.quick.can_offer(&h.session), "it can be tried again");
     }
 
     #[test]

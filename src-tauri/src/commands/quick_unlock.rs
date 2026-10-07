@@ -1,11 +1,15 @@
 //! Quick unlock commands (ADR-0005): whether Windows Hello can unlock a
 //! vault right now, turning it on and off, and unlocking with it.
 //!
-//! Turning it on or off takes the master password. Every failure is a
-//! static code; the UI falls back to the password field.
+//! Turning it on or off takes the master password, except that it can be
+//! turned on without retyping one that opened the session a moment ago.
+//! Every failure is a static code; the UI falls back to the password field.
+
+use std::sync::atomic::Ordering;
 
 use tauri::State;
 use vaultair_core::service::quick_unlock::{QuickUnlockError, QuickUnlockStatus};
+use vaultair_core::service::session::VaultStatus;
 use vaultair_core::vault::VaultInfo;
 use vaultair_core::AppError;
 
@@ -47,6 +51,45 @@ pub async fn quick_unlock_enable(
     let password = secrecy::SecretString::from(password);
     let (quick, session) = (state.quick.clone(), state.session.clone());
     blocking(move || quick.enable(&session, &password)).await
+}
+
+/// Whether to offer Windows Hello unlock now: the master password just
+/// opened a vault that doesn't have it, Hello is set up on this PC, and the
+/// user hasn't declined. Never for a demo vault.
+#[tauri::command]
+#[specta::specta]
+pub async fn quick_unlock_offer(state: State<'_, AppState>) -> IpcResult<bool> {
+    if state.config.hello_offer_dismissed() || state.hello_offer_snoozed.load(Ordering::Relaxed) {
+        return Ok(false);
+    }
+    let (quick, session) = (state.quick.clone(), state.session.clone());
+    blocking(move || {
+        let demo = matches!(session.status(), VaultStatus::Unlocked { vault } if vault.demo);
+        Ok(!demo && quick.can_offer(&session))
+    })
+    .await
+}
+
+/// Declines the offer: until Vaultair restarts, or with `forever` for good
+/// on this PC. Settings > Security can still turn Hello unlock on.
+#[tauri::command]
+#[specta::specta]
+pub fn quick_unlock_offer_dismiss(state: State<'_, AppState>, forever: bool) {
+    state.hello_offer_snoozed.store(true, Ordering::Relaxed);
+    if forever {
+        state.config.set_hello_offer_dismissed(true);
+    }
+    tracing::info!(forever, "Windows Hello offer declined");
+}
+
+/// Turns quick unlock on without asking for the master password again,
+/// while it is fresh from opening this session; later than that it is
+/// `quick_unlock_password_required` and the UI asks. Shows a Hello prompt.
+#[tauri::command]
+#[specta::specta]
+pub async fn quick_unlock_enable_now(state: State<'_, AppState>) -> IpcResult<QuickUnlockStatus> {
+    let (quick, session) = (state.quick.clone(), state.session.clone());
+    blocking(move || quick.enable_after_password(&session)).await
 }
 
 /// Unlocks the vault in `path` with Windows Hello. Shows a Hello prompt.

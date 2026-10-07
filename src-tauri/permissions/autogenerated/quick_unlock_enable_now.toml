@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-quick-unlock-enable-now"
+description = "Enables the quick_unlock_enable_now command without any pre-configured scope."
+commands.allow = ["quick_unlock_enable_now"]
+
+[[permission]]
+identifier = "deny-quick-unlock-enable-now"
+description = "Denies the quick_unlock_enable_now command without any pre-configured scope."
+commands.deny = ["quick_unlock_enable_now"]

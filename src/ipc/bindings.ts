@@ -326,6 +326,23 @@ export const commands = {
 	 */
 	quickUnlockForget: (password: string) => typedError<QuickUnlockStatus, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_forget", { password })),
 	/**
+	 *  Whether to offer Windows Hello unlock now: the master password just
+	 *  opened a vault that doesn't have it, Hello is set up on this PC, and the
+	 *  user hasn't declined. Never for a demo vault.
+	 */
+	quickUnlockOffer: () => typedError<boolean, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_offer")),
+	/**
+	 *  Declines the offer: until Vaultair restarts, or with `forever` for good
+	 *  on this PC. Settings > Security can still turn Hello unlock on.
+	 */
+	quickUnlockOfferDismiss: (forever: boolean) => __TAURI_INVOKE<void>("quick_unlock_offer_dismiss", { forever }),
+	/**
+	 *  Turns quick unlock on without asking for the master password again,
+	 *  while it is fresh from opening this session; later than that it is
+	 *  `quick_unlock_password_required` and the UI asks. Shows a Hello prompt.
+	 */
+	quickUnlockEnableNow: () => typedError<QuickUnlockStatus, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_enable_now")),
+	/**
 	 *  Saves whether closing the window keeps Vaultair in the tray, and shows
 	 *  or removes the tray icon to match.
 	 */

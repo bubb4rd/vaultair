@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -26,6 +27,9 @@ pub struct AppState {
     pub capture: Arc<dyn CaptureProtection>,
     /// Windows Hello quick unlock (ADR-0005).
     pub quick: Arc<QuickUnlock>,
+    /// "Not now" on the offer to turn Hello unlock on: no more offers until
+    /// Vaultair restarts.
+    pub hello_offer_snoozed: AtomicBool,
 }
 
 impl std::fmt::Debug for AppState {
@@ -81,6 +85,7 @@ impl AppState {
                 default_app_dir(),
                 Arc::new(SystemClock),
             )),
+            hello_offer_snoozed: AtomicBool::new(false),
         }
     }
 }

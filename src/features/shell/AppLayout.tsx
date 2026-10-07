@@ -6,6 +6,7 @@ import { onClipboardCleared } from "@/ipc/events";
 import { CaptureGuard } from "@/features/settings/CaptureGuard";
 import { ActivityTracker } from "./ActivityTracker";
 import { CommandPalette } from "./CommandPalette";
+import { HelloOffer } from "./HelloOffer";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
@@ -56,6 +57,7 @@ export function AppLayout() {
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ActivityTracker />
       <CaptureGuard />
+      <HelloOffer />
     </div>
   );
 }
