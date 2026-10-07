@@ -93,10 +93,12 @@ describe("dashboard health", () => {
   it("renders the health counts and a needs-attention fix", async () => {
     setIdentityFilter(null);
     await renderApp("/", handlers());
-    const weak = await screen.findByRole("link", { name: /Weak passwords/ });
-    expect(within(weak).getByText("2")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Reused passwords/ })).toBeInTheDocument();
-    expect(screen.getByText("This password is weak.", { exact: false })).toBeInTheDocument();
+    // 2 weak + 1 reused + 3 missing codes + 1 dormant, counted once per check.
+    expect(await screen.findByText("open issues")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Security Health" })).toHaveAttribute("href", "/health");
+    const attention = screen.getByRole("list", { name: "Issues, highest severity first" });
+    expect(within(attention).getByText("This password is weak.", { exact: false })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Fix Arena alt" })).toBeInTheDocument();
   });
 

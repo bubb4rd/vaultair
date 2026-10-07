@@ -415,11 +415,11 @@ describe("dashboard", () => {
       "/",
       withIdentities({ dashboard_summary: (a) => summary((a.identityId as string | null) ?? null) }),
     );
-    expect(await screen.findByText("Needs MFA")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "3 without MFA" })).toBeInTheDocument();
     expect(calls).toContainEqual({ cmd: "dashboard_summary", args: { identityId: null } });
 
     await user.selectOptions(screen.getByRole("combobox", { name: "Filter by identity" }), "i1");
-    expect(await screen.findByText("All covered")).toBeInTheDocument();
+    expect(await screen.findByText("None without MFA")).toBeInTheDocument();
     expect(calls).toContainEqual({ cmd: "dashboard_summary", args: { identityId: "i1" } });
     expect(screen.getByText("only.").parentElement).toHaveTextContent(/Showing.*Competitive.*only./);
     setIdentityFilter(null);
@@ -441,7 +441,7 @@ describe("accessibility", () => {
     ["the identity list", "/identities", "Ranked accounts"],
     ["the identity detail", "/identities/i1", "Recovery dependencies"],
     ["the identity form", "/identities/new", "Create identity"],
-    ["the dashboard", "/", "Recently edited"],
+    ["the dashboard", "/", "Recent activity"],
   ])("%s has no axe violations", async (_name, path, ready) => {
     setIdentityFilter(null);
     const { container } = await renderApp(

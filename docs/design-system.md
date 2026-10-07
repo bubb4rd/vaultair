@@ -141,6 +141,17 @@ Radix dialogs (the command palette) inject a scroll-lock `<style>` tag, which th
 - **Popover** (`GeneratorPopover`, 340 px, overlay radius 12 px): mode, value with a regenerate icon, strength, length or words, then Copy and "Use password". Other options come from the page's last settings.
 - **New primitives**: `Switch` (brand when on), `Slider` (brand range, 2 px focus ring with offset), `Popover`, and `SegmentedGroup` (a Radix radio group styled like the default tabs list, arrow keys move the selection).
 
+## Dashboard (redesigned 2026-10-07)
+
+**Design read**: the owner asked for four dashboard variations with a SaaS feel (two from Opus, two from Fable), then had a fifth composed from the parts they liked and locked it in. Dials unchanged (4 / 3 / 5). The reference for the chart was a dot-matrix "signal" panel the owner supplied.
+
+- **Status strip**: one card divided by hairlines into four cells, never separate tiles: Vault (account total, a main/alt split bar, favorites), Protected by MFA (the percentage in the secure green, a ten-segment meter, the count without MFA linking to Security Health), Backup ("Last backup 30 hours ago", the time and folder in mono, a Backup settings link) and Quick actions (three square tiles, Add account the one filled one). It folds to two by two under 1120 px and to one column under 720 px.
+- **Bars explain themselves on hover**: the split bar has no legend. Each segment is focusable and shows a tooltip with its swatch, label and count; the same words are its accessible name.
+- **Security health** sits under the strip with no card: the open-issue count as the big figure with the change since the first recorded day, then a dot matrix with one column every 9 px across the width and up to 18 rows, lit from the bottom and scaled so the busiest day fills the rows. Every dot is the muted grey until a column is hovered or focused, when its dots split into the five checks in their status colours (weak and reused red, missing MFA orange, missing recovery codes yellow, dormant grey) and the tooltip lists the counts for the nearest recorded day. Date labels sit under the dots; the caption says how the count is made and that days between records are interpolated.
+- **History is not stored yet.** Rust computes the checks live, so `healthTrend.ts` takes an injectable source and production shows today only, with a caption saying history builds up from today. Recording a daily snapshot (a small `health_history` table written on unlock) is the follow-up that makes the chart real. The browser preview (`dev/preview.html`) injects thirty days of fixture counts.
+- **Below**: Recent activity as a timeline grouped Today / Yesterday / Earlier (account logo, title link, purpose · identity, favorite star, relative time) and, in a 300 px right rail, Needs attention (severity badge, title, rule · reason, Fix link, "All n" to Security Health).
+- **Tooltips** across the app moved from shadcn's inverted default to the popover surface with a hairline border and a matching arrow, so they read like menus rather than a white box.
+
 ## Relationship map (Phase 13)
 
 **Design read** (design-taste-frontend): an in-app relationship graph for a desktop security utility, trust-first and restrained; extends this system with no new look. Dials unchanged (4 / 3 / 5). Taste's scope excludes dense product UI, so it set the node language only. The one inspo search for graph views returned a single marketing page, so no reference was taken from it.

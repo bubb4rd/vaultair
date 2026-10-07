@@ -340,7 +340,7 @@ describe("backup reminder", () => {
   it("stays away after a recent backup", async () => {
     await renderApp("/", { handlers: { ...dashboard, backup_status: () => DONE } });
     await screen.findByRole("heading", { level: 1, name: "Dashboard" });
-    await screen.findByText("Alt accounts");
+    await screen.findByText("Protected by MFA");
     expect(screen.queryByText("Backup due.")).not.toBeInTheDocument();
   });
 });
