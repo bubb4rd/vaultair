@@ -80,6 +80,12 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
+      # Production dependencies are bundled into the installer: any advisory fails.
+      - name: npm audit (shipped dependencies)
+        run: npm audit --omit=dev --audit-level=low
+      # Dev dependencies only run on build machines, but they produce the bundle: high and critical fail.
+      - name: npm audit (all dependencies)
+        run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test -- --run
