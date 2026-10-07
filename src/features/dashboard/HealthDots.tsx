@@ -100,12 +100,30 @@ function splitRows(counts: HealthCounts, rows: number): Record<HealthCheck, numb
 }
 
 /**
- * Open issues per day as a dot matrix in the style of a signal chart: one
- * column every 9px across the width, lit from the bottom and scaled so the
- * busiest day fills the rows. Recorded days are spread across the width and the columns
- * between them are interpolated. Every dot is the same grey until a column
- * is hovered or focused: then its dots split into the five checks in their
- * status colours and the tooltip lists the counts for the nearest day.
+ * How many dots a day's issue count draws.
+ *
+ * One open issue is one dot. The grid compresses only when the busiest day
+ * has more issues than there are rows: that day fills the chart and quieter
+ * days scale down with it. A quiet day is never stretched to the top just
+ * because it is the peak. That matters while history is a single snapshot:
+ * today is always the peak, so peak-relative scaling painted a full grid for
+ * one issue and still did after the user came back and fixed some.
+ */
+function dotRows(total: number, peak: number): number {
+  if (total <= 0) return 0;
+  const unit = Math.max(1, peak / ROWS);
+  return Math.min(ROWS, Math.max(1, Math.round(total / unit)));
+}
+
+/**
+ * Open issues per day as a dot matrix in the style of a signal chart, lit
+ * from the bottom. Recorded days start at the left and step right, one
+ * column every 9px. A history shorter than the plot leaves the rest empty.
+ * Only a history with more days than columns is compressed across the full
+ * width, with the columns between recorded days interpolated. Every dot is
+ * the same grey until a column is hovered or focused: then its dots split
+ * into the five checks in their status colours and the tooltip lists the
+ * counts for the nearest day.
  */
 function DotChart({ today, scope }: { today: HealthTrendPoint; scope: string }) {
   const points = useHealthTrend(today);
@@ -118,37 +136,46 @@ function DotChart({ today, scope }: { today: HealthTrendPoint; scope: string }) 
   const span = daysSince(dayDate(first.date).toISOString(), dayDate(last.date));
   const todayTotal = totalOf(last.counts);
 
-  const columns = Math.max(1, Math.floor((width - PAD_LEFT * 2) / COL_PITCH));
+  const capacity = Math.max(1, Math.floor((width - PAD_LEFT * 2) / COL_PITCH));
+  // Short histories stay left-aligned: one column per day, growing right.
+  // A longer history is the only case that fills the plot.
+  const packed = points.length <= capacity;
+  const columns = packed ? points.length : capacity;
   const cells = Array.from({ length: columns }, (_, c) => {
-    const t = single || columns === 1 ? 0 : (c / (columns - 1)) * (points.length - 1);
+    const t = packed || columns === 1 ? c : (c / (columns - 1)) * (points.length - 1);
     const counts = countsAt(points, t);
     const nearest = points[Math.round(t)] ?? last;
     return { counts, total: totalOf(counts), nearest };
   });
   const peak = Math.max(1, ...points.map((p) => totalOf(p.counts)));
   const peakDay = points.find((p) => totalOf(p.counts) === peak) ?? last;
-  /** Issues per dot: the busiest day reaches the top row. Anything open shows at least one dot. */
-  const unit = peak / ROWS;
-  const rowsOf = (total: number) => (total <= 0 ? 0 : Math.min(ROWS, Math.max(1, Math.round(total / unit))));
   const xOf = (c: number) => PAD_LEFT + c * COL_PITCH + COL_PITCH / 2;
   const yOfRow = (row: number) => PAD_TOP + PLOT_HEIGHT - (row + 0.5) * ROW_PITCH;
 
-  // Date labels: five across, on recorded days.
-  const labelAt = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (columns - 1)));
-  const labels = single
-    ? [{ x: xOf(0), text: shortDate.format(dayDate(last.date)), anchor: "start" as const }]
-    : labelAt.map((c, i) => ({
-        x: xOf(c),
-        text: shortDate.format(dayDate(cells[c]?.nearest.date ?? last.date)),
-        anchor: i === 0 ? ("start" as const) : i === labelAt.length - 1 ? ("end" as const) : ("middle" as const),
-      }));
+  // Date labels sit on the columns. A short run has one label at the start,
+  // so it doesn't collide with the next day 9px away.
+  const labelAt =
+    columns <= 1 || (packed && columns * COL_PITCH < 120)
+      ? [0]
+      : [...new Set([0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (columns - 1))))];
+  const labels = labelAt.map((c, i) => ({
+    x: i === 0 ? PAD_LEFT : xOf(c),
+    text: shortDate.format(dayDate((packed ? points[c] : cells[c]?.nearest)?.date ?? last.date)),
+    anchor: i === 0 ? ("start" as const) : i === labelAt.length - 1 && !packed ? ("end" as const) : ("middle" as const),
+  }));
 
   const summary = single
     ? `Security health today: ${plural(todayTotal, "open issue")} across ${scope}. No earlier days are recorded.`
     : `Security health over the last ${plural(span, "day")}: ${plural(todayTotal, "open issue")} today, ${changeWords(first, last)}. Peak ${number.format(peak)}.`;
+  const oneDot =
+    todayTotal <= 0
+      ? ""
+      : todayTotal > ROWS
+        ? ` The column stops at ${String(ROWS)} dots; the figure above is the full count.`
+        : " Each dot is one open issue.";
   const caption = single
-    ? `Open issues across the five checks for ${scope}. History builds up from today; the counts are recorded each time the dashboard opens.`
-    : `Open issues across the five checks for ${scope}. The tallest column is the busiest day, ${number.format(peak)} on ${shortDate.format(dayDate(peakDay.date))}. An account with more than one issue counts once per check. Days between records are filled in. Hover a column for its breakdown.`;
+    ? `Open issues across the five checks for ${scope}.${oneDot} History builds up from today; the counts are recorded each time the dashboard opens.`
+    : `Open issues across the five checks for ${scope}. ${peak > ROWS ? `The tallest column is the busiest day, ${number.format(peak)} on ${shortDate.format(dayDate(peakDay.date))}.` : "Each dot is one open issue."} An account with more than one issue counts once per check. ${packed ? "Each recorded day is a column, starting at the left." : "Days between records are filled in."} Hover a column for its breakdown.`;
 
   return (
     <div className="flex flex-col gap-3">
@@ -164,7 +191,7 @@ function DotChart({ today, scope }: { today: HealthTrendPoint; scope: string }) 
           <svg role="img" aria-label={summary} width={width} height={CHART_HEIGHT} className="block overflow-visible">
             <g aria-hidden="true">
               {cells.map((cell, c) => {
-                const rows = rowsOf(cell.total);
+                const rows = dotRows(cell.total, peak);
                 const active = hovered === c;
                 const split = active ? splitRows(cell.counts, rows) : null;
                 // Dots from the bottom, each check's run stacked in check order.
