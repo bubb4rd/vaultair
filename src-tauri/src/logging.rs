@@ -51,6 +51,21 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(log_panic));
 }
 
+/// Which kind of Tauri error this is, for a log line: its variant name
+/// ("Io", "AssetNotFound"), a fixed word. The error's own text is Tauri's,
+/// not ours, and can quote a path, which can hold a Windows user name.
+pub(crate) fn error_kind(err: &tauri::Error) -> String {
+    let kind: String = format!("{err:?}")
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric())
+        .collect();
+    if kind.is_empty() {
+        "unknown".to_owned()
+    } else {
+        kind
+    }
+}
+
 fn log_panic(info: &std::panic::PanicHookInfo<'_>) {
     match info.location() {
         Some(loc) => tracing::error!(file = loc.file(), line = loc.line(), "panic"),
@@ -79,6 +94,22 @@ mod tests {
         fn flush(&mut self) -> std::io::Result<()> {
             Ok(())
         }
+    }
+
+    /// A Tauri error is logged by its variant name. Its text, which can
+    /// quote a path under the user's profile, stays out.
+    #[test]
+    fn a_tauri_error_is_logged_by_kind_never_by_text() {
+        let path = r"C:\Users\CANARYUSER\Vaults\CANARY7F3A";
+        let io = tauri::Error::Io(std::io::Error::other(path));
+        assert!(io.to_string().contains("CANARYUSER"), "sanity: {io}");
+        assert_eq!(error_kind(&io), "Io");
+        let asset = tauri::Error::AssetNotFound(path.to_owned());
+        assert_eq!(error_kind(&asset), "AssetNotFound");
+        assert_eq!(
+            error_kind(&tauri::Error::WebviewNotFound),
+            "WebviewNotFound"
+        );
     }
 
     /// A panic message is built from whatever the failing code had in hand,

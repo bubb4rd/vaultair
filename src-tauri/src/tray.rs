@@ -60,7 +60,10 @@ pub fn set_visible(app: &AppHandle, visible: bool) {
         return;
     };
     if let Err(err) = tray.set_visible(visible) {
-        tracing::warn!(error = %err, "could not change the tray icon");
+        tracing::warn!(
+            kind = %crate::logging::error_kind(&err),
+            "could not change the tray icon"
+        );
     }
 }
 

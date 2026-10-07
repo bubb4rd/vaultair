@@ -20,6 +20,9 @@ pub struct ClipboardCleared;
 /// Emits `event`, logging (not failing) if the webview is gone.
 pub fn emit<E: Event + Serialize + Clone>(app: &AppHandle, event: E) {
     if let Err(err) = event.emit(app) {
-        tracing::error!(error = %err, "could not emit event");
+        tracing::error!(
+            kind = %crate::logging::error_kind(&err),
+            "could not emit event"
+        );
     }
 }
