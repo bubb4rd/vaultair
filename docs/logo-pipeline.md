@@ -115,7 +115,7 @@ Add a short rule to `docs/design-system.md` under the node and catalog sections:
 | Graph `NodeMark`, account nodes | **Not available today.** `GraphNode` only carries the account's mark slug. Add `mark_id: Option<String>` to `GraphNode` (`crates/vaultair-core/src/domain/graph.rs`), set in `graph/builder.rs` from the same platform/game choice that sets `icon`, regenerate `src/ipc/bindings.ts` with `cargo test -p vaultair`, and update the graph tests |
 | Graph `NodeMark`, prospective accounts | `emailProvider(label).platformId` |
 
-The graph files have uncommitted in-progress work (V8 prospects). Do the graph change last, after that work lands, and don't reformat or restructure the graph files beyond the field.
+The graph work this waited for (V8 prospects) has landed, so the graph change can go ahead. Don't reformat or restructure the graph files beyond the field.
 
 ## The script
 

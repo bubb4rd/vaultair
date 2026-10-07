@@ -14,7 +14,7 @@ Vaultair is a program on your PC. It has no account, no server and no internet c
 | Backups, when you make them: a complete copy of one vault in one file | A folder you choose in Settings > Backups | Yes, the same way as the vault. A backup opens with the master password the vault had when it was made |
 | A list of recently opened vaults (folder paths and when you last opened each), and four settings that belong to the app, not to one vault: screenshot protection, whether account emails are masked, whether closing the window keeps Vaultair in the tray, and whether you asked not to be offered Windows Hello unlock | `%LOCALAPPDATA%\Vaultair\config.json` | No. It holds no vault contents |
 | If you turn on Windows Hello unlock: your vault's key, wrapped so that only a Windows Hello approval on this PC can open it | `%LOCALAPPDATA%\Vaultair\devices` | Yes. It holds no vault contents, never leaves this PC, and is not part of the vault or its backups |
-| Diagnostic logs (app started, vault created/unlocked/locked, settings changed, backups made, error categories) | `%LOCALAPPDATA%\Vaultair\logs` (7 days) | No. They never contain passwords, secrets, usernames, emails, vault names or file paths |
+| Diagnostic logs: a timeline of what the app did (started, vault unlocked or locked, a record created or changed by its internal id, a secret revealed or copied by its kind, a setting changed, a backup made, an error category) | `%LOCALAPPDATA%\Vaultair\logs` (7 days) | No. They never contain passwords, secrets, account titles, usernames, emails or vault names, and Vaultair's own log lines never contain file paths. They do show when Vaultair was used. Details and one limit on file paths: `docs/local-data-storage.md` |
 
 The full list, including the WebView2 browser-engine cache, is in `docs/local-data-storage.md`.
 
@@ -52,4 +52,4 @@ The full list, including the WebView2 browser-engine cache, is in `docs/local-da
 - "No browser storage. The interface never uses web storage, cookies or IndexedDB."
 - "No clipboard history. What you copy is kept out of Windows clipboard history and cloud clipboard, and cleared automatically."
 
-Under the logs folder it says: "Seven days of app events and error categories. They never hold passwords, secrets, usernames, emails, vault names or file paths."
+Under the logs folder it says: "Seven days of app events and error categories. They never hold passwords, secrets, usernames, emails, vault names or file paths." That line is a little stronger than the code can promise about file paths: an error from the app framework is logged as its own text (`docs/local-data-storage.md`, "What the logs hold"). Either log a static description at those five places or soften the line.

@@ -232,6 +232,7 @@ The notes below are a log. Each section records what was true when that phase la
   - Clearing a copied value after a crash (Phase 5). A crash or a killed process before the timeout leaves the value on the clipboard.
   - The lint rule against putting reveal results in query cache keys (Phase 7).
   - The `platform_connection` table from V1 is still unused: nothing writes or reads it.
+  - Settings > Privacy says the logs never hold file paths. Vaultair's own log lines don't, but five calls log a framework error as its own text (`docs/local-data-storage.md`, "What the logs hold"). Log a static description there, or soften the line.
   - The demo-vault step of onboarding still says "Sample accounts to explore arrive in a later version" (`src/features/onboarding/steps.tsx`), though `vault_create_demo` seeds a demo vault with sample accounts (`vaultair_core::demo`).
 
 ## Phase 17: Passkeys and login credentials (scoped)

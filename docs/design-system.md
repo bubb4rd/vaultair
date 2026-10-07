@@ -1,6 +1,6 @@
 # Vaultair design system
 
-> **Status:** Final for the MVP (Phase 16). The colour tokens and the status system were checked against `src/styles/globals.css` and `StatusBadge`; the layout measurements and motion timings were not re-measured. Tokens live in `src/styles/globals.css`; this file records why they are what they are.
+> **Status:** Final for the MVP (Phase 16). The colour tokens, the status system and the sizes and limits named here (sidebar, column widths, map nodes, toast timings) were checked against the code; the contrast ratios were not re-measured. Tokens live in `src/styles/globals.css`; this file records why they are what they are.
 
 ## Design read
 

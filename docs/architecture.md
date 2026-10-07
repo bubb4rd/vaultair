@@ -86,7 +86,7 @@ crates/vaultair-platform  OS integrations; the only crate with `unsafe` (windows
 
 **Errors and logs**
 - The UI only ever sees `{ code, message, field? }`. `src/ipc/client.ts` turns anything else (runtime errors, ACL denials) into the generic internal error, so raw error text never reaches the screen.
-- Logs: `%LOCALAPPDATA%\Vaultair\logs\vaultair.YYYY-MM-DD.log`, INFO and above, daily rotation, 7 files kept. Nothing is printed to stdout/stderr (clippy denies `println!`/`eprintln!`/`dbg!`).
+- Logs: `%LOCALAPPDATA%\Vaultair\logs\vaultair.YYYY-MM-DD.log`, INFO and above, daily rotation, 7 files kept. What they hold, line by line, is in `docs/local-data-storage.md`: record ids and kinds, never contents. Nothing is printed to stdout/stderr (clippy denies `println!`/`eprintln!`/`dbg!`).
 - The panic hook logs the file and line only, never the panic message.
 
 **Build-time guards**
