@@ -730,6 +730,18 @@ fn contains(haystack: &[u8], needle: &str) -> bool {
         || haystack.windows(utf16.len()).any(|w| w == utf16)
 }
 
+/// Whether `needle` is in `text` as a token of its own, not inside a longer
+/// run of letters and digits. Six digits can turn up by chance inside a
+/// timestamp's fraction (`.123456Z`) or an id; a logged code would stand
+/// alone (`code=123456`, `"123456"`).
+fn has_token(text: &str, needle: &str) -> bool {
+    text.match_indices(needle).any(|(i, _)| {
+        let before = text[..i].chars().next_back();
+        let after = text[i + needle.len()..].chars().next();
+        !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
+    })
+}
+
 #[test]
 fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
     let tmp = tempfile::tempdir().unwrap();
@@ -737,6 +749,7 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
     let captured = capture_logs();
     let mut dtos: Vec<String> = Vec::new();
     let totp_key;
+    let totp_code;
     let mut v = {
         let mut v = new_vault(tmp.path(), &clock);
         let mut form = AccountInput {
@@ -795,9 +808,11 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
             accounts::reveal(&v, &clock, &r).unwrap();
         }
         // What `totp_current_code` runs: the other response that carries a
-        // secret. Its log line and its `Debug` must not.
+        // secret. Its `Debug` must not, and neither may the log (checked
+        // below with the rest).
         let shown = mfa::totp_code(&v, &clock, &m).unwrap();
         assert!(!format!("{shown:?}").contains(&shown.code));
+        totp_code = shown.code.clone();
         totp_key = accounts::reveal(&v, &clock, &SecretRef::TotpSecret { id: m.clone() })
             .unwrap()
             .to_string();
@@ -857,6 +872,11 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
     ] {
         assert!(!logs.contains(canary), "{canary} in logs:\n{logs}");
     }
+    assert_eq!(totp_code.len(), 6, "sanity: a six-digit code");
+    assert!(
+        !has_token(&logs, &totp_code),
+        "the TOTP code {totp_code} in logs:\n{logs}"
+    );
 
     let index: Vec<String> = {
         let mut stmt = v

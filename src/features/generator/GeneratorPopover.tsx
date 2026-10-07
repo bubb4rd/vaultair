@@ -20,7 +20,7 @@ function GeneratorPopoverBody({ onUse }: { onUse: (value: string) => void }) {
             <FieldError>{generatorErrorMessage(error)}</FieldError>
           </div>
         ) : (
-          <GeneratedValue value={result?.value ?? null} className="min-h-14 flex-1 text-[15px] leading-6" />
+          <GeneratedValue value={result?.value ?? null} label={kind} className="min-h-14 flex-1 text-[15px] leading-6" />
         )}
         <Button variant="ghost" size="icon-sm" aria-label="Generate another" title="Generate another" onClick={regenerate}>
           <ArrowsClockwiseIcon aria-hidden="true" />

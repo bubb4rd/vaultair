@@ -2,7 +2,7 @@
 
 > **Status:** Final for the MVP (Phase 16), checked against the code. Format details: [`vault-format.md`](vault-format.md) §11.
 
-A backup is one file, `<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup`, holding a whole vault: its header and its encrypted database. The date and time in the name are UTC.
+A backup is one file, `<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup`, holding a whole vault: its header and its encrypted database. The date and time in the name are UTC. The name itself is not encrypted, so the vault's name and the backup's date are readable wherever the file is kept, including a cloud-synced folder.
 
 ## What a backup is, and isn't
 

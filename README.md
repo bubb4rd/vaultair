@@ -226,13 +226,13 @@ The notes below are a log. Each section records what was true when that phase la
 - **Documentation pass.** Every doc in the plan's §7 table was checked against the code and corrected where it had drifted. `docs/future-extension-sync-checklist.md` is new.
 - **Decided in this phase (ADR-0004):** "Shared household" is not a built-in purpose label, and code signing follows decision 14 (unsigned for the private beta, a certificate before any public release).
 - **No installer yet.** `tauri.conf.json` has an NSIS bundle section, but no installer has been built or tested, so there are no install instructions. Run Vaultair from a source build.
+- **Secret-flow audit and its review** (`docs/threat-model.md`, `docs/security-assumptions.md`). Closed by it: the logs hold no path from your PC or the build PC (a framework error is logged as its kind, a crash by its place in the source); a secret shown on screen that is copied, cut or dragged by hand goes through the protected clipboard path like the Copy button; a shown backup code hides itself like other revealed values; every command's return type is held in a reviewed list (`src-tauri/ipc-surface.snap`; update it with `VAULTAIR_UPDATE_IPC_SURFACE=1 cargo test -p vaultair the_command_surface`). Left as documented limits: a hand copy out of an editable field is an ordinary Windows copy, backup file names show the vault's name, and idle lock can come up to 15 s late.
 - **Still open from earlier phases** (each checked against the code in this pass):
   - The automatic backup before a schema migration (plan §2.4). `db/migrate.rs` runs migrations without one. It is needed once migrations ship to released vaults.
   - Scheduled backups. Backups are made when you press the button.
   - Clearing a copied value after a crash (Phase 5). A crash or a killed process before the timeout leaves the value on the clipboard.
   - The lint rule against putting reveal results in query cache keys (Phase 7).
   - The `platform_connection` table from V1 is still unused: nothing writes or reads it.
-  - Settings > Privacy says the logs never hold file paths. Vaultair's own log lines don't, but five calls log a framework error as its own text (`docs/local-data-storage.md`, "What the logs hold"). Log a static description there, or soften the line.
   - The demo-vault step of onboarding still says "Sample accounts to explore arrive in a later version" (`src/features/onboarding/steps.tsx`), though `vault_create_demo` seeds a demo vault with sample accounts (`vaultair_core::demo`).
 
 ## Phase 17: Passkeys and login credentials (scoped)

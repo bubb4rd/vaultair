@@ -66,9 +66,43 @@ pub(crate) fn error_kind(err: &tauri::Error) -> String {
     }
 }
 
+/// Where a panic happened, without the build machine in it.
+///
+/// `Location::file()` is the path the compiler was given. For Vaultair's own
+/// code that is relative to the workspace (`src-tauri/src/lock.rs`). For a
+/// dependency it is absolute on whichever PC built the release (under that
+/// user's `.cargo/registry/src/<index>/`), and users are invited to share
+/// these logs. So: a relative path is kept; a registry path is cut down to
+/// `<crate>-<version>/...`; a standard library path to what follows
+/// `/rustc/<hash>/`; anything else absolute to its file name.
+fn source_place(file: &str) -> String {
+    let parts: Vec<&str> = file.split(['/', '\\']).filter(|p| !p.is_empty()).collect();
+    let absolute = file.starts_with(['/', '\\']) || file.as_bytes().get(1) == Some(&b':');
+    if !absolute {
+        return parts.join("/");
+    }
+    let after = |at: usize| parts.get(at..).filter(|rest| !rest.is_empty());
+    let registry = parts
+        .windows(2)
+        .rposition(|w| w[0] == "registry" && w[1] == "src")
+        .and_then(|i| after(i + 3));
+    let std_lib = parts
+        .iter()
+        .position(|p| *p == "rustc")
+        .and_then(|i| after(i + 2));
+    match registry.or(std_lib) {
+        Some(rest) => rest.join("/"),
+        None => parts.last().copied().unwrap_or("unknown").to_owned(),
+    }
+}
+
 fn log_panic(info: &std::panic::PanicHookInfo<'_>) {
     match info.location() {
-        Some(loc) => tracing::error!(file = loc.file(), line = loc.line(), "panic"),
+        Some(loc) => tracing::error!(
+            file = %source_place(loc.file()),
+            line = loc.line(),
+            "panic"
+        ),
         None => tracing::error!("panic at unknown location"),
     }
 }
@@ -112,8 +146,48 @@ mod tests {
         );
     }
 
+    /// A panic inside a dependency reports a path on the build machine,
+    /// with the builder's user name in it. None of that prefix is logged.
+    #[test]
+    fn a_panic_place_never_names_the_build_machine() {
+        for (file, logged) in [
+            (
+                r"C:\Users\CANARYUSER\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-2.11.6\src\app.rs",
+                "tauri-2.11.6/src/app.rs",
+            ),
+            (
+                "/home/CANARYUSER/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.151/src/de.rs",
+                "serde_json-1.0.151/src/de.rs",
+            ),
+            (
+                r"/rustc/4a4ef493e3a1488c6e321570238084b38948f6db\library\core\src\option.rs",
+                "library/core/src/option.rs",
+            ),
+            (
+                r"D:\builds\CANARYUSER\vaultair\vendored\thing.rs",
+                "thing.rs",
+            ),
+            (r"\\CANARYUSER-PC\share\x.rs", "x.rs"),
+            (r"C:\Users\CANARYUSER\.cargo\registry\src", "src"),
+            // Vaultair's own files are relative to the workspace already.
+            (r"src-tauri\src\lock.rs", "src-tauri/src/lock.rs"),
+            (
+                "crates/vaultair-core/src/vault/open.rs",
+                "crates/vaultair-core/src/vault/open.rs",
+            ),
+        ] {
+            let place = source_place(file);
+            assert_eq!(place, logged, "{file}");
+            assert!(
+                !place.contains("CANARYUSER") && !place.contains(':'),
+                "{place}"
+            );
+        }
+    }
+
     /// A panic message is built from whatever the failing code had in hand,
     /// so it can hold a secret or a username. The log gets the place only.
+    /// This runs the hook `install_panic_hook` really installs.
     #[test]
     fn a_panic_is_logged_by_place_never_by_message() {
         let captured = Captured::default();
@@ -123,15 +197,18 @@ mod tests {
             .with_ansi(false)
             .finish();
 
-        // Only this thread's panic goes through the hook under test; any
-        // other test that fails meanwhile still prints as usual.
+        // Install the real hook and take it back out, then send only this
+        // thread's panic through it; any other test that fails meanwhile
+        // still prints as usual.
         let me = std::thread::current().id();
         let previous: Arc<dyn Fn(&PanicHookInfo<'_>) + Send + Sync> =
             Arc::from(std::panic::take_hook());
+        install_panic_hook();
+        let installed = std::panic::take_hook();
         let fallback = previous.clone();
         std::panic::set_hook(Box::new(move |info| {
             if std::thread::current().id() == me {
-                log_panic(info);
+                installed(info);
             } else {
                 fallback(info);
             }
@@ -145,8 +222,9 @@ mod tests {
 
         assert!(result.is_err());
         let logs = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        // The place went through `source_place`: relative, forward slashes.
         assert!(
-            logs.contains("panic") && logs.contains("logging.rs"),
+            logs.contains("panic") && logs.contains("file=src-tauri/src/logging.rs"),
             "{logs}"
         );
         assert!(!logs.contains("CANARY"), "{logs}");
