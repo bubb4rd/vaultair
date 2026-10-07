@@ -115,7 +115,7 @@ Add a short rule to `docs/design-system.md` under the node and catalog sections:
 | Graph `NodeMark`, account nodes | **Not available today.** `GraphNode` only carries the account's mark slug. Add `mark_id: Option<String>` to `GraphNode` (`crates/vaultair-core/src/domain/graph.rs`), set in `graph/builder.rs` from the same platform/game choice that sets `icon`, regenerate `src/ipc/bindings.ts` with `cargo test -p vaultair`, and update the graph tests |
 | Graph `NodeMark`, prospective accounts | `emailProvider(label).platformId` |
 
-The graph files have uncommitted in-progress work (V8 prospects). Do the graph change last, after that work lands, and don't reformat or restructure the graph files beyond the field.
+The graph work this waited for (V8 prospects) has landed, so the graph change can go ahead. Don't reformat or restructure the graph files beyond the field.
 
 ## The script
 
@@ -198,7 +198,7 @@ Replacing an approved file follows the same procedure. Nothing replaces an appro
 
 Each phase is one PR that passes the full validation above.
 
-Status (2026-10-06): phases 1 to 3 landed together in one PR, at the owner's request. Phase 4 is still open: the graph work it waits for hasn't landed. Of the 19 monograms, 11 have a colour; the other 8 (World of Warcraft, Call of Duty, EA Sports FC, Rainbow Six Siege, Grand Theft Auto V, Destiny 2, Genshin Impact, Rocket League) stay neutral until the owner supplies a colour from the brand's guidelines, since none was on hand and several of those brands are black and white. No `file` record has shipped, so the file path is proven by fixtures under `src/test/fixtures/logos/` only.
+Status (2026-10-06): phases 1 to 3 landed together in one PR, at the owner's request. Phase 4 is still open: the graph work it waited for (V8 prospects) has since landed, but `GraphNode` has no `mark_id` yet, so graph account nodes still resolve by the stored slug. Of the 19 monograms, 11 have a colour; the other 8 (World of Warcraft, Call of Duty, EA Sports FC, Rainbow Six Siege, Grand Theft Auto V, Destiny 2, Genshin Impact, Rocket League) stay neutral until the owner supplies a colour from the brand's guidelines, since none was on hand and several of those brands are black and white. No `file` record has shipped, so the file path is proven by fixtures under `src/test/fixtures/logos/` only.
 
 **Phase 1: manifest and ID-keyed lookup (no visual change).**
 Create `logos.json` with the 36 entries that have a Simple Icons slug as `simple-icons` records and the 19 gaps as `monogram` records with reasons (no colours yet). Write `report` and `build`, generate `logos.generated.ts`, switch `logos.ts` and `CatalogLogo` to the resolver, pass IDs from every non-graph call site, add the validation suite and CI step, and add `.asset-work/` to `.gitignore`. Acceptance: the app looks identical; `report` shows 0 unaccounted IDs; tests cover the resolver order.

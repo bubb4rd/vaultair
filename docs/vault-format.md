@@ -1,6 +1,6 @@
 # Vault format (v1)
 
-> **Status:** Phase 3. Updated in Phase 14 (backup container, §11), Phase 15 (password change, §8) and Phase 15b (device slot, §12). Describes what `crates/vaultair-core` writes today. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
+> **Status:** Final for the MVP (Phase 16), checked against the code. First written in Phase 3; Phase 14 added the backup container (§11), Phase 15 the password change (§8) and Phase 15b the device slot (§12). Describes what `crates/vaultair-core` writes today. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
 
 This document is meant to be precise enough for an independent implementation to open a vault, given the master password.
 
@@ -81,7 +81,7 @@ Field order is significant (it's part of the AAD, §4). Unknown fields are rejec
 1. Wrong magic, wrong length, CRC mismatch, invalid JSON or unknown fields: **corrupted header**.
 2. `format_version` (prefix) greater than the reader's supported version, or `min_reader_version` greater than it: **too new**.
 3. Prefix and body `format_version` differ: **corrupted header**.
-4. Structural checks: `alg`, `v`, `out_len`, `pw_normalization`, exactly one `password` slot, wrap `alg`, the exact `db` section above, `field_envelope_version` = 1, `vault_id` a UUID. Any mismatch: **corrupted header**.
+4. Structural checks: `alg`, `v`, `out_len`, `pw_normalization`, exactly one slot, of kind `password` with `kdf_ref` = `"kdf"`, wrap `alg`, the exact `db` section above, `field_envelope_version` = 1, `vault_id` a UUID. Any mismatch: **corrupted header**. So `key_slots` is an array, but a v1 reader accepts only this one slot: a header with a second slot, or a slot of another kind, does not open. Adding one needs a new `format_version` (and `min_reader_version`), so that older builds report **too new** and not a damaged vault.
 5. KDF bounds, checked **before** running Argon2: `65536 ≤ m_kib ≤ 2097152`, `3 ≤ t ≤ 64`, `1 ≤ p ≤ 16`, `m_kib ≥ 8·p`. Outside: **corrupted header**. (A tampered header can't force a weak KDF or a huge allocation.)
 6. Salt 32 bytes, nonce 24 bytes, ciphertext 48 bytes, else **corrupted header**.
 
@@ -141,7 +141,7 @@ After opening, Vaultair runs `PRAGMA cipher_integrity_check` (must return no row
 
 The first 16 bytes of `vault.vdb` are SQLCipher's per-database salt (used for its HMAC key derivation even with a raw key). Every page, including page 1, is encrypted with AES-256-CBC and authenticated with HMAC-SHA512.
 
-**Schema:** `crates/vaultair-core/src/db/migrations/V1__init.sql`. `PRAGMA user_version` holds the schema version (currently 1). A database with a higher `user_version` than the reader knows is **too new**. Each migration runs in one transaction with its version bump.
+**Schema:** `crates/vaultair-core/src/db/migrations/`, `V1__init.sql` to `V8__prospects.sql`, applied in order. `PRAGMA user_version` holds the schema version (currently 8). The V4 and V5 migrations also seed the built-in platform and game catalog. A database with a higher `user_version` than the reader knows is **too new**. Each migration runs in one transaction with its version bump.
 
 ## 7. Field envelopes
 
@@ -155,7 +155,7 @@ Binding table, column and row id means an envelope can't be moved to another cel
 
 ## 8. Write ordering
 
-- **Create:** the database is built first (keyed, migrated, `vault_meta` inserted), and the header is written last via write-temp, `fsync`, rename. A crash part-way leaves a folder without a header ("not found"), never a header pointing at a half-built database. If creation fails, the folder is removed (it was verified new or empty first).
+- **Create:** the database is built first (keyed, migrated, `vault_meta` inserted), and the header is written last via write-temp, `fsync`, rename. A crash part-way leaves a folder without a header (reported as header missing, §9), never a header pointing at a half-built database. If creation fails, the folder is removed (it was verified new or empty first).
 - **Header writes** always use the temp-file-and-rename pattern.
 - **Changing the master password or the KDF** (`vault/rekey.rs`) re-wraps the same DEK; the database is not touched. Vaultair unwraps the DEK with the current password, draws a new 32-byte salt, derives a new KEK (new password, or the same one with stronger parameters), and seals the DEK under the new header's AAD (§4). Every other header field stays the same. The header is then replaced:
   1. `vault.vhdr` is copied to `vault.vhdr.prev` and flushed.
@@ -169,6 +169,7 @@ Binding table, column and row id means an envelope can't be moved to another cel
 
 | Condition | Result |
 |---|---|
+| Folder path not absolute | Invalid location |
 | Folder missing | Not found |
 | `vault.vhdr` missing | Header missing |
 | `vault.vdb` missing | Database missing |
@@ -177,6 +178,8 @@ Binding table, column and row id means an envelope can't be moved to another cel
 | Rule 2 in §2, or schema too new | Too new |
 | Key unwrap fails | Wrong password or tampered header |
 | Key doesn't open the DB, integrity checks fail, or `vault_id` mismatch | Corrupted (database) |
+
+These are the classes inside `vaultair-core` (`VaultError`). The UI gets fewer: the three missing cases all read "No vault was found at that location", both corrupted cases read "This vault appears to be damaged", and a failed key unwrap reads "Incorrect master password".
 
 ## 10. Golden fixtures
 
@@ -196,7 +199,7 @@ One file holding a vault's header and database. User guide: [`backup-restore.md`
 | … | 8 + n | Database: u64 LE length, then a complete `vault.vdb` (§6) |
 | end − 32 | 32 | `HMAC-SHA256(BACKUP_KEY, every byte before it)` |
 
-The lengths must add up to the file size exactly: no trailing bytes.
+The lengths must add up to the file size exactly: no trailing bytes. A database length of 0 is refused.
 
 **Nothing in the file is plaintext vault data.** The header has no user data, and the database bytes are the SQLCipher file as it is on disk. `created_at` and `vault_id` are readable without a password and are not trusted until the MAC has been checked.
 
@@ -213,6 +216,8 @@ Anything else that fails in steps 1, 2, 4 or 5 is an **invalid backup**.
 **Writing a backup.** The database bytes are read from `vault.vdb` under a SQLite read transaction, with the vault held so no write of ours is in flight. With `journal_mode = DELETE`, the file alone is then the whole database. SQLCipher refuses SQLite's online backup API on encrypted databases, and `sqlcipher_export` would rewrite every page; a byte copy keeps the pages and their HMACs exactly as they are. The header bytes are read from `vault.vhdr`. The container is written to `<name>.vaultair-backup.tmp`, flushed and renamed. Vaultair then reads it back (steps 1 to 5) before reporting success.
 
 **Password change.** A backup carries the header it was made with, so it opens with the master password of that time. The DEK does not change on a password change, so BACKUP_KEY stays the same and older backups of the same vault still pass step 4 with the open vault's key.
+
+**Restore** runs steps 1 to 5 with the password, then writes the database first and the header last, into a folder that must be new or empty, like create (§8). The header is the backup's, byte for byte, so the restored vault has the same vault id, KDF parameters and master password as the backup. It takes its folder's name: `vault_meta.display_name` is updated if it differs.
 
 ## 12. Device slot (`devices\<vault_id>.qu`)
 
@@ -274,4 +279,4 @@ DEVICE_KEY comes from the DEK (§5), so the record can only be written with the 
 
 **Removing it.** "Forget this device", a password change and a KDF change all delete the file and the Hello key. Deleting the key is what makes an old copy of the file useless: without the key the signature can't be made again.
 
-**Restore** writes the database first and the header last, into a folder that must be new or empty, like create (§8). The restored vault takes its folder's name: `vault_meta.display_name` is updated if it differs.
+**A restored copy.** A vault restored from a backup (§11) has the backup's header. If that is still the header the slot was made for (same master password and KDF as now), the binding matches and the slot opens the restored copy too, on this PC.

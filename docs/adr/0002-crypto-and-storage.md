@@ -40,3 +40,12 @@ If the SQLCipher/OpenSSL build becomes a blocker, fall back to **Option C** (pur
 - The field layer keeps secrets out of the page cache, FTS, `SELECT *` results and DTOs.
 - Old backups keep opening with the old password after a password change (same DEK). This must be documented to users.
 - The build requires Strawberry Perl locally and in CI.
+
+## As built (checked in Phase 16)
+
+The decision stands. Where the code is more specific, or differs:
+
+- **Subkeys:** five, not four. Phase 15b added `DEVICE_KEY` (HKDF info `vaultair/v1/quick-unlock-policy`), which keys the MAC on a quick-unlock slot's policy record (ADR-0005).
+- **KDF calibration** aims for about 0.85 s (`CALIBRATE_TARGET`), with memory rounded down to a multiple of 8 MiB. The reader's bounds are 64 MiB ≤ m ≤ 2 GiB, 3 ≤ t ≤ 64 and 1 ≤ p ≤ 16.
+- **Crates:** randomness comes from `getrandom` directly; `rand_core` is not a dependency. TOTP is Vaultair's own `crypto/totp.rs` (RFC 6238) on the RustCrypto HMAC and SHA crates; `totp-rs` is not used, because it would pull in older duplicates of them. `subtle` does the constant-time comparisons.
+- **Backups** copy the database file under a read transaction. SQLite's online backup API, which the plan named, is refused by SQLCipher on encrypted databases (`docs/vault-format.md` §11).

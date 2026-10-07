@@ -1,6 +1,6 @@
 # Forgot your master password?
 
-> **Status:** Phase 4. It is the source for the onboarding screen "We can't recover your master password" and the recovery checklist. Final in Phase 16.
+> **Status:** Final for the MVP (Phase 16), checked against the code. It is the source for the onboarding screen "We can't recover your master password" and the recovery checklist.
 
 ## The honest answer
 
@@ -18,17 +18,17 @@ A recovery backdoor would also be a way in for anyone who found it.
 
 The optional checklist at the end of onboarding suggests the following. Vaultair saves none of it:
 
-1. Write the password on paper and keep it somewhere private at home, with your other important documents.
-2. Don't keep it in a note on your PC, a photo on your phone, or a cloud document.
+1. Write it on paper and keep it somewhere private at home, with your other important documents.
+2. Don't keep it in a note on this PC, a photo on your phone, or a cloud document.
 3. Don't use it for anything else.
-4. Type it a few times over the first week so it sticks.
+4. Type it a few times over the next week so it sticks.
 
 Plan for backups too (Settings > Backups; see [`backup-restore.md`](backup-restore.md)). A backup opens with the master password it was made with, so keep that password as well. A backup does not get you back in if you forget the password.
 
 ## If you have already forgotten it
 
 - Try the passphrases you usually use, carefully. Watch for Caps Lock and your keyboard layout.
-- After five wrong attempts, the lock screen makes you wait a few seconds between tries. That's a speed bump, not a lockout; nothing is deleted.
+- After five wrong attempts, the lock screen makes you wait between tries: 5 seconds, then 10, 20, 40, and 60 from then on. That's a speed bump, not a lockout; nothing is deleted, and restarting Vaultair starts the count again.
 - If you can't get in, the vault stays encrypted on disk. You can create a new vault and start again. Deleting the old vault's folder removes it for good.
 
 ## What Vaultair will never offer
