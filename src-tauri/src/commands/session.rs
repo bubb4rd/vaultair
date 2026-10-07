@@ -53,6 +53,17 @@ pub fn hide_emails_set(state: State<'_, AppState>, enabled: bool) -> SessionConf
     state.locker.update_config(|c| c.hide_emails = enabled)
 }
 
+/// Saves whether closing the window keeps Vaultair in the tray, and shows
+/// or removes the tray icon to match.
+#[tauri::command]
+#[specta::specta]
+pub fn tray_set(app: tauri::AppHandle, state: State<'_, AppState>, enabled: bool) -> SessionConfig {
+    state.config.set_keep_in_tray(enabled);
+    crate::tray::set_visible(&app, enabled);
+    tracing::info!(enabled, "keep in tray changed");
+    state.locker.update_config(|c| c.keep_in_tray = enabled)
+}
+
 /// Hides or shows the window for the account on screen. Ignored unless the
 /// saved mode is Custom, so navigation cannot override Always or Off.
 #[tauri::command]

@@ -1,6 +1,6 @@
 # Vault format (v1)
 
-> **Status:** Phase 3. Updated in Phase 14 (backup container, §11) and Phase 15 (password change, §8). Describes what `crates/vaultair-core` writes today. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
+> **Status:** Phase 3. Updated in Phase 14 (backup container, §11), Phase 15 (password change, §8) and Phase 15b (device slot, §12). Describes what `crates/vaultair-core` writes today. Rationale: `docs/adr/0002-crypto-and-storage.md`, `docs/adr/0003-vault-layout.md`.
 
 This document is meant to be precise enough for an independent implementation to open a vault, given the master password.
 
@@ -112,6 +112,7 @@ The DEK is 32 random bytes from the OS RNG, generated once per vault.
 | `vaultair/v1/field` | FIELD_KEY | Field envelopes (§7) |
 | `vaultair/v1/pwfp` | FP_KEY | `HMAC-SHA256(FP_KEY, NFC(password))` for reuse detection |
 | `vaultair/v1/backup-mac` | BACKUP_KEY | Backup container MAC (§11) |
+| `vaultair/v1/quick-unlock-policy` | DEVICE_KEY | MAC on a device slot's policy record (§12) |
 
 ## 6. Database (`vault.vdb`)
 
@@ -212,5 +213,65 @@ Anything else that fails in steps 1, 2, 4 or 5 is an **invalid backup**.
 **Writing a backup.** The database bytes are read from `vault.vdb` under a SQLite read transaction, with the vault held so no write of ours is in flight. With `journal_mode = DELETE`, the file alone is then the whole database. SQLCipher refuses SQLite's online backup API on encrypted databases, and `sqlcipher_export` would rewrite every page; a byte copy keeps the pages and their HMACs exactly as they are. The header bytes are read from `vault.vhdr`. The container is written to `<name>.vaultair-backup.tmp`, flushed and renamed. Vaultair then reads it back (steps 1 to 5) before reporting success.
 
 **Password change.** A backup carries the header it was made with, so it opens with the master password of that time. The DEK does not change on a password change, so BACKUP_KEY stays the same and older backups of the same vault still pass step 4 with the open vault's key.
+
+## 12. Device slot (`devices\<vault_id>.qu`)
+
+Quick unlock with Windows Hello ([ADR-0005](adr/0005-quick-unlock.md)). The slot is **not part of the vault**: it lives in `%LOCALAPPDATA%\Vaultair\devices\`, one file per vault id, and is never copied into a backup. The vault format stays v1, and a vault opens anywhere without it. Code: `crates/vaultair-core/src/vault/device_slot.rs` (format) and `service/quick_unlock.rs` (rules).
+
+**On disk** the file is the output of DPAPI `CryptProtectData` (current user, `CRYPTPROTECT_UI_FORBIDDEN`, optional entropy = the vault id as UTF-8) over these bytes:
+
+```
+"VAULTAIRQU" (10) | slot_version u16 LE (= 1) | body_len u32 LE | JSON body | CRC32 u32 LE
+```
+
+The CRC (IEEE, over everything before it) catches accidental damage only. The body is at most 16 KiB, with no unknown fields:
+
+```json
+{
+  "vault_id": "01a1134a-b88b-7715-a0b5-3c17a781cf48",
+  "binding_b64": "<32 bytes>",
+  "challenge_b64": "<32 bytes>",
+  "salt_b64": "<32 bytes>",
+  "wrap": { "alg": "xchacha20poly1305", "nonce_b64": "<24 bytes>", "ct_b64": "<48 bytes>" },
+  "policy": { "last_password_at": 1790000000, "boot_at": 1789990000 },
+  "policy_mac_b64": "<32 bytes>",
+  "failures": 0
+}
+```
+
+**Binding.** `binding = SHA-256("vaultair-device-binding-v1\0" || header bytes)`, where the header bytes are the complete `vault.vhdr` (§2). Anything that wraps the DEK again (a new master password, a stronger KDF) gives a new header and so a new binding.
+
+**Wrap.** Windows Hello holds a key named `Vaultair-<vault_id>` (`KeyCredentialManager`; RSA-2048, in the TPM when there is one, never exportable). `signature` is its signature over `challenge`, which is the same every time for the same challenge.
+
+```
+wrap_key = HKDF-SHA256(salt = salt, ikm = signature, info = "vaultair/v1/quick-unlock-wrap")   32 bytes
+ct       = XChaCha20-Poly1305(wrap_key, nonce, plaintext = DEK,
+             aad = "vaultair-device-slot-aad-v1\0" || vault_id || 0x00 || binding || challenge || salt)
+```
+
+A signature shorter than 32 bytes is refused. A failed unwrap means a different signature, a different vault or header, or changed bytes; the three are not told apart.
+
+**Policy record.** `last_password_at` and `boot_at` are Unix seconds (UTC): when the master password was last typed for this vault on this PC, and when that Windows session started (then minus the uptime).
+
+```
+policy_mac = HMAC-SHA256(DEVICE_KEY,
+               "vaultair-device-policy-mac-v1\0" || vault_id || 0x00 || binding
+               || last_password_at i64 LE || boot_at i64 LE)
+```
+
+DEVICE_KEY comes from the DEK (§5), so the record can only be written with the vault unlocked, and only checked after the unwrap. `failures` (Hello attempts in a row that failed or were cancelled) has no MAC: nothing can be authenticated before the DEK is known.
+
+**Unlocking with it, in this order:**
+
+1. Read `vault.vhdr` and compute the binding. No slot for this vault id, or a slot whose `binding_b64` differs: use the password.
+2. Check the rules on the stored values (below). If one asks for the password, stop without a Hello prompt.
+3. Ask Hello to sign `challenge`. Cancelled or failed: add 1 to `failures`, save, use the password. No such key: delete the slot.
+4. Unwrap the DEK and check `policy_mac`. Either failing: delete the slot and the Hello key, use the password.
+5. Check the rules again on the record the MAC vouches for.
+6. Open the vault with the DEK, after reading the header again and comparing its binding.
+
+**The rules.** The password is required when `failures >= 3`; when this Windows session did not start within 120 s of `boot_at` (a restart, or an uptime that can't be read); or when now minus `last_password_at` is negative or more than 7 days. Every master-password unlock rewrites the policy record and sets `failures` to 0. A Hello unlock only resets `failures`.
+
+**Removing it.** "Forget this device", a password change and a KDF change all delete the file and the Hello key. Deleting the key is what makes an old copy of the file useless: without the key the signature can't be made again.
 
 **Restore** writes the database first and the header last, into a folder that must be new or empty, like create (§8). The restored vault takes its folder's name: `vault_meta.display_name` is updated if it differs.

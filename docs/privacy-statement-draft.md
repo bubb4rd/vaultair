@@ -12,6 +12,7 @@ Vaultair is a program on your PC. It has no account, no server and no internet c
 |---|---|---|
 | Your vault: accounts, identities, passwords, codes, notes | A folder you choose. Default: `%LOCALAPPDATA%\Vaultair\Vaults\<name>` | Yes, with a key made from your master password |
 | A list of recently opened vaults (folder paths and when you last opened each), and whether screen-capture protection is on | `%LOCALAPPDATA%\Vaultair\config.json` | No. It holds no vault contents |
+| If you turn on Windows Hello unlock: your vault's key, wrapped so that only a Windows Hello approval on this PC can open it | `%LOCALAPPDATA%\Vaultair\devices` | Yes. It holds no vault contents, never leaves this PC, and is not part of the vault or its backups |
 | Diagnostic logs (app started, vault created/unlocked/locked, error categories) | `%LOCALAPPDATA%\Vaultair\logs` (7 days) | No. They never contain passwords, secrets, usernames, emails, vault names or file paths |
 
 The full list, including the WebView2 browser-engine cache, is in `docs/local-data-storage.md`.

@@ -38,12 +38,34 @@ pub async fn settings_get(state: State<'_, AppState>) -> IpcResult<VaultSettings
 
 /// Saves the settings and applies them now: the idle deadline, the lock
 /// policy and the clipboard and reveal timings change without a restart.
+///
+/// With quick unlock on, turning auto-lock off takes the master password
+/// (ADR-0005 decision 4): a vault that never locks and opens with Hello
+/// would otherwise never ask for it. Without one: `quick_unlock_password_required`.
 #[tauri::command]
 #[specta::specta]
 pub async fn settings_update(
     state: State<'_, AppState>,
     settings: VaultSettings,
+    password: Option<String>,
 ) -> IpcResult<SessionConfig> {
+    let password = password.map(secrecy::SecretString::from);
+    let turning_auto_lock_off =
+        settings.auto_lock_minutes.is_none() && state.locker.config().idle_lock_secs.is_some();
+    if turning_auto_lock_off {
+        let (quick, session) = (state.quick.clone(), state.session.clone());
+        blocking(move || {
+            if !quick.enabled_for_open_vault(&session) {
+                return Ok(Ok(()));
+            }
+            match &password {
+                Some(password) => session.verify_password(password).map(Ok),
+                None => Ok(Err(AppError::QuickUnlockPasswordRequired)),
+            }
+        })
+        .await?
+        .map_err(ipc_err)?;
+    }
     let saved = with_vault(&state, move |v| settings::save(v, &settings, &SystemClock)).await?;
     Ok(state.locker.update_config(|c| saved.apply_to(c)))
 }
@@ -72,7 +94,14 @@ pub async fn vault_change_password(
     let current = secrecy::SecretString::from(current);
     let new = secrecy::SecretString::from(new_password);
     let session = state.session.clone();
-    let info = blocking(move || session.rewrap(&current, Some(&new), None)).await?;
+    let quick = state.quick.clone();
+    let info = blocking(move || {
+        let info = session.rewrap(&current, Some(&new), None)?;
+        // The quick-unlock slot is bound to the old header. Remove it.
+        quick.invalidate(&info.vault_id);
+        Ok(info)
+    })
+    .await?;
     tracing::info!("master password changed");
     Ok(info)
 }
@@ -131,7 +160,14 @@ pub async fn vault_strengthen_kdf(
     if weaker(kdf, current) {
         return Err(ipc_err(AppError::InvalidInput { field: "kdf" }));
     }
-    blocking(move || session.rewrap(&password, None, Some(kdf))).await
+    let quick = state.quick.clone();
+    blocking(move || {
+        let info = session.rewrap(&password, None, Some(kdf))?;
+        // A new KDF is a new header too, so the quick-unlock slot is void.
+        quick.invalidate(&info.vault_id);
+        Ok(info)
+    })
+    .await
 }
 
 /// Where the diagnostic logs are. `None` without `LOCALAPPDATA`.

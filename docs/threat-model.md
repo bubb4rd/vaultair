@@ -1,6 +1,6 @@
 # Vaultair threat model
 
-> **Status: Phase 0 draft.** Written from the product spec before any code exists. Updated in Phase 3 (crypto), Phase 5 (OS integrations and clipboard) and finalised in Phase 16. Statements about mechanisms describe the *design*; each is verified by tests as it's built.
+> **Status: Phase 0 draft.** Written from the product spec before any code exists. Updated in Phase 3 (crypto), Phase 5 (OS integrations and clipboard) and Phase 15b (Windows Hello unlock), and finalised in Phase 16. Statements about mechanisms describe the *design*; each is verified by tests as it's built.
 
 ## What Vaultair is
 
@@ -61,9 +61,36 @@ Stated plainly, as the spec requires:
 - **WebView2** is a Microsoft component with its own update and telemetry behaviour, governed by Windows settings.
 - **Cloud-synced folders:** if the user places a vault or backup in OneDrive/Dropbox, the (encrypted) files leave the machine. The app warns but doesn't block.
 
+## Windows Hello unlock (optional, off by default)
+
+Decided in [ADR-0005](adr/0005-quick-unlock.md); format in `docs/vault-format.md` §12. When it is on for a vault, a copy of the vault's data key sits on this PC, wrapped under a key that can only be rebuilt from a Windows Hello signature. The master password stays the root of trust: it alone creates, restores and re-keys a vault, and it is needed to turn this on or off.
+
+What it changes, against each attacker:
+
+| Attacker | With Windows Hello unlock on |
+|---|---|
+| Has a copy of the vault files or a backup | **Nothing changes.** The slot is not in the vault folder or in backups. Without it, and without this PC's Hello key, only the master password opens the vault |
+| Has the vault files **and** the slot file, but not this PC | **Nothing changes.** The slot needs a signature from a key that never leaves this PC's Windows Hello (and its DPAPI layer needs this Windows account) |
+| Malware running as you, vault locked | Can't open the slot silently: Windows must show a Hello prompt and you must approve it. It can raise that prompt at any time and hope you approve, so **treat a Hello prompt you didn't ask for as an attack and cancel it**. Without Hello unlock, the same malware would have to wait for you to type the master password |
+| Someone at your unlocked Windows session who knows or guesses your Hello PIN | Can unlock the vault, within the rules below. Without Hello unlock they would need the master password. **A short Hello PIN is now part of your vault's protection** |
+| Has the powered-off or restarted PC (stolen laptop) | Vaultair asks for the master password after a restart. An attacker running their own code is not bound by that rule (see the limits): what stands between them and the data key is the Windows sign-in, the Hello PIN and the TPM's guess limit |
+
+The rules Vaultair applies: the master password is asked for after Windows restarts, more than 7 days after it was last typed, after 3 failed or cancelled Hello attempts in a row, and after the password or KDF changes. Turning auto-lock off also takes it. Idle lock, Win+L and sleep still wipe the keys from memory exactly as before; only the next unlock is quicker.
+
+Limits, stated plainly:
+
+- **The restart, 7-day and 3-attempt rules are enforced by Vaultair, not by the key.** They stop someone using Vaultair. Code that reads the slot and gets a Hello approval can unwrap the data key whatever the rules say. The rules can't be faked into letting Vaultair itself skip the password: the record of the last password unlock carries a MAC made with the vault's own key, and a forged one is refused.
+- **Windows Hello is only as strong as its weakest sign-in option.** A 4-digit PIN on a PC with a TPM is protected by the TPM's lockout. On a PC with no TPM the Hello key is protected by software only; Vaultair says so before you turn this on, and allows it.
+- **Restart detection uses the uptime.** With Windows Fast Startup, "Shut down" does not reset it, so only "Restart" (or a full shutdown) brings the password back early. The 7-day rule still applies.
+- **Turning it off deletes the Hello key**, which makes any copy of the slot useless. If that deletion fails, an old copy of the slot plus a Hello approval on this PC would still open the data key, because the data key does not change on a password change. "Rotate encryption key" (not in the MVP) is the full answer.
+- **A restored copy of a vault** has the same vault id. If it also has the same master password and KDF, the slot opens it too. It is the same vault on the same PC.
+- **Windows' signature scheme.** The design relies on Hello signing the same challenge the same way every time (checked on real hardware in the spike). If Windows ever changes that, the slot stops opening, Vaultair falls back to the master password, and the slot is made again.
+
+**Tray.** "Keep running in the tray" only changes what closing the window does: the window hides, the vault locks as it did on quit, and the process stays to skip startup. No key stays in memory because of it.
+
 ## Out of scope for the MVP
 
-Sync, browser extension, autofill, breach checks, imports, attachments, Windows Hello unlock. Each needs a threat-model update before it's built (see the future `future-extension-sync-checklist.md`).
+Sync, browser extension, autofill, breach checks, imports and attachments. Each needs a threat-model update before it's built (see the future `future-extension-sync-checklist.md`).
 
 ## Explicit non-goals
 

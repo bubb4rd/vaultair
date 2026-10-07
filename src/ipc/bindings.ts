@@ -285,8 +285,12 @@ export const commands = {
 	/**
 	 *  Saves the settings and applies them now: the idle deadline, the lock
 	 *  policy and the clipboard and reveal timings change without a restart.
+	 * 
+	 *  With quick unlock on, turning auto-lock off takes the master password
+	 *  (ADR-0005 decision 4): a vault that never locks and opens with Hello
+	 *  would otherwise never ask for it. Without one: `quick_unlock_password_required`.
 	 */
-	settingsUpdate: (settings: VaultSettings) => typedError<SessionConfig, IpcError_Serialize>(__TAURI_INVOKE("settings_update", { settings })),
+	settingsUpdate: (settings: VaultSettings, password: string | null) => typedError<SessionConfig, IpcError_Serialize>(__TAURI_INVOKE("settings_update", { settings, password })),
 	vaultProfileUpdate: (input: VaultProfileInput) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("vault_profile_update", { input })),
 	/**
 	 *  Changes the master password. The vault stays unlocked. Backups made
@@ -304,6 +308,28 @@ export const commands = {
 	logsFolder: () => __TAURI_INVOKE<string | null>("logs_folder"),
 	/**  Opens the logs folder in File Explorer. */
 	logsOpen: () => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("logs_open")),
+	/**
+	 *  Whether the vault in `path` can be unlocked with Windows Hello now, and
+	 *  if not, why the password is needed. Works while locked.
+	 */
+	quickUnlockStatus: (path: string) => typedError<QuickUnlockStatus, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_status", { path })),
+	/**
+	 *  Turns quick unlock on for the open vault on this PC. Shows a Windows
+	 *  Hello prompt.
+	 */
+	quickUnlockEnable: (password: string) => typedError<QuickUnlockStatus, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_enable", { password })),
+	/**  Unlocks the vault in `path` with Windows Hello. Shows a Hello prompt. */
+	quickUnlockUnlock: (path: string) => typedError<VaultInfo, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_unlock", { path })),
+	/**
+	 *  Turns quick unlock off for the open vault on this PC: deletes the slot
+	 *  and the Hello key.
+	 */
+	quickUnlockForget: (password: string) => typedError<QuickUnlockStatus, IpcError_Serialize>(__TAURI_INVOKE("quick_unlock_forget", { password })),
+	/**
+	 *  Saves whether closing the window keeps Vaultair in the tray, and shows
+	 *  or removes the tray icon to match.
+	 */
+	traySet: (enabled: boolean) => __TAURI_INVOKE<SessionConfig>("tray_set", { enabled }),
 };
 
 /** Events */
@@ -684,7 +710,7 @@ export type Dependent = {
 export type EdgeKind = "owns" | "primary_email" | "recovery_email" | "phone" | "login_email" | "recovery_phone" | "linked_launcher" | "linked_console" | "on_platform" | "plays" | "mfa" | "prospective";
 
 /**  Stable, machine-readable error codes. The frontend switches on these. */
-export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy" | "invalid_backup" | "backup_other_vault" | "backup_destination";
+export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy" | "invalid_backup" | "backup_other_vault" | "backup_destination" | "quick_unlock_unavailable" | "quick_unlock_password_required" | "quick_unlock_cancelled" | "quick_unlock_failed";
 
 /**  What the map can be centred on. A contact is an email or a phone. */
 export type FocusKind = "identity" | "account" | "contact" | "platform" | "game";
@@ -883,6 +909,10 @@ export type HealthSummary = {
 	missingRecoveryCodes: number,
 	dormant: number,
 };
+
+export type HelloState = "available" | 
+/**  This PC can do Hello, but no PIN, fingerprint or face is set up. */
+"notSetUp" | "unsupported";
 
 /**
  *  An identity's accent. A fixed palette so the UI can map each name to a
@@ -1141,6 +1171,9 @@ export type PasswordOptions = {
 	exclude: string,
 };
 
+/**  Why the master password is needed this time, though quick unlock is on. */
+export type PasswordReason = "restarted" | "expired" | "tooManyAttempts" | "helloUnavailable";
+
 /**
  *  Accounts sharing a platform. `platform` is the platform's name, or the
  *  publisher until platforms are cataloged (Phase 10); `None` groups the rest.
@@ -1206,6 +1239,19 @@ export type PurposeView = {
 	color: PurposeColor | null,
 	/**  Accounts using it, archived ones included (a delete has to move them all). */
 	accountCount: number,
+};
+
+export type QuickUnlockStatus = {
+	hello: HelloState,
+	/**
+	 *  This PC has a TPM for Hello to keep its keys in. Without one the
+	 *  keys are protected by software only, and the UI says so.
+	 */
+	hardwareBacked: boolean,
+	/**  Quick unlock is on for this vault on this PC. */
+	enabled: boolean,
+	/**  Set when it is on but this unlock needs the password anyway. */
+	passwordRequired: PasswordReason | null,
 };
 
 /**  A recent vault as the lock screen shows it. */
@@ -1338,6 +1384,11 @@ export type SessionConfig = {
 	captureLevel: CaptureLevel,
 	/**  Whether the window is hidden from capture right now. */
 	captureProtection: boolean,
+	/**
+	 *  Closing the window hides Vaultair to the tray (and locks) instead
+	 *  of quitting.
+	 */
+	keepInTray: boolean,
 };
 
 /**  An email one or more of the identity's accounts sign in or recover with. */

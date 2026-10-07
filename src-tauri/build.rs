@@ -107,6 +107,11 @@ fn main() {
             "vault_strengthen_kdf",
             "logs_folder",
             "logs_open",
+            "quick_unlock_status",
+            "quick_unlock_enable",
+            "quick_unlock_unlock",
+            "quick_unlock_forget",
+            "tray_set",
         ]));
 
     // tauri-build only embeds the Windows manifest into the app binary, so test

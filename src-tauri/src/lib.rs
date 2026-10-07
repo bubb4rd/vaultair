@@ -8,10 +8,12 @@ mod events;
 mod ipc;
 mod lock;
 mod logging;
+mod quick_unlock;
 mod state;
+mod tray;
 mod window;
 
-use tauri::{Manager, RunEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 pub fn run() {
     let _log_guard = logging::init();
@@ -30,7 +32,21 @@ pub fn run() {
             let window = window::create_main(app.handle())?;
             // Commands can only arrive once the page loads, after setup returns,
             // so managing state here (it needs the window) is early enough.
-            app.manage(state::AppState::init(app.handle(), &window));
+            let state = state::AppState::init(app.handle(), &window);
+            let keep_in_tray = state.config.keep_in_tray();
+            app.manage(state);
+
+            if let Err(err) = tray::create(app.handle(), keep_in_tray) {
+                tracing::warn!(error = %err, "could not create the tray icon");
+            }
+            let handle = app.handle().clone();
+            window.on_window_event(move |event| {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    if tray::close_to_tray(&handle) {
+                        api.prevent_close();
+                    }
+                }
+            });
             Ok(())
         })
         .build(context());

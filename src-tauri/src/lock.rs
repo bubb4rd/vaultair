@@ -21,6 +21,9 @@ pub enum LockReason {
     Manual,
     Idle,
     Os(SessionEvent),
+    /// The window was closed to the tray. The user did it, so the lock
+    /// screen has nothing to explain.
+    Tray,
     /// The app is closing; there's no UI left to tell.
     Exit,
 }
@@ -56,7 +59,9 @@ impl LockNotice {
             LockReason::Os(SessionEvent::Disconnected) => Self::Disconnected,
             LockReason::Os(SessionEvent::Suspending) => Self::Sleep,
             LockReason::Os(SessionEvent::Minimized) => Self::Minimized,
-            LockReason::Os(SessionEvent::ShuttingDown) | LockReason::Exit => return None,
+            LockReason::Os(SessionEvent::ShuttingDown) | LockReason::Tray | LockReason::Exit => {
+                return None
+            }
         })
     }
 }

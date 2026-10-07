@@ -9,21 +9,30 @@ publish.workspace = true
 
 [dependencies]
 thiserror.workspace = true
+zeroize = "1.9.0"
 
 [features]
-# In-memory clipboard, session events and capture protection for tests.
+# In-memory clipboard, session events, capture protection and Windows Hello for tests.
 fake = []
 
 # Must match the versions Tauri (wry) uses, so COM interface types are shared.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.38.2"
-zeroize = "1.9.0"
 windows = { version = "=0.61.3", features = [
+    # Windows Hello keys (quick unlock, ADR-0005).
+    "Foundation",
+    "Security_Credentials",
+    "Security_Cryptography",
+    "Storage_Streams",
     "Win32_Foundation",
+    "Win32_Security_Cryptography",
     "Win32_System_Com",
     "Win32_System_DataExchange",
     "Win32_System_Memory",
     "Win32_System_RemoteDesktop",
+    "Win32_System_SystemInformation",
+    "Win32_System_TpmBaseServices",
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",

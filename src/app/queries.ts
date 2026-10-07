@@ -11,6 +11,7 @@ import {
   identities,
   EMPTY_FILTER,
   DEFAULT_SORT,
+  quickUnlock,
   recentVaults,
   search,
   session,
@@ -23,6 +24,7 @@ import {
   type GraphFocus,
   type HealthRule,
   type IdentityDetail,
+  type QuickUnlockStatus,
   type VaultInfo,
   type VaultStatus,
 } from "@/ipc/client";
@@ -64,6 +66,7 @@ export const queryKeys = {
   savedViews: ["savedViews"] as const,
   backupStatus: ["backup", "status"] as const,
   vaultSettings: ["settings", "vault"] as const,
+  quickUnlock: (path: string | null) => ["quickUnlock", path] as const,
 };
 
 /**
@@ -101,6 +104,27 @@ export function useSessionConfig() {
 /** The open vault's lock and clipboard settings, as saved. */
 export function useVaultSettings() {
   return useQuery({ queryKey: queryKeys.vaultSettings, queryFn: settings.get });
+}
+
+/**
+ * Whether Windows Hello can unlock the vault in `path` right now. Works on
+ * the lock screen too. `null` waits for a path.
+ */
+export function useQuickUnlock(path: string | null) {
+  return useQuery({
+    queryKey: queryKeys.quickUnlock(path),
+    queryFn: () => (path === null ? null : quickUnlock.status(path)),
+    enabled: path !== null,
+  });
+}
+
+/** After turning Windows Hello unlock on or off, or anything that voids it: show the new state. */
+export function useQuickUnlockChanged() {
+  const queryClient = useQueryClient();
+  return (path: string, status?: QuickUnlockStatus) => {
+    if (status) queryClient.setQueryData(queryKeys.quickUnlock(path), status);
+    else void queryClient.invalidateQueries({ queryKey: queryKeys.quickUnlock(path) });
+  };
 }
 
 /** After the vault's name, colour or KDF changes: show the fresh `VaultInfo` everywhere. */

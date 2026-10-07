@@ -33,4 +33,6 @@ Plan for backups too (Settings > Backups; see [`backup-restore.md`](backup-resto
 
 ## What Vaultair will never offer
 
-Password hints, security questions, "recovery keys" held by anyone but you, or unlocking with a Windows account alone. Quick unlock with Windows Hello may come later (roadmap Phase 2). It would only ever sit *alongside* the master password, and it could never create or recover a vault on its own (see `docs/implementation-plan.md` §5).
+Password hints, security questions, "recovery keys" held by anyone but you, or unlocking with a Windows account alone.
+
+**Windows Hello unlock is not a way back in.** If you turned it on (Settings > Security), your PIN, fingerprint or face can unlock the vault on that PC, but only between master-password unlocks: Vaultair asks for the password again after Windows restarts, every 7 days, and after 3 failed Hello attempts. It can't create a vault, restore a backup or change the password. If you have forgotten the master password and Hello still unlocks the vault today, use that session to copy what you need into a new vault with a password you know; you can't change the password of the old one without it. See [ADR-0005](adr/0005-quick-unlock.md).

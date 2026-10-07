@@ -11,11 +11,17 @@ use crate::PlatformError;
 
 mod capture;
 mod clipboard;
+mod dpapi;
+mod hello;
 mod session;
+mod sysinfo;
 
 pub use capture::WindowsCapture;
 pub use clipboard::WindowsClipboard;
+pub use dpapi::WindowsDpapi;
+pub use hello::WindowsHello;
 pub use session::WindowsSessionEvents;
+pub use sysinfo::WindowsSystem;
 
 fn os(context: &'static str) -> impl FnOnce(windows::core::Error) -> PlatformError {
     move |_| PlatformError::Os { context }

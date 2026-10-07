@@ -1,6 +1,6 @@
 import { useEffect, useState, type SubmitEvent } from "react";
 import { WarningIcon } from "@phosphor-icons/react";
-import { useVaultInfoUpdated } from "@/app/queries";
+import { useOpenVault, useQuickUnlock, useQuickUnlockChanged, useVaultInfoUpdated } from "@/app/queries";
 import { Field, FieldError, describedBy } from "@/components/common/Field";
 import { PasswordInput } from "@/components/common/PasswordInput";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,9 @@ type Errors = Partial<Record<"current" | "next" | "confirm" | "form", string | u
  */
 export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const updated = useVaultInfoUpdated();
+  const vault = useOpenVault();
+  const quickUnlockOn = useQuickUnlock(vault?.path ?? null).data?.enabled === true;
+  const quickUnlockChanged = useQuickUnlockChanged();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -79,9 +82,14 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
 
     setBusy(true);
     try {
-      updated(await settings.changePassword(current, next));
+      const info = await settings.changePassword(current, next);
+      updated(info);
+      // Windows Hello unlock was tied to the old password, so Rust turned it off.
+      quickUnlockChanged(info.path);
       toast.success("Master password changed", {
-        description: "Make a new backup so you have one that opens with it.",
+        description: quickUnlockOn
+          ? "Make a new backup so you have one that opens with it. Windows Hello unlock is off until you turn it on again."
+          : "Make a new backup so you have one that opens with it.",
       });
       setBusy(false);
       setCurrent("");
@@ -122,6 +130,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
             <p className="text-[13px] text-muted-foreground">
               <span className="font-medium text-status-warning">Old backups keep the old password.</span> A backup made
               before this change still opens only with the password you have now.
+              {quickUnlockOn && " Windows Hello unlock turns off; you can turn it on again afterwards."}
             </p>
           </div>
 

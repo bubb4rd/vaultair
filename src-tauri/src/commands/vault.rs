@@ -49,7 +49,7 @@ pub(super) fn parent_or_default(location: Option<String>) -> Result<PathBuf, Vau
     }
 }
 
-fn record_recent(state: &AppState, info: &VaultInfo) {
+pub(super) fn record_recent(state: &AppState, info: &VaultInfo) {
     state
         .config
         .record_recent(&info.path, &SystemClock.now_rfc3339());
@@ -138,7 +138,14 @@ pub async fn vault_unlock(
     let password = secrecy::SecretString::from(password);
     let dir = absolute_dir(&path).map_err(ipc_err)?;
     let session = state.session.clone();
-    let info = blocking(move || session.unlock(&dir, &password)).await?;
+    let quick = state.quick.clone();
+    let info = blocking(move || {
+        let info = session.unlock(&dir, &password)?;
+        // Typing the password restarts quick unlock's 7 days.
+        quick.record_password_unlock(&session);
+        Ok(info)
+    })
+    .await?;
     record_recent(&state, &info);
     super::settings::apply_saved(&state).await;
     Ok(info)

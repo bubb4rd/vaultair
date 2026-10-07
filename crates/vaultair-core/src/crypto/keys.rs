@@ -6,6 +6,7 @@
 //!                  --> FIELD_KEY  (field envelopes)
 //!                  --> FP_KEY     (password fingerprints)
 //!                  --> BACKUP_KEY (backup container MAC, Phase 14)
+//!                  --> DEVICE_KEY (quick-unlock policy MAC, Phase 15b)
 //! ```
 //!
 //! Changing the master password only re-wraps the DEK.
@@ -22,6 +23,7 @@ const INFO_DB: &[u8] = b"vaultair/v1/sqlcipher";
 const INFO_FIELD: &[u8] = b"vaultair/v1/field";
 const INFO_FP: &[u8] = b"vaultair/v1/pwfp";
 const INFO_BACKUP: &[u8] = b"vaultair/v1/backup-mac";
+const INFO_DEVICE_POLICY: &[u8] = b"vaultair/v1/quick-unlock-policy";
 
 /// The data-encryption key. Generated once per vault.
 #[derive(Clone, ZeroizeOnDrop)]
@@ -56,6 +58,7 @@ pub struct VaultKeys {
     field: [u8; 32],
     fingerprint: [u8; 32],
     backup: [u8; 32],
+    device_policy: [u8; 32],
 }
 
 fn expand(hk: &Hkdf<Sha256>, info: &[u8]) -> CryptoResult<[u8; 32]> {
@@ -72,6 +75,7 @@ impl VaultKeys {
             field: expand(&hk, INFO_FIELD)?,
             fingerprint: expand(&hk, INFO_FP)?,
             backup: expand(&hk, INFO_BACKUP)?,
+            device_policy: expand(&hk, INFO_DEVICE_POLICY)?,
             dek,
         })
     }
@@ -90,6 +94,11 @@ impl VaultKeys {
 
     pub fn backup_key(&self) -> &[u8; 32] {
         &self.backup
+    }
+
+    /// Keys the MAC on a device slot's policy record (`vault::device_slot`).
+    pub fn device_policy_key(&self) -> &[u8; 32] {
+        &self.device_policy
     }
 
     /// SQLCipher raw-key literal: `x'<64 hex chars>'`. Wiped on drop.
@@ -121,7 +130,7 @@ mod tests {
         let dek = Dek::from_bytes(&[9u8; 32]).unwrap();
         let a = VaultKeys::derive(dek.clone()).unwrap();
         let b = VaultKeys::derive(dek).unwrap();
-        let keys = [a.db, a.field, a.fingerprint, a.backup];
+        let keys = [a.db, a.field, a.fingerprint, a.backup, a.device_policy];
         for (i, x) in keys.iter().enumerate() {
             for y in &keys[i + 1..] {
                 assert_ne!(x, y);

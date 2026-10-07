@@ -2,7 +2,7 @@
 
 A local-first, encrypted Windows workspace for people who manage several gaming and online identities: accounts, identities, recovery codes, MFA and how they all connect, in one vault on your own disk. No cloud account, no network.
 
-> **Status:** Phase 15 (settings), with Phase 9 (purpose labels) done after it. Next: Phase 15b, Windows Hello quick unlock. Phase 17 (passkeys) is scoped below and is not part of the MVP.
+> **Status:** Phase 15b (Windows Hello quick unlock and tray), not yet driven with a real Hello prompt in the running app. Next: Phase 16, release hardening. Phase 17 (passkeys) is scoped below and is not part of the MVP.
 > Proprietary. All rights reserved.
 
 ## Docs
@@ -196,6 +196,21 @@ Vault files (`*.vdb`, `*.vhdr`, `*.vaultair-backup`) must never be committed. `.
 - **Privacy** shows the promises from `docs/privacy-statement-draft.md` and the logs folder, with "Open logs folder" (Explorer on Vaultair's own folder only; `vaultair-platform::windows::open_folder`).
 - New commands: `settings_get`, `settings_update`, `vault_profile_update`, `vault_change_password`, `vault_kdf_check`, `vault_strengthen_kdf`, `logs_folder`, `logs_open`. The plan's `app_config_*` already exist as `capture_policy_set` and `hide_emails_set`.
 - Not done in Phase 15: the purpose labels section (Phase 9), the Windows Hello and tray settings (Phase 15b), and remembering the generator's options. The UI is tested against mocked IPC; the change-password and strengthen flows haven't been driven in the running app yet.
+
+## Phase 15b notes
+
+- **Windows Hello unlock** is opt-in, per vault and per PC (Settings > Security > Windows Hello), decided in [ADR-0005](docs/adr/0005-quick-unlock.md). Turning it on takes the master password and one Hello prompt. After that the lock screen offers "Unlock with Windows Hello", and asks for it by itself once per vault when Vaultair is in front, except straight after a manual lock.
+- **The master password is still asked for** after Windows restarts, more than 7 days after it was last typed, after 3 Hello attempts in a row that failed or were cancelled, after the password or KDF changes, to turn Hello unlock on or off, and to set auto-lock to "never" while it is on. The lock screen says which rule applies. Change password, Strengthen key derivation and Restore already took it.
+- **How it works.** Hello holds a key named `Vaultair-<vault_id>` that never leaves it. Its signature over a random challenge is the same every time; HKDF over the signature gives the key that wraps the vault's data key. The wrapped key is the device slot, `%LOCALAPPDATA%\Vaultair\devices\<vault_id>.qu`, wrapped again with DPAPI. It is not in `vault.vhdr`, so the vault format stays v1 and nothing travels with the vault or its backups. Format: `docs/vault-format.md` §12.
+- **Where the code is.** `vaultair-core`: `vault/device_slot.rs` (format and crypto), `service/quick_unlock.rs` (the rules and the enable, unlock and forget steps, against a `QuickUnlockDevice` port), and `open_vault` split so a vault can open from keys (`open_vault_with_keys`). `vaultair-platform`: `QuickUnlockKey`, `DeviceProtection` and `SystemInfo`, with `windows/{hello,dpapi,sysinfo}.rs` and fakes. `src-tauri`: `quick_unlock.rs` (the adapter) and `commands/quick_unlock.rs`.
+- **A password or KDF change turns it off**: the slot is bound to the header, and Vaultair deletes the slot and the Hello key. Deleting the key is the real revocation, since the data key itself doesn't change. The dialogs say so, and you turn it on again afterwards.
+- **No TPM** is allowed with a warning in the dialog. The TPM is detected with `Tbsi_GetDeviceInfo`, not Hello attestation (the spike showed a working firmware TPM reporting `NotSupported`).
+- **Keep running in the tray** (Settings > Security, saved in `config.json`): closing the window hides it and **locks the vault**, as quitting did, and the tray icon has Open, Lock and Quit. A second launch brings the hidden window back.
+- New commands: `quick_unlock_status`, `quick_unlock_enable`, `quick_unlock_unlock`, `quick_unlock_forget`, `tray_set`. `settings_update` takes an optional `password`. New error codes: `quick_unlock_unavailable`, `quick_unlock_password_required`, `quick_unlock_cancelled`, `quick_unlock_failed`.
+- **Known limits** (in `docs/threat-model.md` and `docs/security-assumptions.md`): the restart, 7-day and 3-attempt rules are enforced by Vaultair, not by the key; with Windows Fast Startup only "Restart" resets the uptime the restart rule reads; the failure count in the slot has no MAC.
+- Driven in the real webview (2026-10-06, scratch `LOCALAPPDATA`): the app starts; `quick_unlock_status` reports this PC's Hello and TPM; a wrong password is refused before any Hello prompt; the Windows Hello section and the tray switch render; with the tray setting on, closing hides the window, locks the vault (`reason=Tray`) and keeps the process.
+- **Found on first use (owner, 2026-10-06), fixed but not yet rechecked:** the Hello prompt opened behind the Vaultair window, and turning it on asked for the PIN twice. The prompt has no owner-window option, so while a request waits `windows/hello.rs` now finds the "Windows Security" prompt and brings it forward (topmost, then foreground, then one Alt-key nudge if Windows refuses), for at most 5 seconds. Turning it on now signs with the credential the create call returns, in the same approval; opening the key again by name was what asked a second time.
+- **Not done yet: nothing here has been approved through a real Windows Hello prompt in the app by the tests.** The tests use in-memory Hello. Before relying on it, turn it on in a test vault and check: unlock after relock (idle, Win+L, sleep) and after reopening the app; the password is asked for after a Windows restart; cancel 3 times; change the password and see it turn off. Also run `cargo test -p vaultair-platform -- --ignored real_hello` (3 prompts). The tray icon and its menu have not been clicked by hand.
 
 ## Phase 17: Passkeys and login credentials (scoped)
 

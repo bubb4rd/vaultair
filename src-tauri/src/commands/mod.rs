@@ -10,6 +10,7 @@ pub mod identity;
 pub mod mfa;
 pub mod password;
 pub mod purpose;
+pub mod quick_unlock;
 pub mod recent;
 pub mod search;
 pub mod secret;

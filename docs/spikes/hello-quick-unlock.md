@@ -48,6 +48,8 @@ The debug command `spike_hello_sign` polled the foreground window every 50 ms wh
 - If another window grabs focus mid-prompt (a Firefox Picture-in-Picture window did once), the dialog stays open and takes focus back. Approval still succeeded.
 - Phase 15b: trigger the Hello prompt when the lock screen is shown or focused, not while Vaultair is minimized, so the prompt appears in context.
 
+**Corrected in Phase 15b (2026-10-06).** In the real flow the prompt opened *behind* Vaultair, so the "no focus workaround is needed" result above does not hold in general, and `windows/hello.rs` now brings the prompt forward itself. Finding 4 below also holds only for the credential object the create call returns: opening the key again by name and signing asked for the PIN a second time.
+
 ## Findings (feed back into ADR-0005 / Phase 15b)
 
 1. **Hello rejects `/` in credential names.** `Vaultair/spike-0000` failed with `0x80090027` (`NTE_INVALID_PARAMETER`) on `OpenAsync`. Use `Vaultair-<vault_id>`. ADR-0005 already has the fix.
