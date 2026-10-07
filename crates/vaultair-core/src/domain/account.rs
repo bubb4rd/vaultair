@@ -508,6 +508,30 @@ mod tests {
         assert_eq!(unchanged, SecretUpdate::Unchanged);
     }
 
+    /// The two reveal responses serialize their value (that is their job)
+    /// and print nothing of it.
+    #[test]
+    fn reveal_responses_never_print_their_value() {
+        let revealed = RevealedSecret {
+            value: "CANARY7F3A".into(),
+        };
+        assert_eq!(format!("{revealed:?}"), "RevealedSecret([redacted])");
+        assert_eq!(
+            serde_json::to_value(&revealed).unwrap(),
+            serde_json::json!({ "value": "CANARY7F3A" })
+        );
+
+        let code = TotpCodeView {
+            code: "CANARY7F3A".into(),
+            seconds_remaining: 17,
+            period: 30,
+        };
+        let debug = format!("{code:?} {code:#?}");
+        assert!(!debug.contains("CANARY"), "{debug}");
+        assert!(debug.contains("[redacted]"));
+        assert_eq!(serde_json::to_value(&code).unwrap()["code"], "CANARY7F3A");
+    }
+
     #[test]
     fn secret_refs_deserialize_from_tagged_json() {
         let r: SecretRef =

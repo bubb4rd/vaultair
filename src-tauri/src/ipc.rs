@@ -147,11 +147,19 @@ mod tests {
             .expect("failed to export TS bindings");
     }
 
-    /// The quoted names after each `marker` in `text`.
-    fn quoted_after<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
-        text.split(marker)
+    /// Every command the bindings invoke. tauri-specta writes
+    /// `__TAURI_INVOKE("name"` for a command that returns a `Result` and
+    /// `__TAURI_INVOKE<T>("name"` for one that doesn't.
+    fn invoked(text: &str) -> Vec<&str> {
+        text.split("__TAURI_INVOKE")
             .skip(1)
-            .filter_map(|rest| rest.split('"').next())
+            .filter_map(|rest| {
+                let call = match rest.strip_prefix('<') {
+                    Some(generic) => generic.split_once(">(")?.1,
+                    None => rest.strip_prefix('(')?,
+                };
+                call.strip_prefix('"')?.split('"').next()
+            })
             .collect()
     }
 
@@ -164,9 +172,9 @@ mod tests {
         let bindings = std::fs::read_to_string(BINDINGS_PATH).expect("bindings.ts");
         let build = include_str!("../build.rs");
         let capability = include_str!("../capabilities/main.json");
-        let commands = quoted_after(&bindings, "__TAURI_INVOKE(\"");
+        let commands = invoked(&bindings);
         assert!(
-            commands.len() > 50,
+            commands.len() > 100,
             "found only {} commands",
             commands.len()
         );
@@ -179,6 +187,77 @@ mod tests {
             assert!(
                 capability.contains(&allow),
                 "{allow} is missing from capabilities/main.json"
+            );
+        }
+    }
+
+    /// Whether `line` names the type `name` (not a longer name containing it).
+    fn names_type(line: &str, name: &str) -> bool {
+        let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+        line.match_indices(name).any(|(i, _)| {
+            !line[..i].chars().next_back().is_some_and(is_ident)
+                && !line[i + name.len()..].chars().next().is_some_and(is_ident)
+        })
+    }
+
+    /// The types that carry a secret value to the webview, and the only
+    /// commands allowed to return each. A new command returning one, or a
+    /// DTO that embeds one, fails here: widening how secrets leave Rust has
+    /// to be a decision, not a side effect.
+    #[test]
+    fn secret_values_leave_only_through_the_reveal_commands() {
+        const EGRESS: &[(&str, &[&str])] = &[
+            ("RevealedSecret", &["secret_reveal"]),
+            ("TotpCodeView", &["totp_current_code"]),
+            ("Generated", &["generate_password", "generate_passphrase"]),
+        ];
+        let bindings = std::fs::read_to_string(BINDINGS_PATH).expect("bindings.ts");
+        let code: Vec<&str> = bindings
+            .lines()
+            .filter(|l| {
+                let t = l.trim_start();
+                !(t.starts_with("//") || t.starts_with("/*") || t.starts_with('*'))
+            })
+            .collect();
+
+        for (ty, allowed) in EGRESS {
+            let definition = format!("export type {ty} = ");
+            assert!(
+                code.iter().any(|l| l.starts_with(&definition)),
+                "{ty} is no longer in the bindings; update this list"
+            );
+            let mut returned_by: Vec<&str> = Vec::new();
+            for line in code
+                .iter()
+                .filter(|l| names_type(l, ty) && !l.starts_with(&definition))
+            {
+                let command = invoked(line);
+                let returned = line.contains(&format!("typedError<{ty},"))
+                    || line.contains(&format!("__TAURI_INVOKE<{ty}>("));
+                assert!(
+                    returned && command.len() == 1,
+                    "{ty} is used outside a command's return type: {line}"
+                );
+                returned_by.extend(command);
+            }
+            returned_by.sort_unstable();
+            let mut allowed = allowed.to_vec();
+            allowed.sort_unstable();
+            assert_eq!(returned_by, allowed, "commands returning {ty}");
+        }
+
+        // Backup codes, keys and the on-disk formats stay in the core: none
+        // of them may ever get a TS type.
+        for internal in [
+            "BackupCode",
+            "VaultKeys",
+            "Dek",
+            "DeviceSlot",
+            "VaultHeader",
+        ] {
+            assert!(
+                !code.iter().any(|l| names_type(l, internal)),
+                "{internal} reached the bindings"
             );
         }
     }

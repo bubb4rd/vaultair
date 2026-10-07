@@ -794,6 +794,10 @@ fn canary_secrets_never_leave_through_dtos_logs_index_or_export() {
         ] {
             accounts::reveal(&v, &clock, &r).unwrap();
         }
+        // What `totp_current_code` runs: the other response that carries a
+        // secret. Its log line and its `Debug` must not.
+        let shown = mfa::totp_code(&v, &clock, &m).unwrap();
+        assert!(!format!("{shown:?}").contains(&shown.code));
         totp_key = accounts::reveal(&v, &clock, &SecretRef::TotpSecret { id: m.clone() })
             .unwrap()
             .to_string();

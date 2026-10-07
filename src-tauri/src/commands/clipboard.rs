@@ -46,6 +46,8 @@ pub async fn clipboard_copy_plain(
     state: State<'_, AppState>,
     text: String,
 ) -> IpcResult<ClipboardCopy> {
+    // A generated password comes this way before it's saved: wipe our copy.
+    let text = zeroize::Zeroizing::new(text);
     if state.session.status() == VaultStatus::Locked {
         return Err(ipc_err(AppError::VaultLocked));
     }

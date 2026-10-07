@@ -582,6 +582,23 @@ fn generate_golden_fixture() {
     fs::remove_file(dir.join(".lock")).unwrap();
 }
 
+/// The bundled engine is SQLCipher 4: the pinned cipher settings in the
+/// header (`cipher_compatibility = 4`) and `docs/vault-format.md` assume it.
+/// The exact version is recorded in `docs/security-assumptions.md`.
+#[test]
+fn the_bundled_engine_is_sqlcipher_4() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (v, _dir) = new_vault(tmp.path());
+    let version: String = v
+        .conn()
+        .query_row("PRAGMA cipher_version", [], |r| r.get(0))
+        .unwrap();
+    assert!(
+        version.starts_with("4."),
+        "PRAGMA cipher_version = {version}"
+    );
+}
+
 #[test]
 fn golden_fixture_v1_still_opens() {
     let src = fixture_dir().join("Golden");

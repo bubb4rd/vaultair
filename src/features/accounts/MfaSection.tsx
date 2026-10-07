@@ -150,8 +150,23 @@ function BackupCodeRow({ methodId, index, used, onUpdated }: {
   used: boolean;
   onUpdated: (d: AccountDetail) => void;
 }) {
+  const config = useSessionConfig();
+  const hideAfter = config.data?.revealHideSecs ?? DEFAULT_REVEAL_SECS;
   const [value, setValue] = useState<string | null>(null);
   const n = String(index + 1);
+
+  // A shown code hides itself after `revealHideSecs`, like every other
+  // revealed secret.
+  useEffect(() => {
+    if (value === null) return;
+    const t = setTimeout(() => {
+      setValue(null);
+    }, hideAfter * 1000);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [value, hideAfter]);
+
   return (
     <li className="flex items-center gap-3 border-b border-border py-1.5 last:border-b-0">
       <span className="w-14 shrink-0 text-xs text-subtle-foreground">Code {n}</span>
