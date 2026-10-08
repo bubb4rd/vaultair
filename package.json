@@ -16,6 +16,7 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest",
     "check:release-config": "node scripts/check-release-config.mjs",
+    "check:release-version": "node scripts/check-release-version.mjs",
     "logos:report": "node scripts/logos.mjs report",
     "logos:suggest": "node scripts/logos.mjs suggest",
     "logos:sheet": "node scripts/logos.mjs sheet",

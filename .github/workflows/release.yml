@@ -1,0 +1,118 @@
+name: Release
+
+# Pushing a version tag (v0.1.1) builds the NSIS installer and files it under a
+# draft pre-release. Nothing is public until the draft is published by hand.
+# Steps for cutting a release: docs/release.md.
+on:
+  push:
+    tags: ["v*"]
+  # A change to the release build is tried as a dry run: the installer is built and
+  # kept as a workflow artifact, and no release is made.
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/check-release-version.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build installer
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history, so the tag can be checked against main.
+          fetch-depth: 0
+      - name: Tag matches the app version and is on main
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          node scripts/check-release-version.mjs "$TAG"
+          git merge-base --is-ancestor HEAD origin/main || (echo "::error::$TAG points at a commit that is not on main." && exit 1)
+      # No dependency or build cache here: a release is built from the lockfiles alone.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+      # openssl-src (vendored by SQLCipher) needs a native Perl, not Git's MSYS Perl.
+      - name: Put Strawberry Perl first on PATH
+        shell: pwsh
+        run: echo "C:\Strawberry\perl\bin" >> $env:GITHUB_PATH
+      - run: npm ci
+      - run: npm run check:release-config
+      - run: npm run check:release-version
+      # Runs `npm run build` first (beforeBuildCommand), then bundles the NSIS installer.
+      # bash, because PowerShell swallows the bare `--` before npx sees it.
+      - name: Build the installer
+        shell: bash
+        run: npx tauri build -- --locked
+      - name: Checksum
+        shell: bash
+        working-directory: target/release/bundle/nsis
+        run: |
+          count=$(ls -1 *-setup.exe | wc -l)
+          if [ "$count" -ne 1 ]; then echo "::error::Expected one installer, found $count."; exit 1; fi
+          # Git Bash marks binary mode with " *name"; write the plain two-space form.
+          sha256sum *-setup.exe | sed 's/ \*/  /' | tee SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installer
+          path: |
+            target/release/bundle/nsis/*-setup.exe
+            target/release/bundle/nsis/SHA256SUMS.txt
+          if-no-files-found: error
+          # The installer is already compressed.
+          compression-level: 0
+          retention-days: 14
+
+  # Kept apart from the build so that nothing which runs dependency code holds a write token.
+  publish:
+    name: Draft pre-release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: installer
+          path: installer
+      - name: Create the draft pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "Unsigned pre-release for testers. Windows 10 or 11, 64-bit."
+            echo
+            echo "How to install and update, and what the SmartScreen warning means: [README, Install](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/README.md#install)."
+            echo
+            echo "SHA-256 of the installer:"
+            echo
+            echo '```'
+            cat installer/SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+          # --prerelease stays until builds are code-signed (ADR-0004, decision 14).
+          gh release create "$TAG" installer/*-setup.exe installer/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --draft \
+            --prerelease \
+            --title "Vaultair ${TAG#v}" \
+            --notes-file notes.md \
+            --generate-notes
