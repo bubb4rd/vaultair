@@ -17,9 +17,33 @@ No cloud account. No network traffic from the app.
 
 ## Project status
 
-The MVP is implemented. Release hardening is mostly complete, but the installer, full smoke test, and code signing are still pending.
+The MVP is implemented, and the first build, [v0.1.0](https://github.com/bubb4rd/vaultair/releases/tag/v0.1.0), is out as a pre-release for testers. The installer is not code-signed yet and the end-to-end smoke test is not automated; both are planned before a general release.
 
-For now, build and run Vaultair from source. See [the development log](docs/phase-notes.md) for completed work and remaining release tasks.
+See [the development log](docs/phase-notes.md) for completed work and remaining release tasks.
+
+## Install
+
+Vaultair runs on 64-bit Windows 10 and 11.
+
+1. Download `Vaultair_<version>_x64-setup.exe` from the [Releases page](https://github.com/bubb4rd/vaultair/releases). Builds are published there and nowhere else.
+2. Run it. The installer is not code-signed yet, so Windows SmartScreen shows “Windows protected your PC”. Choose **More info**, then **Run anyway**. Your browser may also ask whether to keep the download.
+3. Follow the installer. It installs for your Windows account only and does not ask for administrator rights.
+
+To check a download before running it, compare its SHA-256 with the one in the release notes:
+
+```powershell
+Get-FileHash .\Vaultair_0.1.0_x64-setup.exe -Algorithm SHA256
+```
+
+The installer is about 220 MB because it carries Microsoft’s WebView2 runtime, so setup does not have to download it.
+
+### Updating
+
+Vaultair makes no network connections, so it cannot check for updates or install them. To update, download the newer installer from the Releases page and run it. Your vaults and settings are left as they are; making a backup first (Settings → Backups) is still a good habit.
+
+### Uninstalling
+
+Uninstall from Windows Settings → Apps. This removes the program only. Vaults, backups, and settings stay on disk; [Local data storage](docs/local-data-storage.md) lists where they are and how to remove them.
 
 ## Features
 
@@ -35,7 +59,7 @@ Autofill, sync, and browser extensions are outside the MVP scope. See [the scope
 
 ## Build and run
 
-Vaultair currently supports Windows only.
+This section is for building from source rather than installing a release. Vaultair currently supports Windows only.
 
 ### Prerequisites
 
@@ -70,6 +94,8 @@ npx tauri build --no-bundle
 
 The executable is written to `target\release\vaultair.exe`. This does not create an installer.
 
+To build the installer as well, leave out `--no-bundle`; it is written to `target\release\bundle\nsis\`. Published installers are built by GitHub Actions from a version tag: see [Releasing](docs/release.md).
+
 ## Development
 
 ### Tests and checks
@@ -85,8 +111,9 @@ npm test -- --run
 npm run lint
 npm run typecheck
 
-# Release configuration
+# Release configuration and version
 npm run check:release-config
+npm run check:release-version
 
 # Dependency and license checks
 cargo deny check
@@ -119,6 +146,7 @@ CI runs formatting, Clippy, tests, dependency checks, and license checks. It als
 | [Threat model](docs/threat-model.md) | Security assumptions and threats; currently a draft |
 | [Implementation plan](docs/implementation-plan.md) | Phased development plan |
 | [Development log](docs/phase-notes.md) | Implementation progress and open tasks |
+| [Releasing](docs/release.md) | Version bumps, tags, the installer build, and code signing plans |
 | [Security policy](SECURITY.md) | How to report vulnerabilities |
 
 ## Security

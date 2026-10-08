@@ -14,7 +14,7 @@ If the button isn't there, open an issue that says only that you have a security
 
 ## What to include
 
-- The commit or build you tested, and your Windows version.
+- The version you tested (Settings > About shows it), or the commit for a build from source, and your Windows version.
 - Whether Windows Hello unlock was on, and whether the PC has a TPM, if either matters.
 - Steps to reproduce, from a fresh vault if you can.
 - What an attacker gains, and what they need first (the vault files, a backup, a locked or unlocked session, code running as the user).
@@ -24,7 +24,13 @@ Reproduce with a throwaway vault or the built-in demo vault. Don't send a real v
 
 ## Supported versions
 
-There is no release yet. Only the current `main` branch is supported, and fixes land there. This section will change when the first build ships.
+Vaultair is in pre-release. Only the newest build on the [Releases page](https://github.com/bubb4rd/vaultair/releases) and the current `main` branch are supported. A fix lands on `main` and ships in the next build; older builds are not patched.
+
+Vaultair makes no network connections, so it cannot update itself or tell you that a fix is out. Getting a fixed build is done by hand: download the new installer and run it.
+
+## Official builds
+
+Installers are published only on this repository's Releases page, each with its SHA-256 in the release notes. They are not code-signed yet, so Windows SmartScreen warns before running one; for now that warning is expected. A Vaultair installer from anywhere else, or one whose SHA-256 doesn't match the release notes, is not an official build.
 
 ## Scope
 
