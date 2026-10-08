@@ -419,7 +419,7 @@ describe("account detail", () => {
       }),
     );
     await screen.findByRole("heading", { name: "Sign-in" });
-    await user.click(screen.getByRole("button", { name: "Open" }));
+    await user.click(screen.getByRole("button", { name: "Open login page" }));
     const dialog = await screen.findByRole("dialog", { name: "Open the login page?" });
     expect(await within(dialog).findByText("store.example.com")).toBeInTheDocument();
     expect(calls.some((c) => c.cmd === "account_open_url")).toBe(false);
@@ -479,6 +479,33 @@ describe("account detail", () => {
     expect(await screen.findByText("123 456")).toBeInTheDocument();
     expect(screen.getByText("changes in 17s")).toBeInTheDocument();
     expect(calls).toContainEqual({ cmd: "totp_current_code", args: { id: "m1" } });
+  });
+
+  it("puts the account's facts in header chips and the score in a card", async () => {
+    const user = userEvent.setup();
+    const { calls } = await renderApp(
+      "/accounts/a1",
+      withAccounts({
+        account_get: () => ({ ...DETAIL, identityId: "i1", identityName: "Competitive", gameName: "Arena" }),
+        account_mark_verified: () => ({ ...DETAIL, lastVerifiedAt: "2026-10-07T10:00:00Z" }),
+      }),
+    );
+    const chips = await screen.findByRole("list", { name: "At a glance" });
+    expect(within(chips).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "Active",
+      "Main",
+      "Arena",
+      "Competitive",
+      "pc",
+    ]);
+    expect(within(chips).getByRole("link", { name: "Competitive" })).toHaveAttribute("href", "/identities/i1");
+
+    const card = screen.getByRole("complementary", { name: "Security" });
+    expect(within(card).getByText("Security score 100 out of 100, Secure")).toBeInTheDocument();
+    expect(within(card).getByText("Never")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Mark verified" }));
+    expect(calls).toContainEqual({ cmd: "account_mark_verified", args: { id: "a1" } });
+    expect(await within(card).findByText("Oct 7, 2026")).toBeInTheDocument();
   });
 });
 

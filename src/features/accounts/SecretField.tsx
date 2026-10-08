@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 const DEFAULT_REVEAL_SECS = 20;
 const MASK = "••••••••••••";
 
-function IconAction({
+export function IconAction({
   label,
   onClick,
   pressed,

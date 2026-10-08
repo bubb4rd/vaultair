@@ -11,13 +11,10 @@ import {
   LightbulbIcon,
   PencilSimpleIcon,
   SealCheckIcon,
-  StarIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
-import { useAccount, useAccountRemoved, useAccountUpdated, useHealthIssues, useSessionConfig } from "@/app/queries";
+import { useAccount, useAccountRemoved, useAccountUpdated, useSessionConfig } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
-import { PurposeBadge } from "@/components/common/PurposeBadge";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,19 +23,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { AccountLogo } from "@/features/catalog/CatalogLogo";
 import { PageHeader } from "@/features/shell/PageHeader";
 import { toast } from "@/features/toast/toast";
 import { accounts, toIpcError, type AccountDetail, type AccountUrl } from "@/ipc/client";
+import { AccountHeader } from "./AccountHeader";
 import { DeleteConfirmDialog, OpenUrlDialog } from "./ConfirmDialogs";
 import { GameProfilesSection } from "./GameProfilesSection";
 import { suggestionLines } from "./notesHints";
 import { MfaSection } from "./MfaSection";
-import { ConcealedField, CopyButton, FieldRow, SecretField } from "./SecretField";
-import { SecurityDial } from "./SecurityDial";
-import { accountType, displayStatus, formatDate } from "./labels";
-import { accountSecurityFacts, securityScore } from "./securityScore";
+import { ConcealedField, CopyButton, FieldRow, IconAction, SecretField } from "./SecretField";
+import { SecurityCard } from "./SecurityCard";
+import { formatDate } from "./labels";
 
 /** Email and recovery email. Masked when the privacy setting is on. */
 function EmailField({ label, value }: { label: string; value: string | null }) {
@@ -51,103 +46,15 @@ function EmailField({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-function Panel({
-  id,
-  title,
-  children,
-  plain = false,
-}: {
-  id: string;
-  title: string;
-  children: ReactNode;
-  plain?: boolean;
-}) {
+/** A heading over label / value rows. No box: the rows' hairlines are the structure. */
+function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="rounded-lg border border-border bg-card px-4 pt-3 pb-2">
-      <h2 id={id} className="pb-1 text-[13px] font-semibold">
+    <section aria-labelledby={id} className="flex flex-col gap-1">
+      <h2 id={id} className="text-[13px] font-semibold">
         {title}
       </h2>
-      {plain ? <div className="py-2">{children}</div> : <dl className="divide-y divide-border">{children}</dl>}
+      <dl className="divide-y divide-border">{children}</dl>
     </section>
-  );
-}
-
-function Meta({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <dt className="text-xs text-subtle-foreground">{label}</dt>
-      <dd className="text-[13px] text-foreground">{children}</dd>
-    </div>
-  );
-}
-
-/** Left column: what the account is, at a glance. */
-function Summary({ account, onVerify }: { account: AccountDetail; onVerify: () => void }) {
-  const type = accountType(account.accountType);
-  const status = displayStatus(account);
-  const subtitle = [type.label, account.platformName ?? account.gameName ?? account.publisher].filter(Boolean).join(" · ");
-  return (
-    <aside aria-label="Account summary" className="flex flex-col gap-5">
-      <div className="flex items-start gap-3">
-        <AccountLogo account={account} size="lg" />
-        <div className="min-w-0 pt-0.5">
-          <p className="text-[15px] font-semibold break-words">{account.title}</p>
-          <p className="text-[13px] text-muted-foreground">{subtitle}</p>
-        </div>
-      </div>
-      <dl className="flex flex-col gap-4">
-        <Meta label="Status">
-          <span className="flex flex-col items-start gap-1">
-            <StatusBadge status={status.badge} label={status.label} />
-            <span className="text-xs text-subtle-foreground">{status.activity}</span>
-          </span>
-        </Meta>
-        <Meta label="Identity">
-          {account.identityId && account.identityName ? (
-            <Link
-              to="/identities/$identityId"
-              params={{ identityId: account.identityId }}
-              className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {account.identityName}
-            </Link>
-          ) : (
-            <span className="text-subtle-foreground">None</span>
-          )}
-        </Meta>
-        <Meta label="Purpose">
-          <PurposeBadge purposeId={account.purposeId} name={account.purposeName} />
-        </Meta>
-        {account.platformName && <Meta label="Platform">{account.platformName}</Meta>}
-        {account.gameName && <Meta label="Game">{account.gameName}</Meta>}
-        <Meta label="Tags">
-          {account.tags.length === 0 ? (
-            <span className="text-subtle-foreground">None</span>
-          ) : (
-            <ul className="flex flex-wrap gap-1.5">
-              {account.tags.map((t) => (
-                <li key={t} className="rounded-md bg-muted px-2 py-0.5 text-xs">
-                  {t}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Meta>
-        <Meta label="Last verified">
-          <span className="flex flex-col items-start gap-1.5">
-            <span className={account.lastVerifiedAt ? "" : "text-subtle-foreground"}>
-              {formatDate(account.lastVerifiedAt) ?? "Never"}
-            </span>
-            <Button type="button" variant="outline" size="xs" onClick={onVerify}>
-              <SealCheckIcon aria-hidden="true" />
-              Mark verified
-            </Button>
-          </span>
-        </Meta>
-        <Meta label="Added">{formatDate(account.createdAt)}</Meta>
-        <Meta label="Last edited">{formatDate(account.updatedAt)}</Meta>
-      </dl>
-    </aside>
   );
 }
 
@@ -167,10 +74,9 @@ function UrlRow({
       label={label}
       actions={
         url && (
-          <Button type="button" variant="outline" size="xs" onClick={onOpen}>
+          <IconAction label={`Open ${label.toLowerCase()}`} onClick={onOpen}>
             <ArrowSquareOutIcon aria-hidden="true" />
-            Open
-          </Button>
+          </IconAction>
         )
       }
     >
@@ -233,17 +139,6 @@ function NotesSuggestion({ account }: { account: AccountDetail }) {
   );
 }
 
-function Security({ account }: { account: AccountDetail }) {
-  const archived = account.archivedAt !== null;
-  const issues = useHealthIssues(null, null, !archived);
-  const result = securityScore(accountSecurityFacts(account, Array.isArray(issues.data) ? issues.data : null));
-  return (
-    <Panel id="security-heading" title="Security" plain>
-      <SecurityDial result={result} />
-    </Panel>
-  );
-}
-
 function Detail({ account }: { account: AccountDetail }) {
   const navigate = useNavigate();
   const updated = useAccountUpdated();
@@ -261,6 +156,10 @@ function Detail({ account }: { account: AccountDetail }) {
       .catch((err: unknown) => {
         toast.error("That didn't work", { description: toIpcError(err).message });
       });
+  }
+
+  function verify() {
+    run(() => accounts.markVerified(account.id), "Marked as verified");
   }
 
   function duplicate() {
@@ -281,211 +180,189 @@ function Detail({ account }: { account: AccountDetail }) {
     ? { label: getNavLabel(PAGE_PATHS.archived), to: PAGE_PATHS.archived }
     : { label: getNavLabel(PAGE_PATHS.accounts), to: PAGE_PATHS.accounts };
 
-  return (
+  const actions = (
     <>
-      <PageHeader
-        crumbs={[{ label: "Vault", to: "/" }, parent, { label: account.title }]}
-        actions={
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-pressed={account.favorite}
-                  aria-label={account.favorite ? "Remove from favorites" : "Add to favorites"}
-                  onClick={() => {
-                    accounts
-                      .setFavorite(account.id, !account.favorite)
-                      .then(updated)
-                      .catch((err: unknown) => {
-                        toast.error("Couldn't update favorites", { description: toIpcError(err).message });
-                      });
-                  }}
-                >
-                  <StarIcon
-                    aria-hidden="true"
-                    weight={account.favorite ? "fill" : "regular"}
-                    className={account.favorite ? "text-status-attention" : undefined}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{account.favorite ? "Remove from favorites" : "Add to favorites"}</TooltipContent>
-            </Tooltip>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/accounts/$accountId/edit" params={{ accountId: account.id }}>
-                <PencilSimpleIcon aria-hidden="true" />
-                Edit
-              </Link>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label="More actions">
-                  <DotsThreeIcon aria-hidden="true" weight="bold" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onSelect={duplicate}>
-                  <CopySimpleIcon aria-hidden="true" />
-                  Duplicate as alt template
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => {
-                    run(() => accounts.markVerified(account.id), "Marked as verified");
-                  }}
-                >
-                  <SealCheckIcon aria-hidden="true" />
-                  Mark verified
-                </DropdownMenuItem>
-                {archived ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      run(() => accounts.unarchive(account.id), "Account restored");
-                    }}
-                  >
-                    <ArrowCounterClockwiseIcon aria-hidden="true" />
-                    Restore from archive
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      run(() => accounts.archive(account.id), "Account archived");
-                    }}
-                  >
-                    <ArchiveIcon aria-hidden="true" />
-                    Archive
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={() => {
-                    setDeleting(true);
-                  }}
-                >
-                  <TrashIcon aria-hidden="true" />
-                  Delete permanently
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        }
-      />
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-10">
-        {archived && (
-          <div className="mb-6 flex max-w-6xl items-center gap-3 rounded-lg border border-border-strong bg-muted/50 px-4 py-2.5">
-            <ArchiveIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-            <p className="flex-1 text-[13px] text-muted-foreground">
-              Archived {formatDate(account.archivedAt)}. It's left out of lists and security checks.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => {
+      <Button asChild variant="outline" size="sm">
+        <Link to="/accounts/$accountId/edit" params={{ accountId: account.id }}>
+          <PencilSimpleIcon aria-hidden="true" />
+          Edit
+        </Link>
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon-sm" aria-label="More actions">
+            <DotsThreeIcon aria-hidden="true" weight="bold" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onSelect={duplicate}>
+            <CopySimpleIcon aria-hidden="true" />
+            Duplicate as alt template
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={verify}>
+            <SealCheckIcon aria-hidden="true" />
+            Mark verified
+          </DropdownMenuItem>
+          {archived ? (
+            <DropdownMenuItem
+              onSelect={() => {
                 run(() => accounts.unarchive(account.id), "Account restored");
               }}
             >
-              Restore
-            </Button>
-          </div>
-        )}
-        <div className="grid max-w-6xl grid-cols-[240px_minmax(0,1fr)] gap-8">
-          <Summary
+              <ArrowCounterClockwiseIcon aria-hidden="true" />
+              Restore from archive
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onSelect={() => {
+                run(() => accounts.archive(account.id), "Account archived");
+              }}
+            >
+              <ArchiveIcon aria-hidden="true" />
+              Archive
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => {
+              setDeleting(true);
+            }}
+          >
+            <TrashIcon aria-hidden="true" />
+            Delete permanently
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+
+  return (
+    <>
+      <PageHeader crumbs={[{ label: "Vault", to: "/" }, parent, { label: account.title }]} />
+      <div className="@container min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-10">
+        <div className="flex max-w-6xl flex-col gap-6">
+          {archived && (
+            <div className="flex items-center gap-3 rounded-lg border border-border-strong bg-muted/50 px-4 py-2.5">
+              <ArchiveIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+              <p className="flex-1 text-[13px] text-muted-foreground">
+                Archived {formatDate(account.archivedAt)}. It's left out of lists and security checks.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => {
+                  run(() => accounts.unarchive(account.id), "Account restored");
+                }}
+              >
+                Restore
+              </Button>
+            </div>
+          )}
+          <AccountHeader
             account={account}
-            onVerify={() => {
-              run(() => accounts.markVerified(account.id), "Marked as verified");
+            actions={actions}
+            onFavorite={() => {
+              accounts
+                .setFavorite(account.id, !account.favorite)
+                .then(updated)
+                .catch((err: unknown) => {
+                  toast.error("Couldn't update favorites", { description: toIpcError(err).message });
+                });
             }}
           />
-          <div className="flex min-w-0 flex-col gap-5">
-            <Panel id="signin-heading" title="Sign-in">
-              <FieldRow label="Username" actions={account.username && <CopyButton text={account.username} label="Username" />}>
-                {account.username}
-              </FieldRow>
-              <EmailField label="Email" value={account.email} />
-              {account.hasPassword ? (
-                <SecretField label="Password" target={{ kind: "accountPassword", id: account.id }} />
-              ) : (
-                <FieldRow label="Password" />
-              )}
-              <EmailField label="Recovery email" value={account.recoveryEmail} />
-              <FieldRow label="Recovery phone">{account.recoveryPhone}</FieldRow>
-              <UrlRow
-                label="Login page"
-                url={account.loginUrl ?? account.catalogLoginUrl}
-                note={
-                  account.loginUrl
-                    ? undefined
-                    : `From the ${account.platformName ?? "platform"} catalog entry, not saved on this account.`
-                }
-                onOpen={() => {
-                  setOpening("login");
-                }}
-              />
-              <UrlRow
-                label="Website"
-                url={account.websiteUrl}
-                onOpen={() => {
-                  setOpening("website");
-                }}
-              />
-            </Panel>
-
-            <MfaSection account={account} />
-
-            <Security account={account} />
-
-            <GameProfilesSection account={account} />
-
-            {hasGameDetails && (
-              <Panel id="game-heading" title="Game details">
-                <FieldRow label="Publisher">{account.publisher}</FieldRow>
-                <FieldRow label="Region">{account.region}</FieldRow>
-                <FieldRow
-                  label="Player ID"
-                  actions={account.playerId && <CopyButton text={account.playerId} label="Player ID" />}
-                >
-                  {account.playerId}
+          <div className="grid grid-cols-1 gap-8 @4xl:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="flex min-w-0 flex-col gap-8">
+              <Section id="signin-heading" title="Sign-in">
+                <FieldRow label="Username" actions={account.username && <CopyButton text={account.username} label="Username" />}>
+                  {account.username}
                 </FieldRow>
-                <FieldRow label="Display name">{account.displayName}</FieldRow>
-              </Panel>
-            )}
-
-            {account.customFields.length > 0 && (
-              <Panel id="custom-heading" title="Custom fields">
-                {account.customFields.map((f) =>
-                  f.fieldType === "secret" ? (
-                    f.hasValue ? (
-                      <SecretField key={f.id} label={f.label} target={{ kind: "customField", id: f.id }} />
-                    ) : (
-                      <FieldRow key={f.id} label={f.label} />
-                    )
-                  ) : (
-                    <FieldRow
-                      key={f.id}
-                      label={f.label}
-                      actions={f.value && <CopyButton text={f.value} label={f.label} />}
-                    >
-                      {f.value}
-                    </FieldRow>
-                  ),
+                <EmailField label="Email" value={account.email} />
+                {account.hasPassword ? (
+                  <SecretField label="Password" target={{ kind: "accountPassword", id: account.id }} />
+                ) : (
+                  <FieldRow label="Password" />
                 )}
-              </Panel>
-            )}
+                <EmailField label="Recovery email" value={account.recoveryEmail} />
+                <FieldRow label="Recovery phone">{account.recoveryPhone}</FieldRow>
+                <UrlRow
+                  label="Login page"
+                  url={account.loginUrl ?? account.catalogLoginUrl}
+                  note={
+                    account.loginUrl
+                      ? undefined
+                      : `From the ${account.platformName ?? "platform"} catalog entry, not saved on this account.`
+                  }
+                  onOpen={() => {
+                    setOpening("login");
+                  }}
+                />
+                <UrlRow
+                  label="Website"
+                  url={account.websiteUrl}
+                  onOpen={() => {
+                    setOpening("website");
+                  }}
+                />
+              </Section>
 
-            <Panel id="notes-heading" title="Notes">
-              <FieldRow label="Notes">
-                {account.notes && <span className="whitespace-pre-wrap">{account.notes}</span>}
-              </FieldRow>
-              {account.hasSensitiveNotes ? (
-                <SecretField label="Sensitive notes" multiline target={{ kind: "sensitiveNotes", id: account.id }} />
-              ) : (
-                <FieldRow label="Sensitive notes" />
+              <MfaSection account={account} />
+
+              <GameProfilesSection account={account} />
+
+              {hasGameDetails && (
+                <Section id="game-heading" title="Game details">
+                  <FieldRow label="Publisher">{account.publisher}</FieldRow>
+                  <FieldRow label="Region">{account.region}</FieldRow>
+                  <FieldRow
+                    label="Player ID"
+                    actions={account.playerId && <CopyButton text={account.playerId} label="Player ID" />}
+                  >
+                    {account.playerId}
+                  </FieldRow>
+                  <FieldRow label="Display name">{account.displayName}</FieldRow>
+                </Section>
               )}
-            </Panel>
 
-            <NotesSuggestion account={account} />
+              {account.customFields.length > 0 && (
+                <Section id="custom-heading" title="Custom fields">
+                  {account.customFields.map((f) =>
+                    f.fieldType === "secret" ? (
+                      f.hasValue ? (
+                        <SecretField key={f.id} label={f.label} target={{ kind: "customField", id: f.id }} />
+                      ) : (
+                        <FieldRow key={f.id} label={f.label} />
+                      )
+                    ) : (
+                      <FieldRow
+                        key={f.id}
+                        label={f.label}
+                        actions={f.value && <CopyButton text={f.value} label={f.label} />}
+                      >
+                        {f.value}
+                      </FieldRow>
+                    ),
+                  )}
+                </Section>
+              )}
+
+              <Section id="notes-heading" title="Notes">
+                <FieldRow label="Notes">
+                  {account.notes && <span className="whitespace-pre-wrap">{account.notes}</span>}
+                </FieldRow>
+                {account.hasSensitiveNotes ? (
+                  <SecretField label="Sensitive notes" multiline target={{ kind: "sensitiveNotes", id: account.id }} />
+                ) : (
+                  <FieldRow label="Sensitive notes" />
+                )}
+              </Section>
+
+              <NotesSuggestion account={account} />
+            </div>
+            <div className="self-start @4xl:sticky @4xl:top-0">
+              <SecurityCard account={account} onVerify={verify} />
+            </div>
           </div>
         </div>
       </div>
@@ -536,4 +413,3 @@ export function AccountDetailPage({ accountId }: { accountId: string }) {
   }
   return <Detail account={account.data} />;
 }
-

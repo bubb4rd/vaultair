@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STATUS, StatusBadge } from "@/components/common/StatusBadge";
 import { FixLink } from "@/features/health/FixLink";
 import { cn } from "@/lib/utils";
@@ -16,24 +16,14 @@ const TONE: Record<SecurityScoreResult["status"], string> = {
   info: "text-status-linked",
 };
 
-/** Full ring. Ticks start at 12 o'clock and run clockwise. */
-const TICKS = 56;
-const RING = 188;
-const RING_C = RING / 2;
-const TICK_INNER = 66;
-const TICK_OUTER = 86;
-
-const TICK_LINES = Array.from({ length: TICKS }, (_, i) => {
-  const angle = -Math.PI / 2 + (i / TICKS) * Math.PI * 2;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return {
-    x1: RING_C + cos * TICK_INNER,
-    y1: RING_C + sin * TICK_INNER,
-    x2: RING_C + cos * TICK_OUTER,
-    y2: RING_C + sin * TICK_OUTER,
-  };
-});
+/** What each fact on the dial is about. The chip itself only says its state. */
+const FACT_TITLE: Record<string, string> = {
+  password: "Password",
+  mfa: "MFA",
+  backup: "Backup codes",
+  reused: "Reuse",
+  dormant: "Activity",
+};
 
 /** Upper semicircle, left to right through 12 o'clock. */
 const CAPSULES = 18;
@@ -117,40 +107,6 @@ function ScoreReadout({ result }: { result: SecurityScoreResult }) {
   );
 }
 
-function Preview({ caption, children }: { caption: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col items-center gap-2" aria-hidden="true">
-      <p className="text-xs text-subtle-foreground">{caption}</p>
-      {children}
-    </div>
-  );
-}
-
-function TickRing({ result, fill }: { result: SecurityScoreResult; fill: number }) {
-  const filled = filledCount(fill, TICKS);
-  return (
-    <div className="relative size-[188px]">
-      <svg viewBox={`0 0 ${RING} ${RING}`} className="size-full overflow-visible">
-        {TICK_LINES.map((line, i) => (
-          <line
-            key={i}
-            x1={line.x1}
-            y1={line.y1}
-            x2={line.x2}
-            y2={line.y2}
-            strokeWidth={2}
-            strokeLinecap="round"
-            className={i < filled ? cn("stroke-current", TONE[result.status]) : "stroke-border-strong"}
-          />
-        ))}
-      </svg>
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <ScoreReadout result={result} />
-      </div>
-    </div>
-  );
-}
-
 function SegmentedArc({ result, fill }: { result: SecurityScoreResult; fill: number }) {
   const filled = filledCount(fill, CAPSULES);
   return (
@@ -176,28 +132,29 @@ function SegmentedArc({ result, fill }: { result: SecurityScoreResult; fill: num
   );
 }
 
-/** Two score charts for comparison, then the facts that produced the score. */
+/**
+ * The score as a segmented arc, then one row per fact that produced it.
+ * Built for a narrow column: facts stack, with the state badge at the right.
+ */
 export function SecurityDial({ result }: { result: SecurityScoreResult }) {
   const fill = useFill(result.score);
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <p className="sr-only">
         {result.score === null
           ? `Security score, ${result.label}`
           : `Security score ${result.score} out of 100, ${result.label}`}
       </p>
-      <div className="flex flex-wrap items-start gap-8">
-        <Preview caption="Tick ring">
-          <TickRing result={result} fill={fill} />
-        </Preview>
-        <Preview caption="Segmented arc">
-          <SegmentedArc result={result} fill={fill} />
-        </Preview>
+      <div className="flex justify-center" aria-hidden="true">
+        <SegmentedArc result={result} fill={fill} />
       </div>
-      <ul className="flex flex-wrap gap-x-3 gap-y-2">
+      <ul className="flex flex-col divide-y divide-border">
         {result.chips.map((chip) => (
-          <li key={chip.key} className="flex max-w-full flex-wrap items-center gap-2">
-            <StatusBadge status={chip.status} label={chip.label} />
+          <li key={chip.key} className="flex flex-col gap-1 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] text-muted-foreground">{FACT_TITLE[chip.key] ?? chip.key}</span>
+              <StatusBadge status={chip.status} label={chip.label} />
+            </div>
             {chip.detail && <span className="text-xs text-subtle-foreground">{chip.detail}</span>}
             {chip.reason && <span className="text-[13px]">{chip.reason}</span>}
             {chip.issue && chip.issue.fix !== "account" && <FixLink issue={chip.issue} />}

@@ -12,7 +12,7 @@ import { createQueryClient } from "@/app/queries";
 import { createAppRouter } from "@/app/router";
 import { setHealthTrendSource } from "@/features/dashboard/healthTrend";
 import "@/styles/globals.css";
-import { ACCOUNTS, BACKUP, HEALTH, HEALTH_TREND, IDENTITIES, ISSUES, summaryFor } from "./fixtures";
+import { ACCOUNTS, BACKUP, HEALTH, HEALTH_TREND, IDENTITIES, ISSUES, detailFor, summaryFor } from "./fixtures";
 
 mockWindows("main");
 // The app records no score history yet; the gallery fakes a month of it.
@@ -69,6 +69,12 @@ mockIPC(
         return IDENTITIES;
       case "account_list":
         return ACCOUNTS;
+      case "account_get":
+        return detailFor(a.id as string);
+      case "game_profile_list":
+      case "game_list":
+      case "platform_list":
+        return [];
       case "health_summary":
         return HEALTH;
       case "health_issues":
@@ -93,10 +99,12 @@ mockIPC(
   { shouldMockEvents: true },
 );
 
+// `?path=/accounts/a-bnet` opens the preview on a route other than the dashboard.
+const initialPath = new URLSearchParams(window.location.search).get("path") ?? "/";
 const root = document.getElementById("root");
 if (!root) throw new Error("root element missing");
 createRoot(root).render(
   <StrictMode>
-    <App router={createAppRouter(createMemoryHistory({ initialEntries: ["/"] }))} queryClient={createQueryClient()} />
+    <App router={createAppRouter(createMemoryHistory({ initialEntries: [initialPath] }))} queryClient={createQueryClient()} />
   </StrictMode>,
 );
