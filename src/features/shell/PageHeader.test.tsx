@@ -26,10 +26,8 @@ const mockAccount: AccountDetail = {
   publisher: null,
   hasPassword: true,
   passwordStrength: 4,
-  mfaEnabled: true,
-  backupCodesRemaining: 5,
+  passwordChangedAt: null,
   favorite: false,
-  favoritedAt: null,
   archivedAt: null,
   tags: ["gaming"],
   updatedAt: "2026-10-01T12:00:00Z",
@@ -47,8 +45,6 @@ const mockAccount: AccountDetail = {
   hasSensitiveNotes: false,
   notesSuggestions: { identifiers: false, credentials: false, backupCodes: false, securityAnswers: false },
   customFields: [],
-  gameProfiles: [],
-  totpConfigured: false,
   mfa: [],
 };
 

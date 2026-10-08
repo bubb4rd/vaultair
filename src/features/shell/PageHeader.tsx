@@ -62,7 +62,7 @@ export function PageHeader({ crumbs: explicitCrumbs, title, actions }: PageHeade
                 {crumb.to ? (
                   <Link
                     to={crumb.to}
-                    params={crumb.params}
+                    {...(crumb.params ? { params: crumb.params } : {})}
                     className={cn(
                       "rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring",
                       crumb.truncate && "max-w-[220px] truncate",

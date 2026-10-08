@@ -1015,7 +1015,6 @@ export function AccountForm({
   const identityRefs = useIdentityRefs();
   const existing = useAccount(accountId ?? "", accountId !== undefined);
   const editing = accountId !== undefined;
-  const title = editing ? "Edit account" : "New account";
   // The form keeps its first values, so a mailbox's details have to be in before it renders.
   const contacts = useContactPoints();
   const platforms = usePlatforms();
