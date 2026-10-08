@@ -1,5 +1,5 @@
 // Fails if the shipped Tauri configuration loosens the security baseline.
-// Run in CI. See docs/adr/0001-stack.md and docs/implementation-plan.md §1.3.
+// Run in CI. See docs/adr/0001-stack.md.
 import { readFileSync } from "node:fs";
 
 const failures = [];

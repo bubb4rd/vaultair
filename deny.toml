@@ -62,5 +62,5 @@ unknown-registry = "deny"
 unknown-git = "deny"
 
 [licenses.private]
-# Our own crates are unpublished and proprietary.
+# Our own crates are unpublished (GPL-3.0-only, see LICENSE); the allow list is for dependencies.
 ignore = true

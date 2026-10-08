@@ -1,6 +1,6 @@
 # Vaultair architecture
 
-> **Status:** Final for the MVP (Phase 16), checked against the code. Phase 1 set the security baseline below; the vault format is in `docs/vault-format.md`. Design rationale is in `docs/adr/`. `docs/implementation-plan.md` §1 is the design as planned; where the two differ, this file is what was built.
+> **Status:** Final for the MVP (Phase 16), checked against the code. Phase 1 set the security baseline below; the vault format is in `docs/vault-format.md`. Design rationale is in `docs/adr/`. The implementation plan §1 (an internal planning document, not in this repository) is the design as planned; where the two differ, this file is what was built.
 
 ## Layers
 

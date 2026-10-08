@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-23
-- **Decided by:** project owner, from the open questions in `docs/implementation-plan.md` §8 and §9
+- **Decided by:** project owner, from the open questions in the implementation plan §8 and §9 (an internal planning document, not in this repository)
 
 ## Decisions
 
@@ -23,7 +23,7 @@
 | 13 | Typed IPC | tauri-specta, with ts-rs as the fallback. |
 | 14 | Code signing | Unsigned for private beta; OV/EV or Azure Trusted Signing before any public release. |
 | 15 | Auto-updates | **None in the MVP** (no-network promise). |
-| 16 | License | **Closed source (proprietary).** All rights reserved; no open-source license file. |
+| 16 | License | **GPL-3.0-only** since 2026-10-08 (see `LICENSE`). Originally closed source (proprietary), all rights reserved; see the note below. |
 | 17 | Multiple vaults | One open at a time, with a recent-vaults switcher. |
 | 18 | CSV export | **Not implemented in the MVP**; tests assert its absence. |
 | 19 | "High-priority" saved view | Favorites + accounts with the Main or Recovery purpose + accounts with high-severity health issues. |
@@ -63,4 +63,5 @@ The decisions stand. Where the code differs from the table, or adds to it:
 - **Copying a shown secret.** Decided by the project owner (2026-10-07): for now a secret is copied only with its Copy button. Shown secrets are not selectable text (`user-select: none` on the page, with no opt-in on them), and that stays. `useProtectedCopy` remains as a backstop for a copy, cut or drag that reaches one anyway; it has run only in the test DOM, and the check in a real window is on the README's Phase 16 list.
 - **Responses carry only what the UI uses.** Decided by the project owner (2026-10-07): three fields the UI never read were removed from the responses, `lastUsedAt` from the account detail and `totpDigits` and `totpPeriod` from an MFA method. The data is still stored and still used inside Rust: the last-used time feeds an account's last activity (Active, Stale, Dormant) and the Dormant health rule, and the digits and period are what TOTP codes are generated with. No schema or format change.
 - **Decision 16 and the repository.** Decided by the project owner (2026-10-07): the repository is public, as of that date. No licence has been added with that, so the code is published with all rights reserved. `SECURITY.md`'s reporting route (GitHub private vulnerability reporting) depends on the repository being public with that feature turned on; both were done on 2026-10-07.
+- **Decision 16, licence.** Decided by the project owner (2026-10-08): the source is licensed under GPL-3.0-only, replacing "all rights reserved". `LICENSE` holds the text; `Cargo.toml`, `package.json`, the README and Settings > About say the same. Third-party components keep their own licences, and third-party logos and trademarks are not covered.
 - **"Shared household"** was not decided before Phase 9, which shipped without it. Decided in Phase 16: it stays out of the built-ins (see "Still open" above).

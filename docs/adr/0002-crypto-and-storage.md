@@ -5,7 +5,7 @@
 
 ## Context
 
-The spec requires a vetted encryption approach, Argon2id for key derivation, encrypted metadata, working search, and durable incremental writes. Four options were compared in `docs/implementation-plan.md` §2.1:
+The spec requires a vetted encryption approach, Argon2id for key derivation, encrypted metadata, working search, and durable incremental writes. Four options were compared in the implementation plan §2.1 (an internal planning document, not in this repository):
 
 - **A.** SQLCipher only (its PBKDF2 KDF)
 - **B.** Plain SQLite + per-field AEAD

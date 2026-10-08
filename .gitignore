@@ -32,8 +32,15 @@ Desktop.ini
 # Claude Code local-only settings
 .claude/settings.local.json
 
-# Junction to .agents/skills/design-taste-frontend (recreate per README "Design tooling")
-.claude/skills/design-taste-frontend
+# Third-party agent skills: local design tooling, not part of the app
+.claude/skills/
+.agents/
+skills-lock.json
+
+# Internal planning docs, kept locally
+docs/implementation-plan.md
+docs/phase-notes.md
+docs/spikes/
 
 # Logo review scratch: contact sheet and candidate files (docs/logo-pipeline.md)
 .asset-work/
