@@ -407,8 +407,8 @@ describe("custom and hidden purposes on accounts", () => {
 
   it("still shows a hidden purpose on the account page", async () => {
     await renderApp("/accounts/a1", store([MAIN, label({ ...TOURNAMENT, isHidden: true })]));
-    const summaryPanel = await screen.findByRole("complementary", { name: "Account summary" });
-    const badge = within(summaryPanel).getByText("Tournament").closest("[data-purpose-color]");
+    const chips = await screen.findByRole("list", { name: "At a glance" });
+    const badge = within(chips).getByText("Tournament").closest("[data-purpose-color]");
     expect(badge).not.toBeNull();
     await waitFor(() => {
       expect(badge).toHaveAttribute("data-purpose-color", "amber");

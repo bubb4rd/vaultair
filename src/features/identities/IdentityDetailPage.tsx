@@ -14,7 +14,7 @@ import {
   TrashIcon,
   XIcon,
 } from "@phosphor-icons/react";
-import { PAGE_PATHS } from "@/app/nav";
+import { PAGE_PATHS, getNavLabel } from "@/app/nav";
 import { useIdentitiesChanged, useIdentityOverview, useIdentityUpdated } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
@@ -246,7 +246,11 @@ function Detail({ overview }: { overview: IdentityOverview }) {
   return (
     <>
       <PageHeader
-        title={identity.name}
+        crumbs={[
+          { label: "Vault", to: "/" },
+          { label: getNavLabel(PAGE_PATHS.identities), to: PAGE_PATHS.identities },
+          { label: identity.name },
+        ]}
         actions={
           <div className="flex items-center gap-1">
             <Button asChild variant="outline" size="sm">
@@ -421,11 +425,16 @@ function Detail({ overview }: { overview: IdentityOverview }) {
 
 export function IdentityDetailPage({ identityId }: { identityId: string }) {
   const overview = useIdentityOverview(identityId);
-  if (overview.isPending) return <PageHeader title="Identity" />;
+  const fallbackCrumbs = [
+    { label: "Vault", to: "/" },
+    { label: getNavLabel(PAGE_PATHS.identities), to: PAGE_PATHS.identities },
+    { label: "Identity" },
+  ];
+  if (overview.isPending || !overview.data) return <PageHeader crumbs={fallbackCrumbs} />;
   if (overview.isError) {
     return (
       <>
-        <PageHeader title="Identity" />
+        <PageHeader crumbs={fallbackCrumbs} />
         <div className="px-6">
           <EmptyState icon={IdentificationBadgeIcon} title="Identity not found" description="It may have been deleted.">
             <Button asChild variant="outline" size="sm">
@@ -438,3 +447,4 @@ export function IdentityDetailPage({ identityId }: { identityId: string }) {
   }
   return <Detail overview={overview.data} />;
 }
+

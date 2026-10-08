@@ -130,6 +130,14 @@ export const SETTINGS_ITEM: NavItem = {
 export const ALL_NAV_ITEMS: NavItem[] = [...NAV_GROUPS.flatMap((g) => g.items), SETTINGS_ITEM];
 
 /**
+ * Returns the human-readable label for a given path from the navigation configuration,
+ * defaulting to "Vault" if not found.
+ */
+export function getNavLabel(path: string): string {
+  return ALL_NAV_ITEMS.find((item) => item.path === path)?.label ?? "Vault";
+}
+
+/**
  * Paths of sidebar pages, for links from inside features. They're typed as
  * plain strings because these routes are built from `NAV_GROUPS` at runtime,
  * so the router can't list them in its typed path union.

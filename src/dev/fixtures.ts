@@ -3,6 +3,7 @@
  * relative to now so "2 hours ago" style labels stay sensible.
  */
 import type {
+  AccountDetail,
   AccountSummary,
   AccountType,
   BackupStatus,
@@ -92,6 +93,52 @@ const byId = (id: string): AccountSummary => {
   if (!found) throw new Error(`fixture account missing: ${id}`);
   return found;
 };
+
+/**
+ * One account in full, for the detail page. Built from its summary, so the
+ * list and the page agree; the extra fields are plausible stand-ins.
+ */
+export function detailFor(id: string): AccountDetail | null {
+  const s = ACCOUNTS.find((a) => a.id === id);
+  if (!s) return null;
+  const site = s.platformName ? `https://${s.platformName.toLowerCase().replace(/\W+/g, "")}.example.com` : null;
+  const codes = s.backupCodesRemaining;
+  return {
+    ...s,
+    gameName: s.id === "a-bnet" ? "Call of Duty" : s.gameName,
+    recoveryEmail: s.email ? null : "recovery@example.com",
+    recoveryPhone: null,
+    passwordChangedAt: ago(24 * 40),
+    websiteUrl: site,
+    loginUrl: site ? `${site}/login` : null,
+    catalogLoginUrl: null,
+    region: null,
+    playerId: null,
+    displayName: null,
+    notes: "Main library account. Family sharing is on.",
+    hasSensitiveNotes: true,
+    notesSuggestions: { identifiers: false, credentials: false, backupCodes: false, securityAnswers: false },
+    lastVerifiedAt: s.favorite ? ago(24 * 12) : null,
+    createdAt: ago(24 * 400),
+    customFields: [],
+    mfa: s.mfaEnabled
+      ? [
+          {
+            id: `m-${s.id}`,
+            method: "authenticator_app",
+            enabled: true,
+            hasTotp: true,
+            backupCodes: Array.from({ length: 8 }, (_, index) => ({ index, used: index >= codes })),
+            backupCodesRemaining: codes,
+            backupCodesUpdatedAt: ago(24 * 100),
+            hasRecoveryInstructions: false,
+            notes: null,
+            updatedAt: ago(24 * 100),
+          },
+        ]
+      : [],
+  };
+}
 
 export const ISSUES: HealthIssue[] = [
   { accountId: "a-riot-alt", title: "Riot Games (smurf)", rule: "weak", severity: "high", reason: "Password strength is Very weak", fix: "edit_account" },

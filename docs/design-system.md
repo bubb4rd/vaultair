@@ -152,6 +152,17 @@ Radix dialogs (the command palette) inject a scroll-lock `<style>` tag, which th
 - **Below**: Recent activity as a timeline grouped Today / Yesterday / Earlier (account logo, title link, purpose · identity, favorite star, relative time) and, in a 300 px right rail, Needs attention (severity badge, title, rule · reason, Fix link, "All n" to Security Health).
 - **Tooltips** across the app moved from shadcn's inverted default to the popover surface with a hairline border and a matching arrow, so they read like menus rather than a white box.
 
+## Account detail (redesigned 2026-10-07, issue #13)
+
+**Design read**: the owner's rough mock put the account's identity across the top, its details under that on the left, and the security score in a card on the right, with the breadcrumb (#12) carrying `Vault / All Accounts / <title>` in the window header. Dials unchanged (4 / 3 / 5). No inspo search: the page extends the existing system.
+
+- **Account header** (`AccountHeader`): the logo at 44 px, the title at 20 px semibold with the favorite star beside it, and under it the platform (or game, or publisher) and the account type in muted text. Then one row of chips, all 24 px tall: the status badge (icon, text and colour, as everywhere), the purpose with its dot, the game, the identity as a link, and each tag. Edit and the More menu sit at the right of the same row. The window header keeps only the breadcrumb, so the title is not written twice as a heading: the breadcrumb's `<h1>` is the page heading and the in-page title is text.
+- **Details** (left, `minmax(0, 1fr)`): sections with a plain 13 px semibold heading and label / value rows separated by hairlines, no card around them. Row actions are icon-only and right-aligned (show, copy, open), with the action and field in the accessible name: "Copy username", "Open login page". Empty values read "Not set" in the tertiary colour. MFA and game profiles keep their own cards inside their sections, since each method or profile is a record of its own.
+- **Security card** (right, 300 px, `SecurityCard`): the one elevated surface on the page. The score as the 18-capsule segmented arc with the number and band under it, then one row per fact (Password, MFA, Backup codes, Reuse, Activity) with its state badge at the right and any reason or Fix link under it. Below a hairline: last verified, activity, added and last edited, then the Mark verified button. The card is sticky at the top of the scroll area while the details scroll.
+- **Width**: a container query on the scroll area. Above 896 px of content width the card sits to the right; below it the card drops under the details and puts the score and its facts beside the dates, so the 960 px minimum window shows one column and the 1280 px default shows two.
+- **Archived** accounts keep their banner above the account header; the notes suggestion stays under Notes.
+- The browser preview opens any account with `dev/preview.html?path=/accounts/<id>`.
+
 ## Relationship map (Phase 13)
 
 **Design read** (design-taste-frontend): an in-app relationship graph for a desktop security utility, trust-first and restrained; extends this system with no new look. Dials unchanged (4 / 3 / 5). Taste's scope excludes dense product UI, so it set the node language only. The one inspo search for graph views returned a single marketing page, so no reference was taken from it.

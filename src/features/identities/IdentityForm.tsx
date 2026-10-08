@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CheckIcon, IdentificationBadgeIcon } from "@phosphor-icons/react";
-import { PAGE_PATHS } from "@/app/nav";
+import { PAGE_PATHS, getNavLabel } from "@/app/nav";
 import { useIdentity, useIdentityUpdated } from "@/app/queries";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Field, describedBy } from "@/components/common/Field";
@@ -374,10 +374,32 @@ export function IdentityForm({ identityId }: { identityId?: string }) {
     body = <Form key={identityId} initial={fromDetail(existing.data)} existing={existing.data} />;
   }
 
+  let headerCrumbs;
+  if (editing && existing.data) {
+    headerCrumbs = [
+      { label: "Vault", to: "/" },
+      { label: getNavLabel(PAGE_PATHS.identities), to: PAGE_PATHS.identities },
+      {
+        label: existing.data.name,
+        to: "/identities/$identityId",
+        params: { identityId: existing.data.id },
+        truncate: true,
+      },
+      { label: "Edit" },
+    ];
+  } else {
+    headerCrumbs = [
+      { label: "Vault", to: "/" },
+      { label: getNavLabel(PAGE_PATHS.identities), to: PAGE_PATHS.identities },
+      { label: "New identity" },
+    ];
+  }
+
   return (
     <>
-      <PageHeader title={editing ? (existing.data ? `Edit ${existing.data.name}` : "Edit identity") : "New identity"} />
+      <PageHeader crumbs={headerCrumbs} />
       {body}
     </>
   );
 }
+
