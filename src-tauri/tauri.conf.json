@@ -55,7 +55,7 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "copyright": "Copyright (c) 2026 Vaultair. All rights reserved.",
+    "copyright": "Copyright (c) 2026 Vaultair. Licensed under GPL-3.0-only.",
     "category": "Utility",
     "shortDescription": "Local encrypted vault for gaming and online identities",
     "windows": {

@@ -33,7 +33,7 @@ SQLCipher needs a real random-access file, and the KDF parameters and wrapped ke
 - Users see a folder, not a file. Help text and the backup flow must make that clear.
 - Pre-unlock, only the header is readable, and it contains no user data.
 
-Full detail: `docs/implementation-plan.md` §2.4.
+Full detail: the implementation plan §2.4 (an internal planning document, not in this repository).
 
 ## As built (checked in Phase 16)
 

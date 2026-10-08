@@ -39,7 +39,7 @@ export function AboutSettings() {
           {info.buildProfile === "debug" ? " (debug build)" : ""}
         </p>
       )}
-      <p className="text-[13px] text-muted-foreground">Vaultair is proprietary software. All rights reserved.</p>
+      <p className="text-[13px] text-muted-foreground">Vaultair is free software, licensed under the GNU General Public License v3.0.</p>
       <div className="flex flex-col gap-2">
         <h3 className="text-[13px] font-medium">Third-party content</h3>
         <ul className="flex flex-col gap-1.5" data-testid="credits">

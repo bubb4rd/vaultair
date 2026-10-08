@@ -19,8 +19,6 @@ No cloud account. No network traffic from the app.
 
 The MVP is implemented, and the first build, [v0.1.0](https://github.com/bubb4rd/vaultair/releases/tag/v0.1.0), is out as a pre-release for testers. The installer is not code-signed yet and the end-to-end smoke test is not automated; both are planned before a general release.
 
-See [the development log](docs/phase-notes.md) for completed work and remaining release tasks.
-
 ## Install
 
 Vaultair runs on 64-bit Windows 10 and 11.
@@ -144,8 +142,6 @@ CI runs formatting, Clippy, tests, dependency checks, and license checks. It als
 | [Vault format](docs/vault-format.md) | On-disk storage format |
 | [Backup and restore](docs/backup-restore.md) | Encrypted backups |
 | [Threat model](docs/threat-model.md) | Security assumptions and threats; currently a draft |
-| [Implementation plan](docs/implementation-plan.md) | Phased development plan |
-| [Development log](docs/phase-notes.md) | Implementation progress and open tasks |
 | [Releasing](docs/release.md) | Version bumps, tags, the installer build, and code signing plans |
 | [Security policy](SECURITY.md) | How to report vulnerabilities |
 
@@ -157,9 +153,9 @@ Do not open public issues for security vulnerabilities. See [SECURITY.md](SECURI
 
 ## License
 
-The source code in this repository is proprietary. All rights reserved.
+Vaultair is free software, licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0-only).
 
-Third-party components retain their own licenses. See the list below and Settings → About in the app.
+Third-party components retain their own licenses, and the license does not cover third-party logos or trademarks. See the list below and Settings → About in the app.
 
 ## Third-party content
 

@@ -26,7 +26,7 @@ Vaultair is a local-first, Windows-first encrypted workspace for people who mana
 - Two languages and a C dependency (SQLCipher/OpenSSL) raise build complexity; CI builds on `windows-latest` to catch it early.
 - The frontend cannot use browser storage, `fetch`, or `console` in release; ESLint and Vite settings enforce this.
 
-Full detail: `docs/implementation-plan.md` §1.
+Full detail: the implementation plan §1 (an internal planning document, not in this repository).
 
 ## As built (checked in Phase 16)
 

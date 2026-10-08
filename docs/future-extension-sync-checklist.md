@@ -127,4 +127,4 @@ The spec: "do not implement it in the first MVP unless its privacy model is full
 - `docs/vault-format.md` §2 (header and reader rules), §4 (key wrap and AAD), §8 (password change), §12 (device slot)
 - `docs/threat-model.md`, `docs/security-assumptions.md`
 - `docs/adr/0003-vault-layout.md` (key slots), `docs/adr/0004-mvp-scope-decisions.md` (what is out of the MVP), `docs/adr/0005-quick-unlock.md` (the device-slot pattern)
-- `docs/implementation-plan.md` §9, `docs/product-spec.md` ("Future Roadmap")
+- `docs/product-spec.md` ("Future Roadmap")
