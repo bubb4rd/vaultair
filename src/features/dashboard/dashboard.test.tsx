@@ -34,8 +34,9 @@ const account = (over: Partial<AccountSummary> = {}): AccountSummary => ({
   favoritedAt: null,
   archivedAt: null,
   tags: [],
-  updatedAt: ago(1),
-  lastActivityAt: ago(1),
+  // Now, not an hour ago: in the first hour of a day, an hour ago is yesterday.
+  updatedAt: ago(0),
+  lastActivityAt: ago(0),
   ...over,
 });
 
