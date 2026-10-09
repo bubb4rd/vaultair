@@ -709,6 +709,12 @@ export type DashboardSummary = {
 	dormant: number,
 	/**  Up to five issues, highest severity first. */
 	needsAttention: HealthIssue[],
+	/**
+	 *  When each account in scope was added (RFC 3339 UTC), oldest first.
+	 *  Archived accounts are included; deleted ones are gone, so this is a
+	 *  lower bound on how many were ever added.
+	 */
+	accountsCreatedAt: string[],
 };
 
 /**  An account that depends on a contact point, and how. */

@@ -385,6 +385,17 @@ pub fn recent(
     rows.collect()
 }
 
+/// When each account was added, oldest first, optionally only one
+/// identity's. Archived accounts are included: they were still added.
+pub fn created_at(conn: &Connection, identity_id: Option<&str>) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT created_at FROM account WHERE ?1 IS NULL OR identity_id = ?1
+         ORDER BY created_at, id",
+    )?;
+    let rows = stmt.query_map([identity_id], |r| r.get(0))?;
+    rows.collect()
+}
+
 /// Dashboard counts over active accounts, optionally only one identity's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Counts {

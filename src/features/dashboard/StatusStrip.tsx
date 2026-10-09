@@ -1,5 +1,5 @@
 import type { Icon } from "@phosphor-icons/react";
-import { IdentificationBadgeIcon, PlusIcon, PulseIcon, StarIcon } from "@phosphor-icons/react";
+import { IdentificationBadgeIcon, PlusIcon, StarIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { PAGE_PATHS } from "@/app/nav";
@@ -160,7 +160,15 @@ function BackupCell({ now }: { now: Date }) {
   const status = useBackupStatus().data;
   const last = status?.lastBackupAt ?? null;
   return (
-    <Cell id="dashboard-backup" label="Backup" aside={<MoreLink to={PAGE_PATHS.settings}>Backup settings</MoreLink>}>
+    <Cell
+      id="dashboard-backup"
+      label="Backup"
+      aside={
+        <MoreLink to={PAGE_PATHS.settings} hash="backup-heading">
+          Backup settings
+        </MoreLink>
+      }
+    >
       <p className="text-[17px] leading-tight font-semibold tracking-[-0.02em] text-foreground">
         {status === undefined ? "Checking" : last ? `Last backup ${sinceBackup(last, now)}` : "No backup yet"}
       </p>
@@ -196,18 +204,15 @@ function ActionTile({ to, icon: TileIcon, label, primary }: { to: string; icon: 
   );
 }
 
-/** The three actions, three up. In the strip cell the tiles come out about 76 px square. */
+/** The two actions, two up. Add account is the one filled tile. */
 export function ActionGrid({ className }: { className?: string }) {
   return (
-    <ul className={cn("grid grid-cols-3 gap-2", className)}>
+    <ul className={cn("grid grid-cols-2 gap-2", className)}>
       <li>
         <ActionTile to="/accounts/new" icon={PlusIcon} label="Add account" primary />
       </li>
       <li>
         <ActionTile to="/identities/new" icon={IdentificationBadgeIcon} label="Add identity" />
-      </li>
-      <li>
-        <ActionTile to={PAGE_PATHS.health} icon={PulseIcon} label="Review health" />
       </li>
     </ul>
   );
@@ -216,8 +221,8 @@ export function ActionGrid({ className }: { className?: string }) {
 function ActionsCell() {
   return (
     <Cell id="dashboard-actions" label="Quick actions">
-      {/* Capped so the tiles stay about 76 px square when the strip folds to two columns. */}
-      <ActionGrid className="max-w-[260px]" />
+      {/* Capped so the two tiles stay about 80 px square, close to the other cells' height, at every strip width. */}
+      <ActionGrid className="max-w-[168px]" />
     </Cell>
   );
 }

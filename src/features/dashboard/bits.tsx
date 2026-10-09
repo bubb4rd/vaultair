@@ -16,10 +16,17 @@ export function plural(n: number, one: string, many = `${one}s`) {
   return `${number.format(n)} ${n === 1 ? one : many}`;
 }
 
-/** A small brand-coloured link with an arrow, for "All accounts" and the like. */
-export function MoreLink({ to, children }: { to: string; children: ReactNode }) {
+/**
+ * A small brand-coloured link with an arrow, for "All accounts" and the like.
+ * `hash` names a heading on the target page to scroll to.
+ */
+export function MoreLink({ to, hash, children }: { to: string; hash?: string; children: ReactNode }) {
   return (
-    <Link to={to} className={cn(link, "inline-flex items-center gap-1 text-xs text-brand hover:underline")}>
+    <Link
+      to={to}
+      {...(hash ? { hash } : {})}
+      className={cn(link, "inline-flex items-center gap-1 text-xs text-brand hover:underline")}
+    >
       {children}
       <ArrowRightIcon aria-hidden="true" className="size-3" />
     </Link>

@@ -19,7 +19,9 @@ export function BackupReminder() {
         <span className="font-medium text-status-attention">Backup due.</span> {reminderText(status)}
       </p>
       <Button asChild variant="outline" size="sm">
-        <Link to={PAGE_PATHS.settings}>Back up</Link>
+        <Link to={PAGE_PATHS.settings} hash="backup-heading">
+          Back up
+        </Link>
       </Button>
     </div>
   );

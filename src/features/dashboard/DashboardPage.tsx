@@ -14,10 +14,11 @@ import { IdentityChip } from "@/features/identities/IdentityAvatar";
 import { PageHeader } from "@/features/shell/PageHeader";
 import type { AccountSummary, DashboardSummary, HealthIssue } from "@/ipc/client";
 import { cn } from "@/lib/utils";
+import { AccountGrowth } from "./AccountGrowth";
 import { MoreLink, link, number, plural, sectionTitle } from "./bits";
-import { HealthDots } from "./HealthDots";
 import { IdentityFilter } from "./IdentityFilter";
 import { ActionGrid, StatusStrip } from "./StatusStrip";
+import { SecurityHealth } from "./SecurityHealth";
 import { useIdentityFilter } from "./useIdentityFilter";
 
 /* ------------------------------------------------------------- activity */
@@ -106,7 +107,8 @@ function QuickActions() {
       <h2 id="dashboard-actions" className={sectionTitle}>
         Quick actions
       </h2>
-      <ActionGrid className="max-w-[300px]" />
+      {/* Two tiles about 100 px square. */}
+      <ActionGrid className="max-w-[208px]" />
     </section>
   );
 }
@@ -161,8 +163,9 @@ function NeedsAttention({ summary: s }: { summary: DashboardSummary }) {
 /**
  * The vault at a glance, for everything or one identity: one status strip
  * across the top (vault split, MFA coverage, the last backup and the quick
- * actions, in a single card divided by hairlines), the security health dots
- * under it, then the activity timeline with the open issues beside it.
+ * actions, in a single card divided by hairlines), then account growth over
+ * the activity timeline, with today's security health and the open issues
+ * beside them.
  */
 export function DashboardPage() {
   const [identityId] = useIdentityFilter();
@@ -187,7 +190,7 @@ export function DashboardPage() {
         <EmptyState
           icon={KeyIcon}
           title="Your vault at a glance"
-          description="Once you add accounts, this page shows how they split, how many have MFA, when the last backup ran, how your security health has moved, and what you edited recently."
+          description="Once you add accounts, this page shows how they split, how many have MFA, when the last backup ran, how the vault has grown, what needs attention, and what you edited recently."
         >
           <QuickActions />
         </EmptyState>
@@ -203,10 +206,13 @@ export function DashboardPage() {
             </p>
           )}
           <StatusStrip summary={s} filtered={filtered} now={now} />
-          <HealthDots summary={s} filtered={filtered} />
           <div className="grid grid-cols-1 gap-x-10 gap-y-8 min-[1000px]:grid-cols-[minmax(0,1fr)_300px]">
-            <RecentActivity accounts={s.recent} now={now} />
+            <div className="flex min-w-0 flex-col gap-8">
+              <AccountGrowth summary={s} filtered={filtered} />
+              <RecentActivity accounts={s.recent} now={now} />
+            </div>
             <aside aria-label="Open issues" className="flex min-w-0 flex-col gap-8">
+              <SecurityHealth summary={s} filtered={filtered} />
               <NeedsAttention summary={s} />
             </aside>
           </div>

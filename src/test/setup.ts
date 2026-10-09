@@ -13,7 +13,12 @@ if (!("ResizeObserver" in globalThis)) {
   };
 }
 if (!("scrollIntoView" in Element.prototype)) {
-  Object.defineProperty(Element.prototype, "scrollIntoView", { value: () => undefined });
+  // Writable so tests can spy on what the app scrolls to.
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    value: () => undefined,
+    writable: true,
+    configurable: true,
+  });
 }
 
 // jsdom lays nothing out, so every element is 0x0. The account list's

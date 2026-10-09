@@ -201,7 +201,7 @@ export function NameStep({
       title="Name your vault"
       intro={
         demo
-          ? "This vault will be marked as a demo. Sample accounts to explore arrive in a later version."
+          ? "This vault will be marked as a demo. It comes with sample accounts to explore. All the data is made up, with no real credentials."
           : "Most people need one vault. The name is only for you."
       }
       primary="Continue"

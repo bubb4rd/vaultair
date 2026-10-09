@@ -70,17 +70,18 @@ The first build fetches Microsoft's WebView2 runtime installer onto the build ma
 
 ### Code signing
 
-Decision 14: unsigned for the private beta, and a certificate (OV/EV, or Azure Trusted Signing) before any public release. Until then:
+Decision 14: unsigned for the private beta, and a certificate before any public release. The project owner chose **Azure Artifact Signing** (formerly Trusted Signing) on 2026-10-09; the work is [#42](https://github.com/bubb4rd/vaultair/issues/42). Until it ships:
 
 - releases stay marked as pre-releases, and `release.yml` passes `--prerelease`;
 - the README and `SECURITY.md` say the installer is unsigned and that SmartScreen will warn.
 
-When a certificate is chosen:
+What it needs and how it fits:
 
-- Tauri signs through `bundle.windows` in `tauri.conf.json` (`signCommand`, or `certificateThumbprint` with `digestAlgorithm` and `timestampUrl`). Both `vaultair.exe` and the installer need signing.
+- A paid Azure subscription (free, trial and sponsored ones are refused), an Artifact Signing account, a Public Trust identity validation done in the Azure portal, and a Public Trust certificate profile. Public Trust is open to individual developers in the US and Canada, and to organizations in the US, Canada, the EU and the UK.
+- Tauri signs through `bundle.windows.signCommand` in `tauri.conf.json`, calling SignTool with the Artifact Signing client (or `trusted-signing-cli`). Both `vaultair.exe` and the installer need signing. The certificates are short-lived, so every signature must carry a timestamp.
 - The signing credentials belong in a GitHub environment that needs approval, used only by the tag build, so a pull request's dry run never sees them.
 - Signing and timestamping contact the certificate provider from the build machine. The app's no-network promise is about the app, and is unchanged.
-- Afterwards, take `--prerelease` out of `release.yml`, and update the README's Install section, `SECURITY.md` ("Official builds") and the Phase 16 notes.
+- Afterwards, take `--prerelease` out of `release.yml`, and update the README's Install section, `SECURITY.md` ("Official builds") and the Phase 16 notes (internal, not in this repository).
 
 A signature names the publisher. SmartScreen's warning is tied to reputation as well, so it may not disappear with the first signed build.
 

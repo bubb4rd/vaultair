@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axeViolations } from "@/test/axe";
+import { PAGE_PATHS } from "@/app/nav";
 import { recent, renderApp } from "@/test/render";
 import type { BackupStatus, BackupSummary, DashboardSummary, IdentityRef } from "@/ipc/client";
 import { formatSize, restoredName } from "./labels";
@@ -324,8 +325,19 @@ describe("backup reminder", () => {
     missingRecoveryCodes: 0,
     dormant: 0,
     needsAttention: [],
+    accountsCreatedAt: [],
   };
   const dashboard = { dashboard_summary: () => summary, identity_refs: () => [] as IdentityRef[] };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The elements the app scrolled into view, in order. */
+  function scrolledTo() {
+    const spy = vi.spyOn(Element.prototype, "scrollIntoView");
+    return () => spy.mock.contexts as Element[];
+  }
 
   it("shows on the dashboard while a backup is due", async () => {
     await renderApp("/", {
@@ -334,7 +346,50 @@ describe("backup reminder", () => {
     const reminder = await screen.findByRole("status");
     expect(reminder).toHaveTextContent("Backup due.");
     expect(reminder).toHaveTextContent("The last backup was made on");
-    expect(within(reminder).getByRole("link", { name: "Back up" })).toHaveAttribute("href", "/settings");
+    expect(within(reminder).getByRole("link", { name: "Back up" })).toHaveAttribute(
+      "href",
+      "/settings#backup-heading",
+    );
+  });
+
+  it("opens Settings scrolled to Backups", async () => {
+    const user = userEvent.setup();
+    const scrolled = scrolledTo();
+    const { router } = await renderApp("/", {
+      handlers: { ...dashboard, backup_status: () => status({ ...DONE, reminderDue: true }) },
+    });
+    await user.click(within(await screen.findByRole("status")).getByRole("link", { name: "Back up" }));
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "Backups" });
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+    expect(router.state.location.hash).toBe("backup-heading");
+    await vi.waitFor(() => {
+      expect(scrolled()).toContain(heading);
+    });
+  });
+
+  it("opens Settings scrolled to Backups from the status strip", async () => {
+    const user = userEvent.setup();
+    const scrolled = scrolledTo();
+    await renderApp("/", { handlers: { ...dashboard, backup_status: () => DONE } });
+    await user.click(await screen.findByRole("link", { name: "Backup settings" }));
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "Backups" });
+    await vi.waitFor(() => {
+      expect(scrolled()).toContain(heading);
+    });
+  });
+
+  it("scrolls to Backups when Settings is already open", async () => {
+    const scrolled = scrolledTo();
+    const { router } = await renderApp("/settings", { handlers: { backup_status: () => DONE } });
+    const heading = await screen.findByRole("heading", { level: 2, name: "Backups" });
+    expect(scrolled()).not.toContain(heading);
+
+    await router.navigate({ to: PAGE_PATHS.settings, hash: "backup-heading" });
+    await vi.waitFor(() => {
+      expect(scrolled()).toContain(heading);
+    });
   });
 
   it("stays away after a recent backup", async () => {

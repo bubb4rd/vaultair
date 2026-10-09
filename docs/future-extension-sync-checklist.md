@@ -110,7 +110,7 @@ Proposed design (not accepted, not built): [ADR-0007](adr/0007-browser-extension
 - [ ] The value takes the shortest path and is not logged, cached or kept by the extension. The canary tests are extended to the new channel.
 - [ ] The rule that stored secrets reach the UI one at a time by explicit reveal still holds. The extension is not a second, weaker UI.
 - [ ] The extension's own permissions, update channel and store listing are in the threat model: an extension update is code that reaches the user by a different route from the app.
-- [ ] Passkeys are separate (Phase 17 in the README) and have their own scope.
+- [ ] Passkeys are separate (Phase 17 in [the roadmap](roadmap.md)) and have their own scope.
 
 ## Breach checks
 

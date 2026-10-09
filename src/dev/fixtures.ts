@@ -12,8 +12,6 @@ import type {
   HealthSummary,
   IdentityRef,
 } from "@/ipc/client";
-import type { HealthCounts, HealthTrendPoint } from "@/features/dashboard/healthTrend";
-import { localDay } from "@/features/dashboard/healthTrend";
 
 const now = Date.now();
 const ago = (hours: number) => new Date(now - hours * 3_600_000).toISOString();
@@ -157,6 +155,16 @@ export const HEALTH: HealthSummary = {
   dormant: 7,
 };
 
+/** The gallery vault was created 75 days ago. */
+export const VAULT_CREATED_AT = ago(24 * 75);
+
+/**
+ * When each of the 44 accounts was added, oldest first: twenty on the day
+ * the vault was created (an evening of typing in old logins), then a couple
+ * a week. Two of them are archived, so this is longer than `totalAccounts`.
+ */
+const ACCOUNTS_CREATED_AT = Array.from({ length: 44 }, (_, i) => ago(24 * 75 - (i < 20 ? 1 + i * 0.1 : 24 + (i - 20) * 72)));
+
 export const SUMMARY: DashboardSummary = {
   identityId: null,
   totalAccounts: 42,
@@ -171,6 +179,7 @@ export const SUMMARY: DashboardSummary = {
   missingRecoveryCodes: HEALTH.missingRecoveryCodes,
   dormant: HEALTH.dormant,
   needsAttention: ISSUES,
+  accountsCreatedAt: ACCOUNTS_CREATED_AT,
 };
 
 /** The same vault narrowed to one identity, so the filter has something to show. */
@@ -194,36 +203,10 @@ export function summaryFor(identityId: string | null): DashboardSummary {
     missingRecoveryCodes: n(SUMMARY.missingRecoveryCodes),
     dormant: n(SUMMARY.dormant),
     needsAttention,
+    // Every account whose index crosses a step of `scale`, so the subset keeps the same shape.
+    accountsCreatedAt: ACCOUNTS_CREATED_AT.filter((_, i) => Math.floor((i + 1) * scale) > Math.floor(i * scale)),
   };
 }
-
-/**
- * Thirty days of health counts for the Status strip dot chart, oldest first:
- * issues climb to a peak around day ten (39 open), then fall as passwords get
- * fixed and MFA is added, while dormant accounts slowly accumulate. The last
- * day matches `HEALTH` (3, 4, 6, 2, 7: 22 open), so today's live point
- * continues the series.
- */
-const TREND_COUNTS: Record<keyof HealthCounts, number[]> = {
-  weak: [6, 6, 6, 7, 7, 8, 8, 9, 9, 9, 8, 8, 7, 7, 6, 6, 5, 5, 5, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3],
-  reused: [5, 5, 6, 6, 6, 7, 7, 8, 8, 8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
-  missingMfa: [10, 10, 10, 11, 11, 12, 12, 12, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 6, 6],
-  missingRecoveryCodes: [3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-  dormant: [4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7],
-};
-
-const TREND_DAYS = TREND_COUNTS.weak.length;
-
-export const HEALTH_TREND: HealthTrendPoint[] = Array.from({ length: TREND_DAYS }, (_, i) => ({
-  date: localDay(new Date(now - (TREND_DAYS - 1 - i) * 86_400_000)),
-  counts: {
-    weak: TREND_COUNTS.weak[i] ?? 0,
-    reused: TREND_COUNTS.reused[i] ?? 0,
-    missingMfa: TREND_COUNTS.missingMfa[i] ?? 0,
-    missingRecoveryCodes: TREND_COUNTS.missingRecoveryCodes[i] ?? 0,
-    dormant: TREND_COUNTS.dormant[i] ?? 0,
-  },
-}));
 
 export const BACKUP: BackupStatus = {
   destination: "D:\\Backups\\Vaultair",

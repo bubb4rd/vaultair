@@ -183,7 +183,7 @@ These are the classes inside `vaultair-core` (`VaultError`). The UI gets fewer: 
 
 ## 10. Golden fixtures
 
-`tests-fixtures/v1/Golden/` is a real v1 vault (password: `fixture-only password, not a secret`) opened by `golden_fixture_v1_still_opens` on every test run, so format or schema changes are always tested against an existing vault. Until the first public release, V1 may still change and the fixture is regenerated; after it, fixtures are append-only.
+`tests-fixtures/v1/Golden/` is a real v1 vault at schema V1 (password: `fixture-only password, not a secret`) opened by `golden_fixture_v1_still_opens` on every test run, so format or schema changes are always tested against an existing vault. v0.1.0 (schema V8) counts as released (ADR-0004), so fixtures are append-only: an existing fixture is never regenerated or edited, and each released format and schema version gets a fixture of its own. There is none yet for V8 or for the backup container (§11); see [#41](https://github.com/bubb4rd/vaultair/issues/41).
 
 ## 11. Backup container (`*.vaultair-backup`)
 

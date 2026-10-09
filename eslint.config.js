@@ -23,6 +23,20 @@ const bannedProperties = ["window", "globalThis", "self", "navigator"].flatMap((
   ...(object === "navigator" ? [{ object, property: "sendBeacon", message: "No network." }] : []),
 ]);
 
+// A revealed secret or TOTP code stays in component state only; it must never
+// reach the TanStack Query cache. See docs/architecture.md.
+const REVEALS = [
+  ["secrets", "reveal"],
+  ["mfa", "totpCode"],
+];
+const QUERY_CALLS = "useQuery|useQueries|queryOptions|setQueryData|fetchQuery|prefetchQuery";
+const queryCall = `CallExpression[callee.name=/^(${QUERY_CALLS})$/], CallExpression[callee.property.name=/^(${QUERY_CALLS})$/]`;
+const queryProperty = "Property[key.name=/^(queryKey|queryFn|mutationKey)$/]";
+const revealInQuery = REVEALS.map(([object, property]) => ({
+  selector: `:matches(${queryProperty}, ${queryCall}) MemberExpression[object.name='${object}'][property.name='${property}']`,
+  message: `Don't put ${object}.${property} in the query cache. Revealed values stay in component state only (docs/architecture.md).`,
+}));
+
 export default tseslint.config(
   { ignores: ["dist", "target", "src-tauri", "crates", "node_modules", "src/ipc/bindings.ts"] },
   {
@@ -43,6 +57,7 @@ export default tseslint.config(
         "error",
         { selector: "NewExpression[callee.name='Function']", message: "No dynamic code." },
         { selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']", message: "No raw HTML." },
+        ...revealInQuery,
       ],
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
     },
