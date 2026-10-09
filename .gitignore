@@ -51,7 +51,8 @@ docs/spikes/
 # Python bytecode (ui-ux-pro-max scripts)
 __pycache__/
 
-# Golden fixture vaults (test-only password, see crates/vaultair-core/tests) are the one exception.
+# Golden fixture vaults and backups (test-only password, see crates/vaultair-core/tests/golden.rs) are the one exception.
 !tests-fixtures/**/vault.vdb
 !tests-fixtures/**/vault.vhdr
+!tests-fixtures/**/*.vaultair-backup
 tests-fixtures/**/.lock
