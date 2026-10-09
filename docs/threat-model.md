@@ -113,9 +113,113 @@ Limits, stated plainly:
 
 **Tray.** "Keep running in the tray" only changes what closing the window does: the window hides, the vault locks as it did on quit, and the process stays to skip startup. No key stays in memory because of it.
 
+## Browser extension: fill and save (proposed, not built)
+
+> **Status:** written for review before implementation, as `future-extension-sync-checklist.md` §2 requires. The design is [ADR-0007](adr/0007-browser-extension-fill-and-save.md), which is Proposed. Nothing in this section is built. Section numbers (§N) and measure ids (M1–M11, H1–H11) refer to ADR-0007. When the feature ships, this section is rewritten against the code, like the rest of this file.
+
+With the bridge on, a Vaultair extension in Chrome, Edge or Firefox can do two things:
+- **fill** a login (and, if you turn it on, the current authenticator code) into the page you are on;
+- **save** a login you typed on a page into the vault, after you confirm in Vaultair's own window.
+
+**How it connects.** The browser starts a small Vaultair helper program (Native Messaging). The helper relays to the app over a named pipe that only your Windows account can open. Everything between the extension and the app is encrypted with Noise_KK, using keys pinned when you paired them. The helper only ever sees ciphertext.
+
+**What doesn't change.** The app still makes no network connections and contains no network client.
+
+**What does change.** This ends two things the rest of this file relies on. Something now listens for connections (the pipe), and another program (the extension) can ask Vaultair for a secret.
+
+**Off by default.** With the bridge off, which is the default, none of this is active. There is no pipe, and no browser can start the helper: Vaultair registers it with your browsers only when you turn the bridge on. Nothing new is written to your profile or vault. The helper program is installed with Vaultair either way.
+
+### New assets
+
+| Asset | Where | Sensitivity |
+|---|---|---|
+| A password or authenticator code being filled; a password being saved | In Rust, in the extension's WebAssembly and background script, and in the page, for the length of one click | Critical. The same values the vault already protects, now outside Vaultair's window for a moment |
+| Vaultair's pairing key, one per vault | Inside the vault (`browser_pairing`), encrypted under the field key like other secrets. Usable only while the vault is unlocked | High. With it, a program could pose as Vaultair to your paired extension and receive what you save |
+| The extension's long-term pairing key | Your browser profile (`storage.local`), as plain bytes | High with approval set to "Never": it alone gets fills while the vault is unlocked. Medium otherwise: it gets a Vaultair prompt, not a fill |
+| The extension's grant key ("Once per unlock" only) | Browser memory (`storage.session`) and app memory, until Vaultair locks or the browser restarts | High while it lives: it gets fills without another prompt |
+| What `match` returns: account titles and usernames for the site you are on | The extension popup, for one click | High (account metadata, as above) |
+| The browser activity list: time, browser, kind, account and site of the last 100 fills and saves | Inside the vault | High (it maps which sites you log in to, and when) |
+| The helper program, its Native Messaging manifest and its registry entries | Your Windows profile | Integrity only. They hold no secret |
+| The extension's code and the store publisher accounts that ship it | Chrome Web Store, Firefox Add-ons, Edge Add-ons | Critical integrity. An update reaches you by a route other than the Vaultair installer |
+| Fill and save notices | Windows notifications and their history | Low: generic text only ("Vaultair filled a login in Chrome"), never a site, account, username or value |
+
+### New trust boundaries
+
+4. **Vaultair ↔ the extension**, through the helper and the pipe.
+   - **Treated as less trusted than the UI.** The extension is a separate program in another vendor's sandbox, updated by a store.
+   - **It can ask for little:** one site at a time, only while the vault is unlocked, only after pairing, and, depending on the approval setting, only after an Allow in Vaultair's window.
+   - **It can't enumerate or search.** No request lists or searches the vault.
+5. **The extension ↔ the web page.**
+   - The extension touches a page only after your click or shortcut (`activeTab`), only in the top frame, and only in the exact page load it checked (§7, "Pinning the page").
+   - Once a value is in a form field, the page can read it, as it can read what you type.
+6. **Browser store ↔ the extension.** The browser installs extension updates from its store. Vaultair can't check an update before it runs.
+
+### New attackers
+
+| Attacker | What they could try | What stops them | What's left |
+|---|---|---|---|
+| A malicious web page | Get a fill without you, read Vaultair data, or trick a fill into a hidden field or a frame | No extension code runs in a page until you click. The site is matched in Rust by exact host (§9). Top frame only. Hidden and zero-size fields are refused (H4). The fill goes only to the page load that was checked (H5) | None beyond the next rows |
+| A lookalike or phishing site | Receive the real site's password | Hosts are compared as ASCII, so a punycode lookalike is a different host. "Match the whole domain" never crosses registrable domains (Public Suffix List) | **Saving on a phishing site stores a login for the phishing host.** The save confirm shows the host; read it |
+| A script on the real site (XSS, a compromised third-party script) | Read a filled password, or set off a fill | It can't set off a fill: the click is on the browser toolbar or a shortcut, which pages can't reach. Vaultair never asks for the master password in a web page or in the extension popup; pairing asks for it in Vaultair's own window | **It can read a filled value**, as it could read one you type |
+| A cross-origin frame on the real site (ads, embeds) | Receive the fill | Only the top frame is filled | None |
+| Someone on your network (public Wi-Fi) | Read a password sent to an `http:` page | `http:` pages are never filled unless the stored address is `http:` too, and then with a warning (H6). The bridge itself has no network traffic | A login you deliberately stored for `http:` |
+| Another browser extension | Talk to the helper, or read the pairing keys | The helper's manifest names only Vaultair's extension (M2). Extension storage is private to each extension | **An extension that can read every page** can read a filled field, as it can read what you type. That is the browser's model, not Vaultair's |
+| Another Windows user on this PC | Connect to the pipe | The pipe accepts only your Windows account and only local clients (M1) | None |
+| A program running as you that **pretends to be Vaultair** (creates the pipe first, or replaces the helper or its manifest) | Collect what you save, or feed fake fills | The pipe is created as the first and only instance. After signing, the helper checks Vaultair's signature (H1). The extension finishes a session only with the key it pinned at pairing (M4), and sends nothing before that | It can block or delay the bridge (denial of service) |
+| A program running as you that **pretends to be the extension** (with a copied long-term pairing key) | Ask for fills for sites it names, with no click | **"Always" and "Once per unlock":** it causes a Vaultair prompt you didn't ask for. **Treat a browser prompt you didn't cause as an attack and choose Deny**; denied or unanswered prompts count toward the lockout (H7). Saves always need the confirm in Vaultair (M7) and, by default, Windows Hello (H2). Requests are one site at a time and rate-limited (M8) | **"Never": silent fills while the vault is unlocked,** for any site it names. Only the notices and the activity list show it. The prompt names the browser the client claims, which a program can fake |
+| An impostor during pairing | Put itself between the extension and Vaultair | Pairing takes the master password and a 6-digit code compared on both screens, after a commitment, so an impostor gets one guess in a million per visible attempt (§5). An unconfirmed pairing ends after 5 minutes | A user who confirms codes that don't match |
+| A malicious extension update (a hijacked store account or build) | Ask for fills without your clicks, or capture what you type on pages | Chrome documents that an update clears `storage.session`, so there the new code has no grant and needs a fresh Allow (Firefox's behaviour is to be checked before release). Under "Always" it needs an Allow per request. A new permission makes the browser ask you again before the update runs. Pinned dependencies, reproducible builds and 2FA on store accounts (H9) | **After you Allow it,** it can ask for fills for sites it names until Vaultair locks, limited by M8 and visible in the notices. Under "Never", it needs no Allow at all |
+| Someone watching your screen (streaming, screen sharing, capture software) | Read account names in the extension popup | The popup shows titles and masked usernames and emails, not values. Vaultair's own approval prompt and save confirm follow your screenshot-protection setting | **The popup is browser UI, and Vaultair can't hide it from capture.** A title is visible there |
+| Someone reading Windows' notification history | Learn where you log in | Notices carry generic text only | That you used the bridge, from which browser, and when |
+
+### What changes for the attackers already in this file
+
+| Attacker | With the bridge on |
+|---|---|
+| Has a copy of the vault files or a backup | **Nothing new opens.** Backups now carry Vaultair's pairing key and the activity list, both encrypted like the rest of the vault. Restoring a backup clears all pairings |
+| Has the powered-off or stolen PC | The extension's long-term key is readable from the browser profile. It is no use without an unlocked vault on that PC, and the vault is unchanged |
+| Malware running as you, vault locked | Can copy the extension's long-term key and rewrite the helper or its manifest. Gets nothing: a locked vault answers only "locked", and no session starts. It can bring Vaultair's window to the front (`request_unlock`) |
+| Malware running as you, vault unlocked | Already out of scope (it can read memory and drive the UI). **New:** a copied key gives it a quieter route. Under "Always" and "Once per unlock" that route raises a Vaultair prompt; under "Never" it is silent. It can also click the extension's toolbar button for you, which is the same as driving Vaultair's UI |
+| Keyloggers | **Fewer chances.** A filled password is not typed, and a fill doesn't use the clipboard. The master password is typed as before |
+| Programs that read the clipboard | **Fewer chances.** A fill doesn't use the clipboard. A copy from Vaultair works as before |
+| Someone at your unlocked session | Can use the extension to fill what they could already copy from Vaultair. Fills don't count as activity, so the vault still auto-locks on time, and the grant ends with it |
+| Phishing for the master password | Unchanged. Vaultair never asks for it in a web page or in the extension |
+| A copied password pasted into a phishing site | **Harder.** A fill goes only to a site that matches the stored one. A copy and paste still goes anywhere |
+| Screen capture and streaming | Vaultair's window is unchanged. The extension popup is not capture-protected (above) |
+| Compromised OS, drivers or firmware | Unchanged: out of scope |
+
+### Limits, stated plainly
+
+- **The pairing key in the browser is plain bytes.** No browser storage protects it from a program running as you; marking a WebCrypto key "non-extractable" would not either. The approval setting decides whether that key alone is enough. Under "Never", it is.
+- **A filled value is in the page.** Any script the site runs can read it, as it can read what you type. Vaultair can't protect a site from itself.
+- **The prompt can't prove which program is asking.** It names the browser the client says it is. The prompts are useful because you know when you clicked, not because of what they say.
+- **`snow` has no formal audit.** The whole channel rests on it, on both ends. ADR-0007 lists the tests, fuzzing and the external review planned before public release.
+- **The extension popup can't be hidden from screen capture.**
+- **One site per request is a limit, not a wall.** Something holding a grant, or any key under "Never", can ask for one common site after another until Vaultair locks. The rate limit slows this, and the notices and activity list show it.
+- **Signature checks between the helper and Vaultair (H1) need signed releases.** Until then, they are not in place.
+- **Older browsers can't install the extension.** It needs Chrome or Edge 106+ or Firefox 153+, because the fill must be tied to one page load.
+
+### Statements that change if it ships
+
+The checklist asks for every statement the docs make today that the feature would make false, with its new wording. Some stay true and are listed so that's on record.
+
+| Statement today | Where | With the bridge on |
+|---|---|---|
+| "No cloud account. No network traffic from the app." | README | **Stays true.** The pipe is local only, and the extension needs no network |
+| "No network" / "No network connections" | `privacy-statement-draft.md`, onboarding, Settings → Privacy, the lock screen | **Stays true**, for the same reason |
+| "Vaultair never uploads anything. It makes no network connections" | `local-data-storage.md` | **Stays true.** Its table gains: the helper, its Native Messaging manifest and registry keys, and the extension's two keys in the browser profile |
+| "The MVP makes no network connections and has no way for another program to ask it for anything" | `future-extension-sync-checklist.md` | "Vaultair makes no network connections. Another program can ask it for something only through the browser bridge, which is off unless you turn it on and pair a browser." |
+| "Nothing listens. The only way in is the webview's own IPC" | `future-extension-sync-checklist.md` | "Nothing listens unless the browser bridge is on. Then one named pipe does, for your Windows account and local programs only." |
+| "No browser storage. The interface never uses web storage, cookies or IndexedDB." | `privacy-statement-draft.md`, Settings → Privacy | "No browser storage in Vaultair. Its window never uses web storage, cookies or IndexedDB. A paired browser extension keeps its pairing keys in that browser's extension storage, and never a vault value." |
+| "Autofill, sync, and browser extensions are outside the MVP scope." | README | "Vaultair can fill and save logins in Chrome, Edge and Firefox through its browser extension. It is off until you turn it on and pair a browser. Sync is not part of Vaultair." |
+| "Vaultair makes no network connections, so it cannot update itself or tell you that a fix is out." | `SECURITY.md` | Add: "The browser extension is the exception to manual updates: your browser installs its updates from the browser's store. A fix to the extension reaches you that way. A fix to Vaultair itself still needs the new installer." |
+| "No auto-fill or auto-login, ever." | ADR-0004 | Superseded by ADR-0007 for fill on a click. Auto-login stays out: nothing is ever submitted |
+| The logs "never hold … a web address" | This file, Known limits | **Stays true.** A fill or save is logged like a copy: its kind, not which account or site. The account and site go only to the activity list, inside the vault |
+| "Nothing from a vault is written in plaintext anywhere else" | This file, "Vaultair protects against" | **Stays true.** The extension stores only its own keys. Notices carry no vault data |
+
 ## Out of scope for the MVP
 
-Sync, browser extension, autofill, breach checks, imports and attachments. Each needs a threat-model update before it's built (see [`future-extension-sync-checklist.md`](future-extension-sync-checklist.md)).
+Sync, desktop autofill outside the browser, breach checks, imports and attachments. Each needs a threat-model update before it's built (see [`future-extension-sync-checklist.md`](future-extension-sync-checklist.md)). The browser extension has that update in the section above; it is not built either.
 
 ## Explicit non-goals
 

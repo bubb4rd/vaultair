@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>Vaultair mock · What's new · A: Updates inbox</title>
+<style>
+  :root {
+    --background:#0e0f11; --sidebar:#131417; --card:#17181c; --popover:#1a1b1f; --muted:#1e2025;
+    --foreground:#edeef0; --muted-foreground:#a3a7af; --subtle-foreground:#878c95;
+    --primary:#edeef0; --primary-foreground:#0e0f11; --brand:#7aa2ff;
+    --border:#26282d; --border-strong:#33363c; --input:#666a73;
+    --secure:#4cc38a; --attention:#e5c14a; --warning:#f0924a; --risk:#f26d6d; --dormant:#8d929b;
+    --font-sans:"Geist Variable","Geist","Inter","Segoe UI Variable",system-ui,sans-serif;
+    --font-mono:"Geist Mono Variable","Geist Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:#09090b; color:var(--foreground); font:14px/1.5 var(--font-sans); -webkit-font-smoothing:antialiased; font-feature-settings:"ss01","cv11"; }
+  body { padding:32px; display:flex; flex-direction:column; gap:20px; align-items:flex-start; }
+  svg { display:block; }
+  a { color:var(--brand); text-decoration:none; }
+
+  /* ---------- App frame ---------- */
+  .window { width:1200px; height:740px; background:var(--background); border:1px solid var(--border-strong); border-radius:10px; overflow:hidden; display:flex; position:relative; }
+  .sidebar { width:232px; flex:none; background:var(--sidebar); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+  .brand { height:48px; display:flex; align-items:center; gap:10px; padding:0 16px; font-weight:600; letter-spacing:-0.01em; }
+  .brand .mark { width:20px; height:20px; border-radius:6px; background:var(--foreground); display:grid; place-items:center; }
+  .search { margin:0 12px 8px; height:32px; border:1px solid var(--border-strong); border-radius:6px; background:rgba(14,15,17,.4); display:flex; align-items:center; gap:8px; padding:0 10px; font-size:13px; color:var(--subtle-foreground); }
+  .search .kbd { margin-left:auto; display:flex; gap:3px; }
+  .kbd span { font:500 11px/1 var(--font-mono); padding:3px 5px; border:1px solid var(--border-strong); border-radius:4px; color:var(--muted-foreground); background:var(--background); }
+  nav { padding:8px 12px; display:flex; flex-direction:column; gap:16px; flex:1; }
+  .group-label { padding:0 10px 4px; font-size:12px; font-weight:500; color:var(--subtle-foreground); }
+  .nav-item { height:32px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:6px; font-size:13px; font-weight:500; color:var(--muted-foreground); }
+  .nav-item svg { width:16px; height:16px; color:var(--subtle-foreground); }
+  .nav-item.active { background:var(--muted); color:var(--foreground); }
+  .nav-item.active svg { color:var(--brand); }
+  .sidebar-foot { border-top:1px solid var(--border); padding:8px 12px; display:flex; flex-direction:column; gap:4px; }
+  .vault-row { display:flex; align-items:center; gap:8px; padding:4px 10px 0; font-size:12px; color:var(--subtle-foreground); }
+  .vault-row .av { width:20px; height:20px; border-radius:50%; background:rgba(108,156,240,.15); border:1px solid rgba(108,156,240,.45); color:#6c9cf0; font-size:9px; font-weight:600; display:grid; place-items:center; }
+
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  header { height:48px; flex:none; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; padding:0 8px 0 24px; }
+  .crumbs { flex:1; display:flex; align-items:center; gap:6px; font-size:15px; }
+  .crumbs .dim { color:var(--muted-foreground); }
+  .crumbs .sep { color:rgba(163,167,175,.5); }
+  .crumbs h1 { margin:0; font-size:15px; font-weight:600; letter-spacing:-0.01em; }
+  .icon-btn { width:32px; height:32px; border-radius:6px; display:grid; place-items:center; color:var(--muted-foreground); position:relative; }
+  .icon-btn svg { width:16px; height:16px; }
+  .icon-btn.open { background:var(--muted); color:var(--foreground); }
+  .icon-btn .dot { position:absolute; top:7px; right:7px; width:7px; height:7px; border-radius:50%; background:var(--brand); box-shadow:0 0 0 2px var(--background); }
+  .win { display:flex; gap:2px; margin-left:4px; }
+  .win .icon-btn svg { width:12px; height:12px; }
+
+  .content { padding:24px; display:flex; flex-direction:column; gap:20px; }
+  .strip { display:grid; grid-template-columns:repeat(4,1fr); background:var(--card); border:1px solid var(--border); border-radius:8px; }
+  .cell { padding:14px 16px; border-right:1px solid var(--border); display:flex; flex-direction:column; gap:8px; }
+  .cell:last-child { border-right:0; }
+  .cell .lbl { font-size:12px; color:var(--subtle-foreground); }
+  .cell .big { font-size:22px; font-weight:600; letter-spacing:-0.01em; line-height:1.1; }
+  .cell .big.green { color:var(--secure); }
+  .bar { height:4px; border-radius:2px; background:var(--muted); overflow:hidden; display:flex; }
+  .bar i { display:block; height:100%; }
+  .meter { display:flex; gap:3px; } .meter i { flex:1; height:4px; border-radius:2px; background:var(--muted); } .meter i.on { background:var(--secure); }
+  .mono { font-family:var(--font-mono); font-size:12px; color:var(--muted-foreground); }
+  .tiles { display:flex; gap:6px; } .tiles i { width:32px; height:32px; border-radius:6px; border:1px solid var(--border-strong); } .tiles i.fill { background:var(--primary); border-color:var(--primary); }
+  .skeleton { display:flex; flex-direction:column; gap:10px; }
+  .skeleton .line { height:10px; border-radius:3px; background:var(--card); }
+  .matrix { display:grid; grid-template-columns:repeat(30,6px); gap:3px; align-content:end; height:120px; }
+  .matrix i { width:6px; height:6px; border-radius:50%; background:var(--muted); }
+  .matrix i.on { background:var(--secure); }
+
+  /* ---------- Popover ---------- */
+  .pop { position:absolute; top:52px; right:92px; width:424px; background:var(--popover); border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; max-height:676px; }
+  .pop-head { display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid var(--border); }
+  .pop-head h2 { margin:0; font-size:15px; font-weight:600; letter-spacing:-0.01em; flex:1; }
+  .text-btn { font-size:12px; font-weight:500; color:var(--muted-foreground); padding:4px 6px; border-radius:6px; }
+  .tabs { display:flex; gap:2px; padding:3px; background:var(--background); border:1px solid var(--border); border-radius:6px; }
+  .tabs span { font-size:12px; font-weight:500; color:var(--muted-foreground); padding:3px 8px; border-radius:4px; }
+  .tabs span.on { background:var(--muted); color:var(--foreground); }
+
+  .pop-body { overflow:auto; }
+  .ver { display:flex; align-items:center; gap:8px; padding:12px 16px 4px; font-size:12px; color:var(--subtle-foreground); }
+  .ver b { font:500 12px var(--font-mono); color:var(--muted-foreground); }
+  .ver .pill { font-size:11px; font-weight:500; color:var(--brand); background:rgba(122,162,255,.12); padding:1px 6px; border-radius:999px; }
+  .ver .ago { margin-left:auto; }
+
+  .entry { position:relative; display:flex; gap:12px; padding:10px 16px 10px 16px; }
+  .entry:hover { background:var(--muted); }
+  .entry .unread { position:absolute; left:6px; top:32px; width:6px; height:6px; border-radius:50%; background:var(--brand); }
+  .thumb { width:116px; height:68px; flex:none; border-radius:8px; border:1px solid var(--border-strong); background:var(--card); position:relative; overflow:hidden; }
+  .entry.read .thumb { opacity:.75; }
+  .play { position:absolute; left:6px; bottom:6px; display:flex; align-items:center; gap:4px; height:18px; padding:0 6px 0 4px; border-radius:999px; background:rgba(14,15,17,.85); border:1px solid var(--border-strong); font:500 10px var(--font-mono); color:var(--foreground); }
+  .play svg { width:9px; height:9px; }
+  .img-tag { position:absolute; right:6px; top:6px; width:16px; height:16px; border-radius:4px; background:rgba(14,15,17,.85); border:1px solid var(--border-strong); display:grid; place-items:center; color:var(--muted-foreground); }
+  .img-tag svg { width:10px; height:10px; }
+  .entry .txt { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .chips { display:flex; align-items:center; gap:6px; }
+  .chip { display:inline-flex; align-items:center; gap:4px; height:18px; padding:0 6px; border-radius:999px; font-size:11px; font-weight:500; }
+  .chip svg { width:10px; height:10px; }
+  .chip.new { color:var(--secure); background:rgba(76,195,138,.12); }
+  .chip.improved { color:var(--brand); background:rgba(122,162,255,.12); }
+  .chip.fixed { color:var(--dormant); background:rgba(141,146,155,.12); }
+  .entry .title { font-size:13px; font-weight:500; line-height:1.3; }
+  .entry .desc { font-size:12px; color:var(--muted-foreground); line-height:1.4; }
+  .entry .act { font-size:12px; font-weight:500; color:var(--brand); display:inline-flex; align-items:center; gap:3px; margin-top:2px; }
+  .entry .act svg { width:11px; height:11px; }
+  .older { display:flex; align-items:center; gap:8px; margin:6px 16px 0; padding:8px 0; border-top:1px solid var(--border); font-size:12px; color:var(--subtle-foreground); }
+  .older b { font:500 12px var(--font-mono); color:var(--muted-foreground); }
+  .older svg { width:12px; height:12px; margin-left:auto; }
+  .also { padding:6px 16px 10px; display:flex; flex-direction:column; gap:2px; }
+  .also-label { font-size:12px; font-weight:500; color:var(--subtle-foreground); padding:4px 0 4px; }
+  .also .row { display:flex; align-items:center; gap:8px; height:26px; font-size:12.5px; color:var(--muted-foreground); }
+  .also .row .chip { width:72px; justify-content:center; flex:none; }
+  .also .row span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .pop-foot { display:flex; align-items:center; gap:12px; padding:10px 16px; border-top:1px solid var(--border); font-size:12px; }
+  .pop-foot .l { display:inline-flex; align-items:center; gap:4px; font-weight:500; }
+  .pop-foot .l svg { width:11px; height:11px; }
+  .pop-foot .auto { margin-left:auto; display:inline-flex; align-items:center; gap:6px; color:var(--muted-foreground); }
+  .sw { width:24px; height:14px; border-radius:999px; background:var(--brand); position:relative; }
+  .sw::after { content:""; position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:var(--primary-foreground); }
+
+  /* mini drawings inside thumbnails */
+  .mini-matrix { position:absolute; inset:10px 10px 10px 10px; display:grid; grid-template-columns:repeat(14,4px); grid-auto-rows:4px; gap:3px; align-content:end; justify-content:center; }
+  .mini-matrix i { border-radius:50%; background:var(--muted); } .mini-matrix i.on { background:var(--secure); }
+  .mini-card { position:absolute; left:10px; right:10px; top:12px; height:44px; border-radius:5px; border:1px solid var(--border-strong); background:var(--popover); padding:7px 8px; display:flex; flex-direction:column; gap:5px; }
+  .mini-card i { display:block; height:4px; border-radius:2px; background:var(--muted); }
+  .mini-card i.w { width:60%; background:var(--input); } .mini-card i.c { width:38%; background:var(--brand); }
+  .mini-hello { position:absolute; inset:0; display:grid; place-items:center; }
+  .mini-hello .face { width:30px; height:30px; border-radius:7px; border:1.5px solid var(--brand); display:grid; place-items:center; color:var(--brand); }
+  .mini-hello .face svg { width:16px; height:16px; }
+  .mini-pw { position:absolute; inset:0; display:grid; place-items:center; font:500 11px var(--font-mono); color:var(--foreground); letter-spacing:.5px; white-space:nowrap; }
+  .mini-pw b { color:var(--brand); font-weight:500; }
+  .mini-row { position:absolute; left:10px; right:10px; top:50%; transform:translateY(-50%); display:flex; gap:6px; }
+  .mini-row i { height:16px; border-radius:999px; border:1px solid var(--border-strong); flex:1; }
+  .mini-row i.on { background:rgba(240,146,74,.12); border-color:transparent; }
+
+  /* ---------- Notes ---------- */
+  .notes { width:1200px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; color:var(--muted-foreground); font-size:13px; }
+  .notes h3 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--foreground); }
+  .notes ul { margin:0; padding-left:16px; display:flex; flex-direction:column; gap:4px; }
+  .notes code { font:12px var(--font-mono); color:var(--foreground); }
+  .tag { display:inline-block; font:500 11px var(--font-mono); color:var(--subtle-foreground); border:1px solid var(--border-strong); border-radius:4px; padding:1px 6px; margin-bottom:4px; }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand"><span class="mark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0e0f11" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v5c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V7z"/></svg></span>Vaultair</div>
+    <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd"><span>Ctrl</span><span>K</span></span></div>
+    <nav>
+      <div><div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Dashboard</div></div>
+      <div><div class="group-label">Vault</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M15 12v2"/></svg>All Accounts</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M13 10h4M13 13h4M6 17h6"/></svg>Identities</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="4" rx="1"/><path d="M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>Archived</div>
+      </div>
+      <div><div class="group-label">Catalog</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8h12a4 4 0 0 1 4 4v3a3 3 0 0 1-5.5 1.7L15 15H9l-1.5 1.7A3 3 0 0 1 2 15v-3a4 4 0 0 1 4-4z"/><path d="M8 11v3M6.5 12.5h3"/></svg>Games</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>Platforms</div>
+      </div>
+      <div><div class="group-label">Insights</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5l3 8M16 7.5l-3 8"/></svg>Relationship Map</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>Security Health</div>
+      </div>
+      <div><div class="group-label">Tools</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h.01M11 12h.01M15 12h.01"/></svg>Generator</div>
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>Settings</div>
+      <div class="vault-row"><span class="av">BH</span>Personal vault</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div class="crumbs"><span class="dim">Vault</span><span class="sep">/</span><h1>Dashboard</h1></div>
+      <!-- the trigger -->
+      <div class="icon-btn open" title="What's new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z"/></svg>
+        <span class="dot"></span>
+      </div>
+      <div class="win">
+        <div class="icon-btn"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M1 6h10"/></svg></div>
+        <div class="icon-btn"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1.5" y="1.5" width="9" height="9" rx="1"/></svg></div>
+        <div class="icon-btn"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M2 2l8 8M10 2l-8 8"/></svg></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="strip">
+        <div class="cell"><span class="lbl">Vault</span><span class="big">38</span><div class="bar"><i style="width:72%;background:var(--foreground)"></i><i style="width:28%;background:var(--input)"></i></div><span class="mono">31 main · 7 alt</span></div>
+        <div class="cell"><span class="lbl">Protected by MFA</span><span class="big green">84%</span><div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span class="mono">6 without MFA</span></div>
+        <div class="cell"><span class="lbl">Backup</span><span class="big" style="font-size:15px;margin-top:4px">Last backup 30 hours ago</span><span class="mono">2026-10-07 02:14 · ~/Vaultair/backups</span></div>
+        <div class="cell"><span class="lbl">Quick actions</span><div class="tiles"><i class="fill"></i><i></i><i></i></div></div>
+      </div>
+      <div>
+        <div class="lbl" style="font-size:12px;color:var(--subtle-foreground)">Security health</div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin:2px 0 10px"><span class="big" style="font-size:26px;font-weight:600">9</span><span class="mono">open issues · 3 fewer than 30 days ago</span></div>
+        <div class="matrix" id="matrix"></div>
+      </div>
+      <div class="skeleton"><div class="line" style="width:34%"></div><div class="line" style="width:56%"></div><div class="line" style="width:44%"></div></div>
+    </div>
+
+    <!-- ---------- Popover: Updates inbox ---------- -->
+    <div class="pop" role="dialog" aria-label="What's new">
+      <div class="pop-head">
+        <h2>What's new</h2>
+        <div class="tabs"><span class="on">Updates</span><span>Tips</span></div>
+        <span class="text-btn">Mark all read</span>
+      </div>
+
+      <div class="pop-body">
+        <div class="ver"><b>v1.4.0</b><span class="pill">Installed</span><span class="ago">2 days ago</span></div>
+
+        <div class="entry">
+          <span class="unread"></span>
+          <div class="thumb">
+            <div class="mini-matrix">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i>
+              <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+              <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+            </div>
+            <span class="play"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 1.5v7l6-3.5z"/></svg>0:08</span>
+          </div>
+          <div class="txt">
+            <div class="chips"><span class="chip new"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0l1.4 3.6L10 5 6.4 6.4 5 10 3.6 6.4 0 5l3.6-1.4z"/></svg>New</span></div>
+            <div class="title">Security health keeps a history</div>
+            <div class="desc">A snapshot is recorded each time you unlock, so the dashboard shows how open issues change over time.</div>
+            <a class="act">Open Security Health <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6h7M6.5 3l3 3-3 3"/></svg></a>
+          </div>
+        </div>
+
+        <div class="entry">
+          <span class="unread"></span>
+          <div class="thumb">
+            <div class="mini-hello"><span class="face"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 9.5v.01M16 9.5v.01M9 15c1.5 1.3 4.5 1.3 6 0"/><path d="M12 3v2M12 19v2"/></svg></span></div>
+            <span class="play"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M2 1.5v7l6-3.5z"/></svg>0:05</span>
+          </div>
+          <div class="txt">
+            <div class="chips"><span class="chip new"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M5 0l1.4 3.6L10 5 6.4 6.4 5 10 3.6 6.4 0 5l3.6-1.4z"/></svg>New</span></div>
+            <div class="title">Unlock with Windows Hello</div>
+            <div class="desc">Turn it on from the lock screen or Settings. The master password still works as a fallback.</div>
+            <a class="act">Set up Windows Hello <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6h7M6.5 3l3 3-3 3"/></svg></a>
+          </div>
+        </div>
+
+        <!-- text-only entry: no media, text runs the full width -->
+        <div class="entry">
+          <span class="unread"></span>
+          <div class="txt">
+            <div class="chips"><span class="chip improved"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 8.5v-7M2 4.5l3-3 3 3"/></svg>Improved</span></div>
+            <div class="title">Digits and symbols stand out in the Generator</div>
+            <div class="desc">They take the brand blue so a value is easier to read when typed by hand. Letters stay in the text colour.</div>
+          </div>
+        </div>
+
+        <!-- compact one-liners: the rest of the version, no title/description split -->
+        <div class="also">
+          <div class="also-label">Also in this version</div>
+          <div class="row"><span class="chip fixed"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5l2 2 4-4.5"/></svg>Fixed</span><span>Warning badges no longer wrap on narrow windows</span></div>
+          <div class="row"><span class="chip fixed"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5l2 2 4-4.5"/></svg>Fixed</span><span>Ctrl+K keeps focus after a dialog closes</span></div>
+          <div class="row"><span class="chip improved"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 8.5v-7M2 4.5l3-3 3 3"/></svg>Improved</span><span>Backup folder picker remembers the last location</span></div>
+        </div>
+
+        <div class="older"><b>v1.3.2</b><span>3 weeks ago · 5 changes</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg></div>
+        <div class="older" style="margin-top:0;border-top:0;padding-top:0"><b>v1.3.1</b><span>6 weeks ago · 2 changes</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg></div>
+      </div>
+
+      <div class="pop-foot">
+        <a class="l">All release notes <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 2.5h5.5V8M9.5 2.5 3 9"/></svg></a>
+        <span class="auto">Show badge for updates <span class="sw"></span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <div>
+    <span class="tag">A · Updates inbox</span>
+    <h3>Where it lives</h3>
+    <ul>
+      <li>A 32 px icon button in the page header, left of the window controls. Same slot on every page.</li>
+      <li>Unread updates: a 7 px brand dot on the button (same signal as the sidebar's active icon, so no new colour).</li>
+      <li>Click opens a 408 px popover on the popover surface, 12 px overlay radius, hairline strong border. No shadow, no glass.</li>
+      <li>Ctrl+K: "what's new" opens it too.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Anatomy</h3>
+    <ul>
+      <li>Entries grouped by version (mono), newest first. Installed version gets an "Installed" pill in brand.</li>
+      <li>Three densities, chosen per change: <b>media entry</b> (116×68 looping clip with play badge + mono duration, or a still with an image glyph; clips play on hover, open larger on click), <b>text entry</b> (same chip / title / sentence, text runs full width; no empty thumbnail slot), and <b>one-liners</b> under "Also in this version" (chip + one line, ellipsised).</li>
+      <li>Rule of thumb per release: at most 2 or 3 media entries, text entries for anything that needs a sentence, everything else as one-liners. A patch release is usually just one-liners.</li>
+      <li>Type chip follows the status system: icon + text + colour. New = secure green, Improved = brand blue, Fixed = dormant grey. Never colour alone.</li>
+      <li>One action link per entry at most, in the brand blue, deep-linking into the app.</li>
+      <li>Older versions collapse to one row each. Footer: release notes (external) and the badge preference.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Behaviour</h3>
+    <ul>
+      <li>Reading an entry (opening the popover) clears its dot after it has been on screen; "Mark all read" clears everything.</li>
+      <li>"Tips" tab reuses the same entry shape for short how-to clips that aren't tied to a release.</li>
+      <li>Content ships inside the app build (<code>updates.json</code> + <code>.webp</code>/<code>.webm</code> assets), so the CSP stays strict and nothing is fetched.</li>
+      <li>Reduced motion: thumbnails never autoplay; play is a click.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  // dashboard dot matrix filler (decoration only)
+  const m = document.getElementById('matrix');
+  const cols = 30, rows = 14;
+  const heights = Array.from({length: cols}, (_, c) => Math.max(1, Math.round(10 - c * 0.22 + Math.sin(c * 1.3) * 1.5)));
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const i = document.createElement('i');
+    if (rows - r <= heights[c]) i.className = 'on';
+    m.appendChild(i);
+  }
+</script>
+</body>
+</html>

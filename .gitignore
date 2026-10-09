@@ -45,6 +45,9 @@ docs/spikes/
 # Logo review scratch: contact sheet and candidate files (docs/logo-pipeline.md)
 .asset-work/
 
+# Local video work, not part of the app
+/videos/
+
 # Python bytecode (ui-ux-pro-max scripts)
 __pycache__/
 

@@ -101,6 +101,8 @@ The spec allows it only as "opt-in and use user-controlled storage or self-hoste
 
 ADR-0004 records "No auto-fill or auto-login, ever." Either of these needs that decision reopened in a new ADR first. The spec's non-goals stay as they are: no auto-login scripting for game clients.
 
+Proposed design (not accepted, not built): [ADR-0007](adr/0007-browser-extension-fill-and-save.md), fill and save over Native Messaging and a local named pipe.
+
 - [ ] The channel between the extension and the app is designed and threat-modelled: who can connect, how the app knows it is the user's extension and not another program running as the user, and what a malicious web page can make the extension ask for.
 - [ ] The extension gets no key and no bulk access. It asks for one credential for one site, the app decides, and the vault must be unlocked. A locked vault answers nothing, not even whether an account exists.
 - [ ] The site is matched in Rust against the stored URL by exact origin rules that are written down (no substring matching, no matching on page titles), and a mismatch is a refusal.
@@ -127,4 +129,5 @@ The spec: "do not implement it in the first MVP unless its privacy model is full
 - `docs/vault-format.md` §2 (header and reader rules), §4 (key wrap and AAD), §8 (password change), §12 (device slot)
 - `docs/threat-model.md`, `docs/security-assumptions.md`
 - `docs/adr/0003-vault-layout.md` (key slots), `docs/adr/0004-mvp-scope-decisions.md` (what is out of the MVP), `docs/adr/0005-quick-unlock.md` (the device-slot pattern)
+- `docs/adr/0007-browser-extension-fill-and-save.md` (proposed: browser fill and save)
 - `docs/product-spec.md` ("Future Roadmap")

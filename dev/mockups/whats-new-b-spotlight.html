@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="color-scheme" content="dark" />
+<title>Vaultair mock · What's new · B: Release spotlight</title>
+<style>
+  :root {
+    --background:#0e0f11; --sidebar:#131417; --card:#17181c; --popover:#1a1b1f; --muted:#1e2025;
+    --foreground:#edeef0; --muted-foreground:#a3a7af; --subtle-foreground:#878c95;
+    --primary:#edeef0; --primary-foreground:#0e0f11; --brand:#7aa2ff;
+    --border:#26282d; --border-strong:#33363c; --input:#666a73;
+    --secure:#4cc38a; --attention:#e5c14a; --warning:#f0924a; --risk:#f26d6d; --dormant:#8d929b;
+    --font-sans:"Geist Variable","Geist","Inter","Segoe UI Variable",system-ui,sans-serif;
+    --font-mono:"Geist Mono Variable","Geist Mono",ui-monospace,"Cascadia Mono",Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:#09090b; color:var(--foreground); font:14px/1.5 var(--font-sans); -webkit-font-smoothing:antialiased; font-feature-settings:"ss01","cv11"; }
+  body { padding:32px; display:flex; flex-direction:column; gap:20px; align-items:flex-start; }
+  svg { display:block; }
+  a { color:var(--brand); text-decoration:none; }
+
+  /* ---------- App frame ---------- */
+  .window { width:1200px; height:740px; background:var(--background); border:1px solid var(--border-strong); border-radius:10px; overflow:hidden; display:flex; position:relative; }
+  .sidebar { width:232px; flex:none; background:var(--sidebar); border-right:1px solid var(--border); display:flex; flex-direction:column; }
+  .brand { height:48px; display:flex; align-items:center; gap:10px; padding:0 16px; font-weight:600; letter-spacing:-0.01em; }
+  .brand .mark { width:20px; height:20px; border-radius:6px; background:var(--foreground); display:grid; place-items:center; }
+  .search { margin:0 12px 8px; height:32px; border:1px solid var(--border-strong); border-radius:6px; background:rgba(14,15,17,.4); display:flex; align-items:center; gap:8px; padding:0 10px; font-size:13px; color:var(--subtle-foreground); }
+  .search .kbd { margin-left:auto; display:flex; gap:3px; }
+  .kbd span { font:500 11px/1 var(--font-mono); padding:3px 5px; border:1px solid var(--border-strong); border-radius:4px; color:var(--muted-foreground); background:var(--background); }
+  nav { padding:8px 12px; display:flex; flex-direction:column; gap:16px; flex:1; }
+  .group-label { padding:0 10px 4px; font-size:12px; font-weight:500; color:var(--subtle-foreground); }
+  .nav-item { height:32px; display:flex; align-items:center; gap:10px; padding:0 10px; border-radius:6px; font-size:13px; font-weight:500; color:var(--muted-foreground); }
+  .nav-item svg { width:16px; height:16px; color:var(--subtle-foreground); }
+  .nav-item.active { background:var(--muted); color:var(--foreground); }
+  .nav-item.active svg { color:var(--brand); }
+  .sidebar-foot { border-top:1px solid var(--border); padding:8px 12px; display:flex; flex-direction:column; gap:4px; }
+  .vault-row { display:flex; align-items:center; gap:8px; padding:4px 10px 0; font-size:12px; color:var(--subtle-foreground); }
+  .vault-row .av { width:20px; height:20px; border-radius:50%; background:rgba(108,156,240,.15); border:1px solid rgba(108,156,240,.45); color:#6c9cf0; font-size:9px; font-weight:600; display:grid; place-items:center; }
+
+  /* persistent entry point after dismissal */
+  .update-row { margin:0 12px 6px; display:flex; align-items:center; gap:8px; height:32px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:rgba(122,162,255,.06); font-size:12px; color:var(--muted-foreground); }
+  .update-row svg { width:14px; height:14px; color:var(--brand); }
+  .update-row b { font:500 12px var(--font-mono); color:var(--foreground); }
+  .update-row .x { margin-left:auto; color:var(--subtle-foreground); }
+  .update-row .x svg { width:12px; height:12px; color:currentColor; }
+
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; }
+  header { height:48px; flex:none; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; padding:0 8px 0 24px; }
+  .crumbs { flex:1; display:flex; align-items:center; gap:6px; font-size:15px; }
+  .crumbs .dim { color:var(--muted-foreground); }
+  .crumbs .sep { color:rgba(163,167,175,.5); }
+  .crumbs h1 { margin:0; font-size:15px; font-weight:600; letter-spacing:-0.01em; }
+  .icon-btn { width:32px; height:32px; border-radius:6px; display:grid; place-items:center; color:var(--muted-foreground); position:relative; }
+  .icon-btn svg { width:16px; height:16px; }
+  .win { display:flex; gap:2px; margin-left:4px; }
+  .win .icon-btn svg { width:12px; height:12px; }
+
+  .content { padding:24px; display:flex; flex-direction:column; gap:20px; }
+  .strip { display:grid; grid-template-columns:repeat(4,1fr); background:var(--card); border:1px solid var(--border); border-radius:8px; }
+  .cell { padding:14px 16px; border-right:1px solid var(--border); display:flex; flex-direction:column; gap:8px; }
+  .cell:last-child { border-right:0; }
+  .cell .lbl { font-size:12px; color:var(--subtle-foreground); }
+  .cell .big { font-size:22px; font-weight:600; letter-spacing:-0.01em; line-height:1.1; }
+  .cell .big.green { color:var(--secure); }
+  .bar { height:4px; border-radius:2px; background:var(--muted); overflow:hidden; display:flex; }
+  .bar i { display:block; height:100%; }
+  .meter { display:flex; gap:3px; } .meter i { flex:1; height:4px; border-radius:2px; background:var(--muted); } .meter i.on { background:var(--secure); }
+  .mono { font-family:var(--font-mono); font-size:12px; color:var(--muted-foreground); }
+  .tiles { display:flex; gap:6px; } .tiles i { width:32px; height:32px; border-radius:6px; border:1px solid var(--border-strong); } .tiles i.fill { background:var(--primary); border-color:var(--primary); }
+  .skeleton { display:flex; flex-direction:column; gap:10px; }
+  .skeleton .line { height:10px; border-radius:3px; background:var(--card); }
+  .matrix { display:grid; grid-template-columns:repeat(30,6px); gap:3px; align-content:end; height:120px; }
+  .matrix i { width:6px; height:6px; border-radius:50%; background:var(--muted); }
+  .matrix i.on { background:var(--secure); }
+
+  /* ---------- Backdrop + dialog ---------- */
+  .backdrop { position:absolute; inset:0; background:rgba(14,15,17,.72); display:grid; place-items:center; }
+  .dialog { width:860px; height:460px; background:var(--popover); border:1px solid var(--border-strong); border-radius:12px; display:grid; grid-template-columns:440px 1fr; overflow:hidden; position:relative; }
+  .close { position:absolute; top:10px; right:10px; width:28px; height:28px; border-radius:6px; display:grid; place-items:center; color:var(--muted-foreground); }
+  .close svg { width:14px; height:14px; }
+
+  /* media pane */
+  .media { background:var(--background); border-right:1px solid var(--border); position:relative; display:grid; place-items:center; }
+  .media .stage { width:360px; height:260px; border:1px solid var(--border-strong); border-radius:8px; background:var(--card); position:relative; overflow:hidden; }
+  .media .status { position:absolute; left:14px; top:14px; display:flex; align-items:center; gap:6px; height:22px; padding:0 8px 0 6px; border-radius:999px; background:rgba(26,27,31,.9); border:1px solid var(--border-strong); font:500 11px var(--font-mono); color:var(--muted-foreground); }
+  .media .status svg { width:10px; height:10px; color:var(--foreground); }
+  .media .status i { width:6px; height:6px; border-radius:50%; background:var(--secure); }
+  .scrub { position:absolute; left:14px; right:14px; bottom:14px; display:flex; align-items:center; gap:10px; font:500 11px var(--font-mono); color:var(--subtle-foreground); }
+  .scrub .track { flex:1; height:3px; border-radius:2px; background:var(--muted); overflow:hidden; }
+  .scrub .track i { display:block; height:100%; width:38%; background:var(--foreground); animation:scrub 8s linear infinite; }
+  @keyframes scrub { from { width:0 } to { width:100% } }
+
+  /* the clip: a stylised "security health" panel that fills in, then a cursor hovers a column */
+  .clip-title { position:absolute; left:18px; top:16px; font-size:11px; color:var(--subtle-foreground); }
+  .clip-num { position:absolute; left:18px; top:32px; display:flex; align-items:baseline; gap:8px; }
+  .clip-num b { font-size:28px; font-weight:600; letter-spacing:-0.01em; line-height:1; }
+  .clip-num span { font:12px var(--font-mono); color:var(--muted-foreground); }
+  .clip-matrix { position:absolute; left:18px; bottom:22px; display:grid; grid-template-columns:repeat(34,6px); grid-auto-rows:6px; gap:3px; align-content:end; }
+  .clip-matrix i { border-radius:50%; background:var(--muted); }
+  .clip-matrix i.on { background:var(--secure); animation:lit 8s ease-out infinite; opacity:0; }
+  @keyframes lit { 0% { opacity:0 } 12% { opacity:0 } 40% { opacity:1 } 90% { opacity:1 } 100% { opacity:0 } }
+  .cursor { position:absolute; width:12px; height:12px; left:200px; top:150px; animation:cursor 8s ease-in-out infinite; }
+  @keyframes cursor { 0%,45% { transform:translate(60px,40px); opacity:0 } 55% { opacity:1; transform:translate(0,0) } 85% { opacity:1; transform:translate(0,0) } 100% { opacity:0; transform:translate(0,0) } }
+  .tip { position:absolute; left:196px; top:112px; background:var(--popover); border:1px solid var(--border-strong); border-radius:6px; padding:5px 8px; font-size:11px; color:var(--muted-foreground); white-space:nowrap; opacity:0; animation:tip 8s ease-out infinite; }
+  .tip b { color:var(--foreground); font-weight:500; display:block; font-size:11px; }
+  @keyframes tip { 0%,58% { opacity:0; transform:translateY(4px) } 64% { opacity:1; transform:translateY(0) } 88% { opacity:1 } 100% { opacity:0 } }
+  @media (prefers-reduced-motion: reduce) { .clip-matrix i.on, .tip, .cursor, .scrub .track i { animation:none; opacity:1; } .scrub .track i { width:38% } }
+
+  /* text pane */
+  .copy { padding:28px 32px 24px; display:flex; flex-direction:column; min-width:0; }
+  .meta { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--subtle-foreground); }
+  .meta b { font:500 12px var(--font-mono); color:var(--muted-foreground); }
+  .meta .pill { font-size:11px; font-weight:500; color:var(--secure); background:rgba(76,195,138,.12); padding:1px 6px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; }
+  .meta .pill svg { width:10px; height:10px; }
+  .copy h2 { margin:14px 0 6px; font-size:20px; font-weight:600; letter-spacing:-0.01em; line-height:1.25; }
+  .copy p { margin:0; color:var(--muted-foreground); font-size:13px; line-height:1.5; max-width:34ch; }
+  .list { margin:16px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .list li { display:flex; gap:10px; font-size:13px; line-height:1.4; }
+  .list li svg { width:14px; height:14px; flex:none; margin-top:2px; color:var(--secure); }
+  .list li span { color:var(--muted-foreground); }
+  .list li span b { color:var(--foreground); font-weight:500; }
+  .spacer { flex:1; }
+  .steps { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .segs { display:flex; gap:4px; }
+  .segs i { flex:1; height:4px; border-radius:2px; background:var(--border-strong); overflow:hidden; }
+  .segs i.done { background:var(--brand); }
+  .segs i.cur { position:relative; } .segs i.cur::after { content:""; position:absolute; inset:0; width:100%; background:var(--brand); }
+  .steps .cap { display:flex; font-size:12px; color:var(--subtle-foreground); }
+  .steps .cap b { color:var(--muted-foreground); font-weight:500; }
+  .steps .cap .n { margin-left:auto; font:500 12px var(--font-mono); }
+  .actions { display:flex; align-items:center; gap:8px; }
+  .btn { height:32px; padding:0 12px; border-radius:6px; display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:500; white-space:nowrap; }
+  .btn.primary { background:var(--primary); color:var(--primary-foreground); }
+  .btn.ghost { color:var(--muted-foreground); }
+  .btn svg { width:12px; height:12px; }
+  .actions .all { margin-left:auto; font-size:12px; font-weight:500; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .actions .all svg { width:11px; height:11px; }
+
+  /* ---------- Notes ---------- */
+  .notes { width:1200px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; color:var(--muted-foreground); font-size:13px; }
+  .notes h3 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--foreground); }
+  .notes ul { margin:0; padding-left:16px; display:flex; flex-direction:column; gap:4px; }
+  .notes code { font:12px var(--font-mono); color:var(--foreground); }
+  .tag { display:inline-block; font:500 11px var(--font-mono); color:var(--subtle-foreground); border:1px solid var(--border-strong); border-radius:4px; padding:1px 6px; margin-bottom:4px; }
+</style>
+</head>
+<body>
+
+<div class="window">
+  <aside class="sidebar">
+    <div class="brand"><span class="mark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0e0f11" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v5c0 5 3.5 8.5 8 9 4.5-.5 8-4 8-9V7z"/></svg></span>Vaultair</div>
+    <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search<span class="kbd"><span>Ctrl</span><span>K</span></span></div>
+    <nav>
+      <div><div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Dashboard</div></div>
+      <div><div class="group-label">Vault</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M15 12v2"/></svg>All Accounts</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M13 10h4M13 13h4M6 17h6"/></svg>Identities</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="4" rx="1"/><path d="M5 9v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>Archived</div>
+      </div>
+      <div><div class="group-label">Catalog</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8h12a4 4 0 0 1 4 4v3a3 3 0 0 1-5.5 1.7L15 15H9l-1.5 1.7A3 3 0 0 1 2 15v-3a4 4 0 0 1 4-4z"/><path d="M8 11v3M6.5 12.5h3"/></svg>Games</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>Platforms</div>
+      </div>
+      <div><div class="group-label">Insights</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5l3 8M16 7.5l-3 8"/></svg>Relationship Map</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>Security Health</div>
+      </div>
+      <div><div class="group-label">Tools</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h.01M11 12h.01M15 12h.01"/></svg>Generator</div>
+      </div>
+    </nav>
+    <!-- persistent entry point: stays until read, then disappears -->
+    <div class="update-row">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>
+      <span>Updated to <b>v1.4.0</b></span>
+      <span class="x"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></span>
+    </div>
+    <div class="sidebar-foot">
+      <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>Settings</div>
+      <div class="vault-row"><span class="av">BH</span>Personal vault</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header>
+      <div class="crumbs"><span class="dim">Vault</span><span class="sep">/</span><h1>Dashboard</h1></div>
+      <div class="win">
+        <div class="icon-btn"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M1 6h10"/></svg></div>
+        <div class="icon-btn"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1.5" y="1.5" width="9" height="9" rx="1"/></svg></div>
+        <div class="icon-btn"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M2 2l8 8M10 2l-8 8"/></svg></div>
+      </div>
+    </header>
+    <div class="content">
+      <div class="strip">
+        <div class="cell"><span class="lbl">Vault</span><span class="big">38</span><div class="bar"><i style="width:72%;background:var(--foreground)"></i><i style="width:28%;background:var(--input)"></i></div><span class="mono">31 main · 7 alt</span></div>
+        <div class="cell"><span class="lbl">Protected by MFA</span><span class="big green">84%</span><div class="meter"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div><span class="mono">6 without MFA</span></div>
+        <div class="cell"><span class="lbl">Backup</span><span class="big" style="font-size:15px;margin-top:4px">Last backup 30 hours ago</span><span class="mono">2026-10-07 02:14 · ~/Vaultair/backups</span></div>
+        <div class="cell"><span class="lbl">Quick actions</span><div class="tiles"><i class="fill"></i><i></i><i></i></div></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--subtle-foreground)">Security health</div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin:2px 0 10px"><span style="font-size:26px;font-weight:600">9</span><span class="mono">open issues · 3 fewer than 30 days ago</span></div>
+        <div class="matrix" id="matrix"></div>
+      </div>
+      <div class="skeleton"><div class="line" style="width:34%"></div><div class="line" style="width:56%"></div><div class="line" style="width:44%"></div></div>
+    </div>
+  </div>
+
+  <!-- ---------- Release spotlight ---------- -->
+  <div class="backdrop">
+    <div class="dialog" role="dialog" aria-labelledby="t">
+      <div class="media" aria-hidden="true">
+        <div class="status"><svg viewBox="0 0 10 10" fill="currentColor"><path d="M1.5 1h2.5v8h-2.5zM6 1h2.5v8H6z"/></svg>Playing<i></i></div>
+        <div class="stage">
+          <div class="clip-title">Security health</div>
+          <div class="clip-num"><b>9</b><span>open issues · 3 fewer than 30 days ago</span></div>
+          <div class="clip-matrix" id="clip"></div>
+          <div class="tip"><b>Oct 3</b>12 open issues</div>
+          <svg class="cursor" viewBox="0 0 12 12" fill="var(--foreground)" stroke="var(--background)" stroke-width="1"><path d="M1 1l4 10 1.5-4L10.5 5.5z"/></svg>
+        </div>
+        <div class="scrub"><span>0:03</span><div class="track"><i></i></div><span>0:08</span></div>
+      </div>
+
+      <div class="copy">
+        <div class="meta"><b>v1.4.0</b><span>·</span><span>Installed today</span><span class="pill"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5l2 2 4-4.5"/></svg>Up to date</span></div>
+        <h2 id="t">Security health keeps a history</h2>
+        <p>A snapshot is recorded each time you unlock, so the dashboard shows how open issues change instead of just today's count.</p>
+        <ul class="list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>One dot is one open issue.</b> Hover a column for the day and count.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>History starts today.</b> Nothing earlier is backfilled, so the plot fills in as you unlock.</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span><b>Stored in your vault.</b> Snapshots are encrypted with everything else and never leave the device.</span></li>
+        </ul>
+        <div class="spacer"></div>
+        <div class="steps">
+          <div class="segs"><i class="cur"></i><i></i><i></i></div>
+          <div class="cap"><b>Security health</b><span class="n">1 / 3</span></div>
+        </div>
+        <div class="actions">
+          <span class="btn primary">Next: Windows Hello <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7M6.5 3l3 3-3 3"/></svg></span>
+          <span class="btn ghost">Skip</span>
+          <a class="all">All changes <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 2.5h5.5V8M9.5 2.5 3 9"/></svg></a>
+        </div>
+      </div>
+
+      <span class="close"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.4"><path d="M2 2l8 8M10 2l-8 8"/></svg></span>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <div>
+    <span class="tag">B · Release spotlight</span>
+    <h3>When it shows</h3>
+    <ul>
+      <li>Once, on the first unlock after an update that carries a spotlight. Never on a patch release and never mid-task: only on the dashboard.</li>
+      <li>800×460 dialog on the popover surface, 12 px overlay radius, hairline strong border, over a 72% backdrop. Esc or the close button dismisses it.</li>
+      <li>Dismissed early? The sidebar keeps a one-row "Updated to v1.4.0" entry above Settings until it is opened or closed with its x.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Anatomy</h3>
+    <ul>
+      <li>Left: the clip pane on the page background. A 360×260 stage with the feature drawn at real proportions, a "Playing" status pill, and a scrub bar with mono times. Clips are 5 to 10 s, muted, loop.</li>
+      <li>Right: version in mono with an "Up to date" status (icon + text + secure green), a 20 px title, one sentence, then up to three check-bulleted facts with the lead in foreground and the rest muted.</li>
+      <li>Bottom: the onboarding progress pattern. One segment per spotlight (max 3), the current one filling in brand blue, stage name under it, "1 / 3" in mono. Next is the one filled button and names the next stage.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Behaviour</h3>
+    <ul>
+      <li>Next advances with the onboarding slide (300 ms, 24 px), reduced motion swaps instantly and shows the clip's final frame as a still.</li>
+      <li>The last step's primary becomes "Done"; "All changes" opens the full list (variation A's popover, or a Settings › Updates page).</li>
+      <li>Assets ship in the build as <code>.webm</code> + a <code>.webp</code> poster; the pane shows the poster until the clip can play.</li>
+      <li>Spotlight count and copy live in <code>updates.json</code>; a release with no spotlight shows nothing.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  const fill = (el, cols, rows, fn, delayed) => {
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const i = document.createElement('i');
+      const h = fn(c);
+      if (rows - r <= h) { i.className = 'on'; if (delayed) i.style.animationDelay = (c * 0.06) + 's'; }
+      el.appendChild(i);
+    }
+  };
+  fill(document.getElementById('matrix'), 30, 14, c => Math.max(1, Math.round(10 - c * 0.22 + Math.sin(c * 1.3) * 1.5)), false);
+  fill(document.getElementById('clip'), 34, 14, c => Math.max(1, Math.round(12 - c * 0.25 + Math.sin(c * 1.1) * 1.6)), true);
+</script>
+</body>
+</html>
