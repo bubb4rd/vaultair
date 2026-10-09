@@ -183,7 +183,25 @@ These are the classes inside `vaultair-core` (`VaultError`). The UI gets fewer: 
 
 ## 10. Golden fixtures
 
-`tests-fixtures/v1/Golden/` is a real v1 vault at schema V1 (password: `fixture-only password, not a secret`) opened by `golden_fixture_v1_still_opens` on every test run, so format or schema changes are always tested against an existing vault. v0.1.0 (schema V8) counts as released (ADR-0004), so fixtures are append-only: an existing fixture is never regenerated or edited, and each released format and schema version gets a fixture of its own. There is none yet for V8 or for the backup container (§11); see [#41](https://github.com/bubb4rd/vaultair/issues/41).
+Golden fixtures are real vaults and backups committed under `tests-fixtures/v1/` and opened by `crates/vaultair-core/tests/golden.rs` on every test run, so format and schema changes are always tested against files users really have. Every fixture's password is `fixture-only password, not a secret`. v0.1.0 (schema V8) counts as released (ADR-0004), so fixtures are append-only: an existing fixture is never regenerated or edited, and each released format and schema version gets a fixture of its own.
+
+| Folder | Written by | Holds | Tests |
+|---|---|---|---|
+| `Golden/` | Pre-release code, 2026-09-23 | Vault, header v1, schema V1: one account with an encrypted password | `golden_fixture_v1_still_opens` |
+| `v0.1.0/` | The `v0.1.0` tag | `Golden/`: vault, header v1, schema V8. `Golden.vaultair-backup`: a backup of it, container v1 (§11) | `release_fixture_v0_1_0_opens_and_migrates`, `release_backup_v0_1_0_verifies_and_restores` |
+
+A release fixture fills every table in use, and the columns V2–V8 added, through the services: an account with a password, sensitive notes (so `sensitive_notes_hints` is set), a hidden custom field and `last_used_at`; an identity with contact points; an MFA method with a TOTP key, recovery instructions and backup codes; a game profile linked to a launcher account; tags; a custom purpose label; a saved view; a dismissed mailbox prospect; non-default `vault_settings` and a vault colour. Each encrypted value is a canary, and the tests read every one back with the current build, after the migrations ran and after a restore.
+
+**Adding one.** For a release that ships a new schema version or file format, generate its fixture from that release's own code, not from `main`:
+
+```powershell
+git worktree add --detach ..\vaultair-v0.2.0 v0.2.0
+# Copy crates/vaultair-core/tests/golden.rs from main into the worktree if the tag's copy is older.
+cd ..\vaultair-v0.2.0
+cargo test -p vaultair-core --test golden -- --ignored --exact generate_golden_fixture
+```
+
+`generate_golden_fixture` writes `tests-fixtures/v1/v<version>/` and refuses if that folder exists. Move the folder into this repository, add tests for it next to the v0.1.0 ones, and list it above. Build in the worktree's own target directory: if it shares this repository's `CARGO_TARGET_DIR`, Cargo then reuses the `vaultair-core` built from the tag here too, and `cargo clean -p vaultair-core` is needed before testing `main`.
 
 ## 11. Backup container (`*.vaultair-backup`)
 

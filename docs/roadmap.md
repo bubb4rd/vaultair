@@ -8,7 +8,7 @@
 - **ADR-0007** (browser fill and save) is Proposed. Its security review on 2026-10-09 left 22 findings open, SR1–SR22, and that review is still going.
 - **Open issues:** #40 (p1, Security Health history is never recorded), #34 (p2, backup link lands at the top of Settings), #35 (p2, duplicate Security Health quick action).
 - **Not built yet, and needed before anything in `future-extension-sync-checklist.md` starts:** the automatic backup before a schema migration (no code for it exists), the end-to-end smoke test in CI (`release.md`), a recorded install on a PC without WebView2, and a recorded restore on a second PC.
-- **Schema:** V1–V8 migrations; one golden fixture (`tests-fixtures/v1/Golden`), which may still be regenerated until the first public release (`vault-format.md` §10).
+- **Schema:** V1–V8 migrations. Golden fixtures (`vault-format.md` §10): `tests-fixtures/v1/Golden` (schema V1) and `tests-fixtures/v1/v0.1.0` (schema V8, with a backup), both append-only.
 
 ## Decided (2026-10-09, project owner)
 

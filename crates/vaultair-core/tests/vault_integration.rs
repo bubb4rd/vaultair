@@ -553,36 +553,6 @@ fn idle_lock_can_be_turned_off() {
     assert!(session.lock_if_idle());
 }
 
-// Golden fixture: a schema V1 vault committed to the repo, so future format
-// or schema changes are tested against a real old vault. Fixtures are
-// append-only since v0.1.0 (docs/vault-format.md §10): never regenerate
-// `Golden`. `generate_golden_fixture` still deletes and rewrites it, so don't
-// run it; issue #41 makes it write new fixtures only.
-const FIXTURE_PASSWORD: &str = "fixture-only password, not a secret";
-
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests-fixtures/v1")
-}
-
-#[test]
-#[ignore = "writes tests-fixtures/v1; run manually"]
-fn generate_golden_fixture() {
-    let parent = fixture_dir();
-    let dir = parent.join("Golden");
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&parent).unwrap();
-    let parent = parent.canonicalize().unwrap();
-    let mut v = create_vault(
-        &opts(&parent, "Golden"),
-        &pw(FIXTURE_PASSWORD),
-        &SystemClock,
-    )
-    .unwrap();
-    insert_canary_account(&mut v);
-    drop(v);
-    fs::remove_file(dir.join(".lock")).unwrap();
-}
-
 /// The bundled engine is SQLCipher 4: the pinned cipher settings in the
 /// header (`cipher_compatibility = 4`) and `docs/vault-format.md` assume it.
 /// The exact version is recorded in `docs/security-assumptions.md`.
@@ -598,57 +568,6 @@ fn the_bundled_engine_is_sqlcipher_4() {
         version.starts_with("4."),
         "PRAGMA cipher_version = {version}"
     );
-}
-
-#[test]
-fn golden_fixture_v1_still_opens() {
-    let src = fixture_dir().join("Golden");
-    assert!(
-        src.join(HEADER_FILE).is_file(),
-        "missing fixture; see generate_golden_fixture"
-    );
-    let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("Golden");
-    fs::create_dir(&dir).unwrap();
-    for f in [HEADER_FILE, DB_FILE] {
-        fs::copy(src.join(f), dir.join(f)).unwrap();
-    }
-    let v = open_vault(&dir, &pw(FIXTURE_PASSWORD)).unwrap();
-    assert_eq!(v.info().name, "Golden");
-    let blob: Vec<u8> = v
-        .conn()
-        .query_row("SELECT password_enc FROM account WHERE id='a1'", [], |r| {
-            r.get(0)
-        })
-        .unwrap();
-    let secret = envelope::open(
-        v.keys().field_key(),
-        FieldRef {
-            table: "account",
-            column: "password_enc",
-            row_id: "a1",
-        },
-        &blob,
-    )
-    .unwrap();
-    assert_eq!(secret.as_slice(), SECRET_CANARY.as_bytes());
-
-    // Migrated to the latest schema: the v1 account is readable through the
-    // account service, and the built-in purposes were added around the
-    // fixture's own "main" (which keeps its id).
-    let listed = vaultair_core::service::accounts::list(
-        &v,
-        &SystemClock,
-        Default::default(),
-        Default::default(),
-    )
-    .unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].purpose_id, "p1");
-    assert!(listed[0].has_password);
-    let purposes = vaultair_core::service::accounts::purposes(&v).unwrap();
-    assert_eq!(purposes.len(), 10);
-    assert_eq!(purposes.iter().filter(|p| p.slug == "main").count(), 1);
 }
 
 /// Acceptance: unlock at calibrated parameters takes <= 1.5 s. Timing-based,

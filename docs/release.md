@@ -41,6 +41,8 @@ There is no updater (ADR-0004, decision 15). Testers get a new build by download
 
    The README's Install section says the same, for anyone who arrives without the message.
 
+8. **Add a golden fixture** if the release ships a new schema version (a migration) or a new file format: generate it from the tag, as `vault-format.md` §10 describes, and merge it through a pull request.
+
 ## If something is wrong
 
 - **The workflow failed, or the draft's installer is bad.** Nothing is public yet. Delete the draft and the tag (`gh release delete v0.1.1 --cleanup-tag`), fix `main`, and tag again.
