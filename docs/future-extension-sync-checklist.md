@@ -101,7 +101,7 @@ The spec allows it only as "opt-in and use user-controlled storage or self-hoste
 
 ADR-0004 records "No auto-fill or auto-login, ever." Either of these needs that decision reopened in a new ADR first. The spec's non-goals stay as they are: no auto-login scripting for game clients.
 
-Proposed design (not accepted, not built): [ADR-0007](adr/0007-browser-extension-fill-and-save.md), fill and save over Native Messaging and a local named pipe.
+Proposed design (not accepted, not built): [ADR-0007](adr/0007-browser-extension-fill-and-save.md), fill and save over Native Messaging and a local named pipe. Its security review (2026-10-09) found 22 issues, all resolved in the ADR's design.
 
 - [ ] The channel between the extension and the app is designed and threat-modelled: who can connect, how the app knows it is the user's extension and not another program running as the user, and what a malicious web page can make the extension ask for.
 - [ ] The extension gets no key and no bulk access. It asks for one credential for one site, the app decides, and the vault must be unlocked. A locked vault answers nothing, not even whether an account exists.
