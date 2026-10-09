@@ -44,7 +44,7 @@ In scope:
 Out of scope:
 - auto-submit, fill on page load, and auto-login of any kind;
 - inline field icons or menus, which would need `<all_urls>`;
-- game launchers, passkeys (README Phase 17), sync, and any bulk export or search through the extension.
+- game launchers, passkeys (Phase 17 in `docs/roadmap.md`), sync, and any bulk export or search through the extension.
 
 ### 2. Components
 

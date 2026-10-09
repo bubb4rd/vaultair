@@ -1,9 +1,10 @@
 //! Schema migrations, tracked by `PRAGMA user_version`. Each migration runs
 //! in its own transaction together with the version bump.
 //!
-//! Until the first public release, V1 may still change; golden fixtures are
-//! regenerated when it does. After release, migrations are append-only and
-//! an automatic backup precedes any migration (plan §2.4).
+//! v0.1.0 shipped schema V8 to testers and counts as released (ADR-0004), so
+//! migrations are append-only: never edit V1–V8, add a new one. An automatic
+//! backup must precede any migration of an existing vault (plan §2.4); it is
+//! not built yet, so no migration may ship before it is.
 
 use rusqlite::Connection;
 

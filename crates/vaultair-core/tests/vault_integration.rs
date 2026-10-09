@@ -553,10 +553,11 @@ fn idle_lock_can_be_turned_off() {
     assert!(session.lock_if_idle());
 }
 
-// Golden fixture: a v1 vault committed to the repo, so future format or
-// schema changes are tested against a real old vault. Regenerate (only
-// before the first public release) with:
-//   cargo test -p vaultair-core --test vault_integration -- --ignored generate_golden_fixture
+// Golden fixture: a schema V1 vault committed to the repo, so future format
+// or schema changes are tested against a real old vault. Fixtures are
+// append-only since v0.1.0 (docs/vault-format.md §10): never regenerate
+// `Golden`. `generate_golden_fixture` still deletes and rewrites it, so don't
+// run it; issue #41 makes it write new fixtures only.
 const FIXTURE_PASSWORD: &str = "fixture-only password, not a secret";
 
 fn fixture_dir() -> PathBuf {

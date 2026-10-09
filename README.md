@@ -137,6 +137,15 @@ CI runs formatting, Clippy, tests, dependency checks, and license checks. It als
 | [Vault format](docs/vault-format.md) | On-disk storage format |
 | [Backup and restore](docs/backup-restore.md) | Encrypted backups |
 | [Threat model](docs/threat-model.md) | Security assumptions and threats; currently a draft |
+| [Security assumptions](docs/security-assumptions.md) | What the defenses rely on, their limits, and the tests behind them |
+| [Local data storage](docs/local-data-storage.md) | Every file Vaultair writes, and how to remove them |
+| [Privacy statement](docs/privacy-statement-draft.md) | What Vaultair never does with your data |
+| [Forgot master password](docs/forgot-master-password.md) | Why it can't be recovered, and what to do |
+| [Design system](docs/design-system.md) | Visual tokens, components, and the reasons behind them |
+| [Logo pipeline](docs/logo-pipeline.md) | How platform and game logos are sourced and approved |
+| [Before sync or extensions](docs/future-extension-sync-checklist.md) | What must be true before any network or extension feature starts |
+| [Roadmap](docs/roadmap.md) | Phases after the MVP; a draft |
+| [Decision records](docs/adr/) | Architecture and scope decisions (ADR-0001 to ADR-0007) |
 | [Releasing](docs/release.md) | Version bumps, tags, the installer build, and code signing plans |
 | [Security policy](SECURITY.md) | How to report vulnerabilities |
 
