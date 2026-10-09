@@ -1,22 +1,15 @@
 <p align="center">
-  <a href="https://github.com/bubb4rd/vaultair">
-    <img src="src-tauri/icons/icon.png" alt="Vaultair" width="128" height="128">
-  </a>
+  <a href="https://github.com/bubb4rd/vaultair"><img src="src-tauri/icons/icon.png" alt="Vaultair" width="128" height="128"></a>
 </p>
 
 <h1 align="center">Vaultair</h1>
 
 <p align="center">
-  <a href="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml">
-    <img src="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml/badge.svg" alt="CI">
-  </a>
-  <a href="https://github.com/bubb4rd/vaultair/blob/main/LICENSE">
-    <img alt="Static Badge" src="https://img.shields.io/badge/GNU%203.0-L?label=License&color=%232193d9">
-  </a>
-  <a href="https://github.com/bubb4rd/vaultair/releases/tag/v0.1.0">
-    <img alt="Static Badge" src="https://img.shields.io/badge/0.1.0-L?label=Version&color=fad318">
-  </a>
+  <a href="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml"><img src="https://github.com/bubb4rd/vaultair/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/bubb4rd/vaultair/blob/main/LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/GNU%203.0-L?label=License&color=%232193d9"></a>
+  <a href="https://github.com/bubb4rd/vaultair/releases/tag/v0.1.0"><img alt="Version 0.1.0" src="https://img.shields.io/badge/0.1.0-L?label=Version&color=fad318"></a>
 </p>
+
 Vaultair is an encrypted, local-first Windows app for managing gaming and online accounts. Keep passwords, recovery codes, MFA, and the connections between your identities in one vault on your own disk.
 
 No cloud account. No network traffic from the app.
