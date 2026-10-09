@@ -260,6 +260,10 @@ pub struct DashboardSummary {
     pub dormant: u32,
     /// Up to five issues, highest severity first.
     pub needs_attention: Vec<HealthIssue>,
+    /// When each account in scope was added (RFC 3339 UTC), oldest first.
+    /// Archived accounts are included; deleted ones are gone, so this is a
+    /// lower bound on how many were ever added.
+    pub accounts_created_at: Vec<String>,
 }
 
 #[cfg(test)]

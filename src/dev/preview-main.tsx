@@ -10,13 +10,10 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { App } from "@/app/App";
 import { createQueryClient } from "@/app/queries";
 import { createAppRouter } from "@/app/router";
-import { setHealthTrendSource } from "@/features/dashboard/healthTrend";
 import "@/styles/globals.css";
-import { ACCOUNTS, BACKUP, HEALTH, HEALTH_TREND, IDENTITIES, ISSUES, detailFor, summaryFor } from "./fixtures";
+import { ACCOUNTS, BACKUP, HEALTH, IDENTITIES, ISSUES, VAULT_CREATED_AT, detailFor, summaryFor } from "./fixtures";
 
 mockWindows("main");
-// The app records no score history yet; the gallery fakes a month of it.
-setHealthTrendSource(() => HEALTH_TREND);
 mockIPC(
   (cmd, args) => {
     const a = (args ?? {}) as Record<string, unknown>;
@@ -32,7 +29,7 @@ mockIPC(
             color: "blue",
             path: "C:\\Users\\sam\\AppData\\Local\\Vaultair\\Vaults\\Main",
             kdfSummary: "Argon2id 256 MiB, t=3, p=4",
-            createdAt: "2026-09-24T10:00:00Z",
+            createdAt: VAULT_CREATED_AT,
             demo: false,
           },
         };

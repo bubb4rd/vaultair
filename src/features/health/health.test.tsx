@@ -39,6 +39,7 @@ const dashboardSummary = (over: Partial<DashboardSummary> = {}): DashboardSummar
   missingRecoveryCodes: 3,
   dormant: 1,
   needsAttention: [issue()],
+  accountsCreatedAt: [],
   ...over,
 });
 

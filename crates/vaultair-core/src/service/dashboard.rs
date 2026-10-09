@@ -18,7 +18,8 @@ const ATTENTION: usize = 5;
 
 /// Counts over active accounts. With `identity_id`, only that identity's
 /// accounts count; an unknown identity is `NotFound`. `now` places the
-/// dormant rule.
+/// dormant rule. Only `accounts_created_at` includes archived accounts, for
+/// the growth chart.
 pub fn summary(
     vault: &OpenVault,
     identity_id: Option<&str>,
@@ -55,5 +56,6 @@ pub fn summary(
         missing_recovery_codes: health.missing_recovery_codes,
         dormant: health.dormant,
         needs_attention,
+        accounts_created_at: account_repo::created_at(conn, identity_id)?,
     })
 }

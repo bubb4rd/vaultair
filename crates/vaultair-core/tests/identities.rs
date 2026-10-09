@@ -621,6 +621,39 @@ fn dashboard_summary_filters_by_identity() {
 }
 
 #[test]
+fn dashboard_summary_lists_when_accounts_were_added() {
+    let tmp = tempfile::tempdir().unwrap();
+    let clock = ManualClock::default();
+    let mut v = new_vault(tmp.path(), &clock);
+    let comp = identities::create(&mut v, &clock, &identity("Competitive"))
+        .unwrap()
+        .id;
+
+    let mut added = Vec::new();
+    for (title, owner) in [
+        ("Loose", None),
+        ("Main", Some(comp.as_str())),
+        ("Gone", Some(comp.as_str())),
+    ] {
+        clock.advance(std::time::Duration::from_secs(86_400));
+        added.push(accounts::create(&mut v, &clock, &account(title, owner, None)).unwrap());
+    }
+    // Archived accounts were still added, so they stay in the list.
+    accounts::set_archived(&mut v, &clock, &added[2].id, true).unwrap();
+    let created = |i: usize| accounts::get(&v, &added[i].id).unwrap().created_at;
+
+    let all = dashboard::summary(&v, None, clock.now_utc()).unwrap();
+    assert_eq!(all.total_accounts, 2);
+    assert_eq!(
+        all.accounts_created_at,
+        vec![created(0), created(1), created(2)]
+    );
+
+    let one = dashboard::summary(&v, Some(&comp), clock.now_utc()).unwrap();
+    assert_eq!(one.accounts_created_at, vec![created(1), created(2)]);
+}
+
+#[test]
 fn identity_dtos_carry_no_secrets() {
     let tmp = tempfile::tempdir().unwrap();
     let clock = ManualClock::default();

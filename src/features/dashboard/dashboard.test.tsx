@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { screen, within } from "@testing-library/react";
 import type { AccountSummary, DashboardSummary, IdentityRef } from "@/ipc/client";
 import { setIdentityFilter } from "@/features/dashboard/useIdentityFilter";
-import { setHealthTrendSource, type HealthCounts } from "@/features/dashboard/healthTrend";
-import { renderApp, type RenderOptions } from "@/test/render";
+import { TEST_VAULT, renderApp, type RenderOptions } from "@/test/render";
 
 const HOUR = 3_600_000;
 const ago = (hours: number) => new Date(Date.now() - hours * HOUR).toISOString();
+/** Noon `n` local days ago, clear of midnight and daylight-saving edges. */
+const daysAgo = (n: number) => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - n, 12).toISOString();
+};
 
 const account = (over: Partial<AccountSummary> = {}): AccountSummary => ({
   id: "a1",
@@ -59,6 +63,7 @@ const summary = (over: Partial<DashboardSummary> = {}): DashboardSummary => ({
   needsAttention: [
     { accountId: "a1", title: "Steam", rule: "weak", severity: "high", reason: "This password is weak.", fix: "edit_account" },
   ],
+  accountsCreatedAt: [ago(0)],
   ...over,
 });
 
@@ -105,7 +110,11 @@ describe("dashboard", () => {
   });
   afterEach(() => {
     globalThis.ResizeObserver = original;
-    setHealthTrendSource(null);
+  });
+
+  /** The vault was created `days` ago. */
+  const createdDaysAgo = (days: number) => ({
+    vault_status: () => ({ state: "unlocked", vault: { ...TEST_VAULT, createdAt: daysAgo(days) } }),
   });
 
   it("shows the vault split, MFA coverage and the open issues", async () => {
@@ -115,76 +124,76 @@ describe("dashboard", () => {
     // The split bar has no legend: each segment carries its own words.
     expect(await screen.findByRole("img", { name: "Main: 8 accounts" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Alt: 4 accounts" })).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("favorites")).toBeInTheDocument();
+    const favorites = screen.getByText("favorites");
+    expect(within(favorites).getByText("2")).toBeInTheDocument();
 
     // 9 of 12 have MFA.
     expect(screen.getByText("75")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "3 without MFA" })).toHaveAttribute("href", "/health");
 
-    // 1 weak + 3 missing MFA + 1 missing codes + 2 dormant. With no history the chart is today only.
+    // Today's health, live: 1 weak + 3 missing MFA + 1 missing codes + 2 dormant.
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("open issues")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /7 open issues across all active accounts\. No earlier days/ })).toBeInTheDocument();
-    expect(screen.getByText(/History builds up from today/)).toBeInTheDocument();
-    // 7 open issues, one recorded day: one dot each, one column. Not a full-height wall.
-    expect(await dotColumns(/7 open issues across all active accounts/)).toEqual(new Map([["6.5", 7]]));
-  });
-
-  it("shortens the snapshot after issues are fixed, and caps a tall day at the grid", async () => {
-    const counts = (missingMfa: number): Partial<DashboardSummary> => ({
-      totalAccounts: 13,
-      weak: 0,
-      reused: 0,
-      missingMfa,
-      missingRecoveryCodes: 0,
-      dormant: 0,
-      needsAttention: [],
-    });
-
-    const { unmount } = await renderApp("/", handlers({ dashboard_summary: () => summary(counts(1)) }));
-    expect(await dotColumns(/1 open issue across all active accounts/)).toEqual(new Map([["6.5", 1]]));
-    unmount();
-
-    await renderApp("/", handlers({ dashboard_summary: () => summary(counts(21)) }));
-    expect(await dotColumns(/21 open issues across all active accounts/)).toEqual(new Map([["6.5", 18]]));
-    expect(screen.getByText(/column stops at 18/)).toBeInTheDocument();
-  });
-
-  it("grows a short history from the left and fills the width only when the days exceed it", async () => {
-    const day = (n: number): HealthCounts => ({
-      weak: n,
-      reused: 0,
-      missingMfa: 0,
-      missingRecoveryCodes: 0,
-      dormant: 0,
-    });
-    setHealthTrendSource(() => [
-      { date: "2020-01-01", counts: day(2) },
-      { date: "2020-02-01", counts: day(40) },
+    const checks = within(screen.getByRole("list", { name: "Open issues by check" })).getAllByRole("listitem");
+    expect(checks.map((li) => li.textContent)).toEqual([
+      "Weak passwords1",
+      "Reused passwords0",
+      "Missing MFA3",
+      "Missing recovery codes1",
+      "Dormant2",
     ]);
-    const { unmount } = await renderApp("/", handlers());
-    const columns = await dotColumns(/Security health over the last/);
-    // Today is appended, so three recorded days sit on the first three pitches.
-    expect([...columns.keys()]).toEqual(["6.5", "15.5", "24.5"]);
-    const heights = [...columns.values()];
-    expect(Math.min(...heights)).toBeLessThan(Math.max(...heights));
-    expect(Math.max(...heights)).toBeLessThanOrEqual(18);
-    unmount();
+    expect(screen.getByRole("link", { name: "Open Security Health" })).toHaveAttribute("href", "/health");
+  });
 
-    setHealthTrendSource(() =>
-      Array.from({ length: 80 }, (_, i) => {
-        const date = new Date(2020, 0, 1 + i);
-        const m = String(date.getMonth() + 1).padStart(2, "0");
-        const d = String(date.getDate()).padStart(2, "0");
-        return { date: `${String(date.getFullYear())}-${m}-${d}`, counts: day(i < 40 ? 4 : 30) };
+  it("plots account growth from the day the vault was created, blank before the first account", async () => {
+    await renderApp(
+      "/",
+      handlers({
+        ...createdDaysAgo(10),
+        dashboard_summary: () => summary({ accountsCreatedAt: [daysAgo(7), daysAgo(7), daysAgo(2)] }),
       }),
     );
-    await renderApp("/", handlers());
-    const filled = await dotColumns(/Security health over the last/);
-    expect(filled.size).toBe(66);
-    expect(Math.min(...[...filled.keys()].map(Number))).toBe(6.5);
-    expect(Math.max(...[...filled.keys()].map(Number))).toBeGreaterThan(500);
+    expect(await screen.findByRole("heading", { level: 2, name: "Account growth" })).toBeInTheDocument();
+    const chart = await screen.findByRole("img", { name: /^Account growth since .+: 3 accounts added\. Deleted accounts aren't counted\.$/ });
+    // Eleven days, one column each from the left. The first three are before any account.
+    expect(await dotColumns(/^Account growth since/)).toEqual(
+      new Map([
+        ["33.5", 2],
+        ["42.5", 2],
+        ["51.5", 2],
+        ["60.5", 2],
+        ["69.5", 2],
+        ["78.5", 3],
+        ["87.5", 3],
+        ["96.5", 3],
+      ]),
+    );
+    const firstLabel = chart.querySelector("text")?.textContent;
+    expect(firstLabel).toBe(new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" }).format(new Date(daysAgo(10))));
+  });
+
+  it("compresses a vault older than the plot and scales a total past the rows", async () => {
+    const early = Array.from({ length: 30 }, () => daysAgo(195));
+    const late = Array.from({ length: 30 }, () => daysAgo(0));
+    await renderApp(
+      "/",
+      handlers({ ...createdDaysAgo(200), dashboard_summary: () => summary({ accountsCreatedAt: [...early, ...late] }) }),
+    );
+    const columns = await dotColumns(/^Account growth since .+: 60 accounts added/);
+    // 201 days in 66 columns of about three days. The first run is before any account.
+    expect(columns.has("6.5")).toBe(false);
+    expect(columns.size).toBe(65);
+    // 60 fills the 18 rows, so 30 draws 9.
+    expect(columns.get("15.5")).toBe(9);
+    expect(Math.max(...columns.values())).toBe(18);
+    expect(Math.max(...[...columns.keys()].map(Number))).toBeGreaterThan(500);
+  });
+
+  it("says when no account has been added for the chosen identity", async () => {
+    setIdentityFilter("i1");
+    await renderApp("/", handlers({ dashboard_summary: () => summary({ identityId: "i1", totalAccounts: 0, accountsCreatedAt: [] }) }));
+    expect(await screen.findByText("Accounts appear here as you add them.")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /^Account growth/ })).not.toBeInTheDocument();
   });
 
   it("groups recent activity by day and lists the open issues beside it", async () => {
@@ -223,10 +232,24 @@ describe("dashboard", () => {
       }),
     );
     expect(await screen.findByText("Last backup 30 hours ago")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Backup settings" })).toHaveAttribute("href", "/settings");
-    expect(screen.getByRole("link", { name: "Add account" })).toHaveAttribute("href", "/accounts/new");
-    expect(screen.getByRole("link", { name: "Add identity" })).toHaveAttribute("href", "/identities/new");
-    expect(screen.getByRole("link", { name: "Review health" })).toHaveAttribute("href", "/health");
+    expect(screen.getByRole("link", { name: "Backup settings" })).toHaveAttribute("href", "/settings#backup-heading");
+    const actions = within(screen.getByRole("region", { name: "Quick actions" })).getAllByRole("link");
+    expect(actions.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Add account", "/accounts/new"],
+      ["Add identity", "/identities/new"],
+    ]);
+  });
+
+  it("offers the same two quick actions on an empty vault", async () => {
+    await renderApp(
+      "/",
+      handlers({
+        dashboard_summary: () =>
+          summary({ totalAccounts: 0, mainAccounts: 0, altAccounts: 0, recent: [], needsAttention: [], accountsCreatedAt: [] }),
+      }),
+    );
+    const region = await screen.findByRole("region", { name: "Quick actions" });
+    expect(within(region).getAllByRole("link").map((a) => a.textContent)).toEqual(["Add account", "Add identity"]);
   });
 
   it("says when there is no backup yet", async () => {

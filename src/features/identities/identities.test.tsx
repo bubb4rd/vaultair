@@ -406,6 +406,7 @@ describe("dashboard", () => {
     missingRecoveryCodes: 0,
     dormant: 0,
     needsAttention: [],
+    accountsCreatedAt: [],
   });
 
   it("filters the summary by identity", async () => {
@@ -461,6 +462,7 @@ describe("accessibility", () => {
           missingRecoveryCodes: 0,
           dormant: 0,
           needsAttention: [],
+          accountsCreatedAt: [],
         }),
       }),
     );
