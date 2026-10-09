@@ -15,10 +15,6 @@ Vaultair is an encrypted, local-first Windows app for managing gaming and online
 
 No cloud account. No network traffic from the app.
 
-## Project status
-
-The MVP is implemented, and the first build, [v0.1.0](https://github.com/bubb4rd/vaultair/releases/tag/v0.1.0), is out as a pre-release for testers. The installer is not code-signed yet and the end-to-end smoke test is not automated; both are planned before a general release.
-
 ## Install
 
 Vaultair runs on 64-bit Windows 10 and 11.
