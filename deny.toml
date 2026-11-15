@@ -61,6 +61,12 @@ deny = [
 unknown-registry = "deny"
 unknown-git = "deny"
 
+# SQLCipher's bundled source (rusqlite `bundled-sqlcipher`): SQLite's public-domain
+# blessing, and libtomcrypt's WTFPL. Both permissive; allowed for this crate only.
+[[licenses.exceptions]]
+crate = "sqlcipher-src"
+allow = ["blessing", "WTFPL"]
+
 [licenses.private]
 # Our own crates are unpublished (GPL-3.0-only, see LICENSE); the allow list is for dependencies.
 ignore = true

@@ -10,7 +10,7 @@
 | RustCrypto `chacha20poly1305` 0.11 | Key wrap, field envelopes | Widely used AEAD implementation |
 | RustCrypto `hkdf`, `hmac`, `sha2` | Subkeys, fingerprints | Standard constructions |
 | `getrandom` | All randomness | Calls the OS CSPRNG (`BCryptGenRandom` on Windows) |
-| SQLCipher 4.14.0, on SQLite 3.51.3 (bundled by `rusqlite` 0.40.2 through `libsqlite3-sys` 0.38.2) + OpenSSL 3 (vendored) | Whole-database encryption | Mature, widely deployed; settings pinned in the header |
+| SQLCipher 4.20.0, on SQLite 3.54.1 (bundled by `rusqlite` 0.42.0 through `libsqlite3-sys` 0.40.0 and `sqlcipher-src` 420.0.0) + OpenSSL 3.6 (vendored, the crypto provider) | Whole-database encryption | Mature, widely deployed; settings pinned in the header |
 | `zxcvbn` | Master password strength | Port of Dropbox's estimator |
 
 Versions are pinned in `Cargo.lock`; `cargo deny` checks advisories, licenses and sources in CI.
