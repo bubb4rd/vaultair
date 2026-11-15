@@ -70,12 +70,13 @@ The first build fetches Microsoft's WebView2 runtime installer onto the build ma
 
 ## E2E smoke test
 
-`e2e/` drives the smoke path of step 5 through the real app: `tauri-driver` with WebdriverIO, and Microsoft's `msedgedriver` for WebView2. The release workflow runs it after the build, on the same `vaultair.exe` the installer carries, so a release whose smoke path fails never reaches a draft. A pull request that changes `e2e/` or the workflow runs it as part of the dry run.
+`e2e/` drives the smoke path of step 5 through the real app: `tauri-driver` with WebdriverIO, and Microsoft's `msedgedriver` for WebView2. The release workflow runs it in its own job, on the same `vaultair.exe` the installer carries, and the draft waits for it, so a release whose smoke path fails never reaches a draft. A pull request that changes `e2e/` or the workflow runs it as part of the dry run.
 
 - It runs the app with `LOCALAPPDATA` pointed at a scratch folder (`VAULTAIR_E2E_HOME`, or a new temp folder), so it never sees a real vault, config or Windows Hello slot, and checks that the vault was created there.
 - Every step goes through the UI except one: the backup folder is set with the `backup_set_destination` command that **Choose a folder** calls, because WebDriver can't reach the native folder picker.
 - Copying reads the clipboard with PowerShell, then **Clear now** must empty it.
 - On a failure the workflow uploads the app's logs from the scratch folder (no secrets or paths, see `local-data-storage.md`); the scratch vault itself is not uploaded.
+- **Run it unelevated.** WebView2 150 and later ignores msedgedriver's `--remote-debugging-port` when the app runs as administrator ([tauri-apps/wry#1782](https://github.com/tauri-apps/wry/issues/1782)), and the session fails with "DevToolsActivePort file doesn't exist". GitHub's Windows runners are elevated, so the workflow runs the test at medium integrity through `gsudo`, pinned by version and SHA-256. The app is not changed for this: the port exists only when msedgedriver launches it.
 
 To run it on your PC: close Vaultair first (it is single-instance, and the test's launch would hand off to the running copy), then
 
