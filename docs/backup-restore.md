@@ -52,6 +52,29 @@ The restored vault is a copy of the same vault: it keeps the original's vault id
 
 To replace a damaged vault: restore to a new name, open the restored vault and confirm it has what you expect, then delete the old vault's folder yourself.
 
+## Before an upgrade
+
+A newer Vaultair sometimes needs to upgrade a vault's database to open it. When you unlock a vault that needs one, Vaultair first makes a backup of it, exactly as the older version left it, and only then upgrades it. You don't have to do anything.
+
+- **Where:** `%LOCALAPPDATA%\Vaultair\upgrade-backups\`, with the usual name, `<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup`. Not your backup folder: that may be on a drive that isn't connected, and an upgrade mustn't depend on it.
+- **Checked:** it is read back the same way as Back up now (see "What the check covers") before the upgrade starts.
+- **If it can't be made,** the vault doesn't open and isn't changed. The lock screen says that the safety copy couldn't be written and why: the disk is full, the folder can't be written to, or the copy didn't read back. Fix that and unlock again. There is no way to upgrade without the copy.
+- **Kept:** Vaultair never deletes these. They are small, and each one is the only way back to the older Vaultair for that vault. Delete them yourself when you no longer need them.
+- **Not your backup:** it doesn't count as the last backup in Settings and doesn't change "Backup due".
+- Every vault gets one, demo vaults included. A new vault, or one that is already up to date, doesn't.
+
+Settings > Backups shows "Copies made before an upgrade" with an **Open folder** button once the folder exists.
+
+### Going back to an older Vaultair
+
+An older Vaultair can't open a vault a newer one has upgraded: it says the vault was made by a newer version. To go back:
+
+1. Install the older Vaultair.
+2. On its lock screen, choose **Restore a backup** and pick the file in `upgrade-backups` from just before the upgrade.
+3. Restore it to a new folder (a restore never writes over a vault) with the master password the vault had then.
+
+The restored vault is the vault as it was before the upgrade. Anything you changed after the upgrade is only in the upgraded vault.
+
 ## What can go wrong
 
 | Message | Meaning |
@@ -62,10 +85,10 @@ To replace a damaged vault: restore to a new name, open the restored vault and c
 | "Vaultair couldn't write to the backup folder…" | The folder is missing, the drive is not connected, or it is full or read-only. |
 | "That folder already contains files…" | A restore needs a new or empty folder. Change the name or the folder. |
 | "This vault was made by a newer version of Vaultair…" | The backup was made by a newer version. Update Vaultair to restore it. |
+| "This vault needs an upgrade, and Vaultair makes a safety copy of it first…" | The copy made before an upgrade couldn't be written: the disk is full, `%LOCALAPPDATA%\Vaultair\upgrade-backups` can't be written to, or the copy didn't read back. The vault was not changed. See "Before an upgrade". |
 
 ## Not in this version
 
-- Scheduled or automatic backups. Backups are made when you press the button.
-- An automatic backup before a schema migration. The plan calls for one once migrations ship to released vaults.
+- Scheduled backups. Apart from the copy made before an upgrade, backups are made when you press the button.
 - CSV or any other plaintext export.
 - Restoring over an existing vault.

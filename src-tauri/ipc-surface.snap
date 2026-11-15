@@ -94,6 +94,8 @@ strength_estimate -> StrengthEstimate
 tag_list -> string[]
 totp_current_code -> TotpCodeView
 tray_set -> SessionConfig
+upgrade_backups_folder -> string | null
+upgrade_backups_open -> null
 vault_change_password -> VaultInfo
 vault_create -> VaultInfo
 vault_create_demo -> VaultInfo

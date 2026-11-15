@@ -724,7 +724,7 @@ mod tests {
             let app = tempfile::tempdir().unwrap();
             let clock = Arc::new(ManualClock::default());
             let device = Arc::new(FakeDevice::new(clock.clone()));
-            let session = SessionManager::new(clock.clone());
+            let session = SessionManager::new(clock.clone(), None);
             let info = session
                 .create(
                     &CreateOptions {

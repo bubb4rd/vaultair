@@ -2,9 +2,9 @@
 //! in its own transaction together with the version bump.
 //!
 //! v0.1.0 shipped schema V8 to testers and counts as released (ADR-0004), so
-//! migrations are append-only: never edit V1–V8, add a new one. An automatic
-//! backup must precede any migration of an existing vault (plan §2.4); it is
-//! not built yet, so no migration may ship before it is.
+//! migrations are append-only: never edit V1–V8, add a new one. Unlocking a
+//! vault that a migration will change backs it up first (`vault::open`,
+//! `backup::upgrade`, plan §2.4).
 
 use rusqlite::Connection;
 
@@ -27,9 +27,15 @@ const MIGRATIONS: &[&str] = &[
 const CATALOG_SEEDS: &[u32] = &[4, 5];
 
 pub fn latest_version() -> u32 {
+    latest_with(&[])
+}
+
+/// The latest version with `extra` migrations after the real ones. Only tests
+/// pass any, to play a newer build (`vault::open_vault_with_extra_migrations`).
+pub(crate) fn latest_with(extra: &[&str]) -> u32 {
     // A handful of migrations; fits a u32.
     #[allow(clippy::cast_possible_truncation)]
-    let n = MIGRATIONS.len() as u32;
+    let n = (MIGRATIONS.len() + extra.len()) as u32;
     n
 }
 
@@ -38,11 +44,21 @@ pub fn current_version(conn: &Connection) -> Result<u32, VaultError> {
 }
 
 pub fn run(conn: &mut Connection) -> Result<(), VaultError> {
+    run_with(conn, &[])
+}
+
+/// `run`, with `extra` migrations after the real ones (see `latest_with`).
+pub(crate) fn run_with(conn: &mut Connection, extra: &[&str]) -> Result<(), VaultError> {
     let current = current_version(conn)?;
-    if current > latest_version() {
+    if current > latest_with(extra) {
         return Err(VaultError::TooNew);
     }
-    for (i, sql) in MIGRATIONS.iter().enumerate().skip(current as usize) {
+    for (i, sql) in MIGRATIONS
+        .iter()
+        .chain(extra)
+        .enumerate()
+        .skip(current as usize)
+    {
         let tx = conn.transaction()?;
         tx.execute_batch(sql)?;
         let version = u32::try_from(i + 1).unwrap_or(u32::MAX);

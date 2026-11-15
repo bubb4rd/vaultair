@@ -239,6 +239,28 @@ describe("lock screen", () => {
     expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
   });
 
+  it("says why the vault stayed locked when its safety copy couldn't be written", async () => {
+    const user = userEvent.setup();
+    const message =
+      "This vault needs an upgrade, and Vaultair makes a safety copy of it first. The copy couldn't be written because the disk is full. Free up some space and unlock again. The vault was not changed.";
+    await renderApp("/", {
+      unlocked: false,
+      recents: [recent("Main")],
+      handlers: {
+        vault_unlock: () => {
+          throw { code: "upgrade_backup_failed", message };
+        },
+      },
+    });
+    await user.type(await screen.findByLabelText("Master password"), "orbit lantern cactus mosaic");
+    await user.click(screen.getByRole("button", { name: "Unlock" }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByText(/Something went wrong/)).not.toBeInTheDocument();
+    // There is no way to upgrade without the copy.
+    expect(screen.queryByRole("button", { name: /upgrade/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
+  });
+
   it("asks for the password instead of calling Rust with an empty one", async () => {
     const user = userEvent.setup();
     const { calls } = await renderApp("/", { unlocked: false, recents: [recent("Main")] });

@@ -97,6 +97,8 @@ fn main() {
             "backup_set_destination",
             "backup_create",
             "backup_verify",
+            "upgrade_backups_folder",
+            "upgrade_backups_open",
             "backup_pick_file",
             "backup_restore_to",
             "settings_get",

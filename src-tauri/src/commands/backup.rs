@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
-use vaultair_core::backup::{restore_backup, RestoreOptions, EXTENSION};
+use vaultair_core::backup::{restore_backup, RestoreOptions, UpgradeBackups, EXTENSION};
 use vaultair_core::clock::{Clock, SystemClock};
 use vaultair_core::config::default_app_dir;
 use vaultair_core::service::backup::{self as service, BackupStatus, BackupSummary};
@@ -25,6 +25,14 @@ use crate::state::{ipc_err, AppState, IpcResult};
 /// checked. Emptied again after each check. See docs/local-data-storage.md.
 fn scratch_dir() -> PathBuf {
     default_app_dir().map_or_else(std::env::temp_dir, |dir| dir.join("tmp"))
+}
+
+/// `%LOCALAPPDATA%\Vaultair\upgrade-backups`, if it exists: it's made by
+/// the first unlock that upgrades a vault (see docs/backup-restore.md).
+fn upgrade_backups_dir() -> Option<PathBuf> {
+    default_app_dir()
+        .map(|app| UpgradeBackups::in_app_dir(&app).dir)
+        .filter(|dir| dir.is_dir())
 }
 
 fn absolute_file(path: &str) -> Result<PathBuf, AppError> {
@@ -78,6 +86,24 @@ pub async fn backup_create(state: State<'_, AppState>) -> IpcResult<BackupSummar
 pub async fn backup_verify(state: State<'_, AppState>, path: String) -> IpcResult<BackupSummary> {
     let path = absolute_file(&path).map_err(ipc_err)?;
     with_vault(&state, move |v| service::verify(v, &path, &scratch_dir())).await
+}
+
+/// Where the backups made before an upgrade are. `None` until the first one
+/// is made (or without `LOCALAPPDATA`).
+#[tauri::command]
+#[specta::specta]
+pub fn upgrade_backups_folder() -> Option<String> {
+    upgrade_backups_dir().map(|d| d.display().to_string())
+}
+
+/// Opens the folder of backups made before an upgrade in File Explorer.
+#[tauri::command]
+#[specta::specta]
+pub async fn upgrade_backups_open() -> IpcResult<()> {
+    let Some(dir) = upgrade_backups_dir() else {
+        return Err(ipc_err(AppError::NotFound));
+    };
+    blocking(move || super::settings::open_folder(&dir)).await
 }
 
 /// Shows the system file picker for a backup. Returns `None` if cancelled,

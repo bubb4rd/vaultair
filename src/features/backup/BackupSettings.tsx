@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircleIcon, CloudIcon, FolderSimpleIcon, WarningIcon } from "@phosphor-icons/react";
 import { queryKeys, useBackupStatus } from "@/app/queries";
@@ -10,6 +10,51 @@ import { formatDateTime, formatSize, PROVIDER_NAMES, reminderText } from "./labe
 import { RestoreDialog } from "./RestoreDialog";
 
 type Busy = "folder" | "backup" | "check" | null;
+
+/**
+ * "Copies made before an upgrade": the folder of backups an unlock wrote
+ * before upgrading a vault. Shown only once that folder exists.
+ */
+function UpgradeBackups() {
+  const [folder, setFolder] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    backup
+      .upgradeBackupsFolder()
+      .then((next) => {
+        if (!cancelled) setFolder(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!folder) return null;
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="upgrade-backups">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <p className="text-[13px] font-medium">Copies made before an upgrade</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            backup.openUpgradeBackups().catch((err: unknown) => {
+              toast.error("Couldn't open the folder", { description: toIpcError(err).message });
+            });
+          }}
+        >
+          Open folder
+        </Button>
+      </div>
+      <p className="text-[13px] text-muted-foreground">
+        Before Vaultair upgrades a vault, it saves a backup of it here. To go back to an older Vaultair, restore one of
+        these with that version.
+      </p>
+    </div>
+  );
+}
 
 /**
  * Settings > Backups: where backups go, "Back up now", how the last one
@@ -200,6 +245,8 @@ export function BackupSettings() {
           </p>
         )}
       </div>
+
+      <UpgradeBackups />
 
       <RestoreDialog open={restoreOpen} onOpenChange={setRestoreOpen} />
     </section>

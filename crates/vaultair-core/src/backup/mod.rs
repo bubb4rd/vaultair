@@ -8,9 +8,12 @@
 pub mod container;
 mod create;
 mod restore;
+mod upgrade;
 mod verify;
 
 pub use container::EXTENSION;
 pub use create::{create_backup, BackupFile};
 pub use restore::{restore_backup, RestoreOptions};
+pub(crate) use upgrade::back_up_before_upgrade;
+pub use upgrade::{UpgradeBackups, UPGRADE_BACKUPS_DIR};
 pub use verify::{inspect_backup, verify_backup, BackupInfo};

@@ -2,14 +2,16 @@ use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 
+use rusqlite::Connection;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 use super::container::{self, EXTENSION};
 use crate::clock::Clock;
+use crate::crypto::keys::VaultKeys;
 use crate::vault::error::VaultError;
 use crate::vault::header::VaultHeader;
-use crate::vault::layout::validate_name;
+use crate::vault::layout::{validate_name, VaultPaths};
 use crate::vault::OpenVault;
 
 /// A backup that was just written.
@@ -53,50 +55,74 @@ fn free_path(dir: &Path, stem: &str) -> PathBuf {
         .unwrap_or(first)
 }
 
-/// Writes a backup of the unlocked vault into `dest_dir`.
+/// Why `write_backup` wrote nothing.
+#[derive(Debug)]
+pub(crate) enum WriteError {
+    /// The vault's own files couldn't be read.
+    Vault(VaultError),
+    /// The destination couldn't take the file.
+    Destination(io::ErrorKind),
+}
+
+impl From<VaultError> for WriteError {
+    fn from(e: VaultError) -> Self {
+        Self::Vault(e)
+    }
+}
+
+impl From<rusqlite::Error> for WriteError {
+    fn from(e: rusqlite::Error) -> Self {
+        Self::Vault(e.into())
+    }
+}
+
+/// Writes a backup of the vault in `paths`, whose database `conn` has open
+/// with `keys`, into `dest_dir` (which must exist). `header` is the header
+/// that was read when the vault was opened. No `OpenVault` is needed, so an
+/// unlock can back a vault up before upgrading it (`backup::upgrade`).
 ///
 /// The database is copied as it is on disk, under a read transaction so
 /// nothing can change it part-way. (SQLCipher refuses SQLite's online backup
-/// API on encrypted databases.) The caller holds the vault, so no write of
-/// ours is in flight, and `journal_mode = DELETE` means the file alone is the
-/// whole database. The backup is written to a `.tmp` file and renamed.
-pub fn create_backup(
-    vault: &OpenVault,
+/// API on encrypted databases.) The caller holds the vault's `.lock`, so no
+/// write of ours is in flight, and `journal_mode = DELETE` means the file
+/// alone is the whole database. The backup is written to a `.tmp` file and
+/// renamed.
+pub(crate) fn write_backup(
+    conn: &Connection,
+    paths: &VaultPaths,
+    keys: &VaultKeys,
+    header: &VaultHeader,
+    vault_name: &str,
     dest_dir: &Path,
-    clock: &dyn Clock,
-) -> Result<BackupFile, VaultError> {
-    if !dest_dir.is_absolute() || !dest_dir.is_dir() {
-        return Err(VaultError::BackupDestination);
-    }
-    let now = clock.now_utc();
+    now: OffsetDateTime,
+) -> Result<BackupFile, WriteError> {
     let created_at = now
         .format(&Rfc3339)
         .map_err(|_| VaultError::Io(io::ErrorKind::Other))?;
-    let paths = vault.paths();
 
     // The header as it is on disk now: it's what opens this database.
-    let header = fs::read(&paths.header)?;
-    if VaultHeader::decode(&header)?.vault_id != vault.header().vault_id {
-        return Err(VaultError::Corrupted(crate::vault::CorruptPart::Header));
+    let header_bytes = fs::read(&paths.header).map_err(VaultError::from)?;
+    if VaultHeader::decode(&header_bytes)?.vault_id != header.vault_id {
+        return Err(VaultError::Corrupted(crate::vault::CorruptPart::Header).into());
     }
 
-    let read = vault.conn().unchecked_transaction()?;
+    let read = conn.unchecked_transaction()?;
     read.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
         r.get::<_, i64>(0)
     })?;
-    let mut db = File::open(&paths.db)?;
-    let db_len = db.metadata()?.len();
+    let mut db = File::open(&paths.db).map_err(VaultError::from)?;
+    let db_len = db.metadata().map_err(VaultError::from)?.len();
 
-    let target = free_path(dest_dir, &file_stem(&vault.info().name, now));
+    let target = free_path(dest_dir, &file_stem(vault_name, now));
     let tmp = target.with_extension(format!("{EXTENSION}.tmp"));
     let written = (|| {
         let mut out = File::create(&tmp)?;
         let size = container::write(
             &mut out,
-            vault.keys().backup_key(),
+            keys.backup_key(),
             &created_at,
-            &vault.header().vault_id,
-            &header,
+            &header.vault_id,
+            &header_bytes,
             &mut db,
             db_len,
         )?;
@@ -119,9 +145,33 @@ pub fn create_backup(
         Err(e) => {
             let _ = fs::remove_file(&tmp);
             tracing::warn!(kind = ?e.kind(), "backup could not be written");
-            Err(VaultError::BackupDestination)
+            Err(WriteError::Destination(e.kind()))
         }
     }
+}
+
+/// Writes a backup of the unlocked vault into `dest_dir` (see `write_backup`).
+pub fn create_backup(
+    vault: &OpenVault,
+    dest_dir: &Path,
+    clock: &dyn Clock,
+) -> Result<BackupFile, VaultError> {
+    if !dest_dir.is_absolute() || !dest_dir.is_dir() {
+        return Err(VaultError::BackupDestination);
+    }
+    write_backup(
+        vault.conn(),
+        vault.paths(),
+        vault.keys(),
+        vault.header(),
+        &vault.info().name,
+        dest_dir,
+        clock.now_utc(),
+    )
+    .map_err(|e| match e {
+        WriteError::Vault(e) => e,
+        WriteError::Destination(_) => VaultError::BackupDestination,
+    })
 }
 
 #[cfg(test)]

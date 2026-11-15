@@ -137,7 +137,7 @@ PRAGMA trusted_schema = OFF;
 PRAGMA cell_size_check = ON;
 ```
 
-After opening, Vaultair runs `PRAGMA cipher_integrity_check` (must return no rows) and `PRAGMA quick_check` (must return `ok`); otherwise the database is reported **corrupted**. It then applies pending migrations and checks that `vault_meta.vault_id` equals the header's `vault_id`.
+After opening, Vaultair runs `PRAGMA cipher_integrity_check` (must return no rows) and `PRAGMA quick_check` (must return `ok`); otherwise the database is reported **corrupted**. If `user_version` is above 0 and below the latest version, it then writes a backup of the vault as it is (§11, "Before an upgrade") and stops, changing nothing, if that fails. It then applies pending migrations and checks that `vault_meta.vault_id` equals the header's `vault_id`.
 
 The first 16 bytes of `vault.vdb` are SQLCipher's per-database salt (used for its HMAC key derivation even with a raw key). Every page, including page 1, is encrypted with AES-256-CBC and authenticated with HMAC-SHA512.
 
@@ -187,8 +187,8 @@ Golden fixtures are real vaults and backups committed under `tests-fixtures/v1/`
 
 | Folder | Written by | Holds | Tests |
 |---|---|---|---|
-| `Golden/` | Pre-release code, 2026-09-23 | Vault, header v1, schema V1: one account with an encrypted password | `golden_fixture_v1_still_opens` |
-| `v0.1.0/` | The `v0.1.0` tag | `Golden/`: vault, header v1, schema V8. `Golden.vaultair-backup`: a backup of it, container v1 (§11) | `release_fixture_v0_1_0_opens_and_migrates`, `release_backup_v0_1_0_verifies_and_restores` |
+| `Golden/` | Pre-release code, 2026-09-23 | Vault, header v1, schema V1: one account with an encrypted password | `golden_fixture_v1_still_opens` (also checks the backup made before its upgrade) |
+| `v0.1.0/` | The `v0.1.0` tag | `Golden/`: vault, header v1, schema V8. `Golden.vaultair-backup`: a backup of it, container v1 (§11) | `release_fixture_v0_1_0_opens_and_migrates`, `release_backup_v0_1_0_verifies_and_restores`, `release_fixture_v0_1_0_is_backed_up_before_an_upgrade` (a test-only migration plays a newer build) |
 
 A release fixture fills every table in use, and the columns V2–V8 added, through the services: an account with a password, sensitive notes (so `sensitive_notes_hints` is set), a hidden custom field and `last_used_at`; an identity with contact points; an MFA method with a TOTP key, recovery instructions and backup codes; a game profile linked to a launcher account; tags; a custom purpose label; a saved view; a dismissed mailbox prospect; non-default `vault_settings` and a vault colour. Each encrypted value is a canary, and the tests read every one back with the current build, after the migrations ran and after a restore.
 
@@ -232,6 +232,8 @@ The lengths must add up to the file size exactly: no trailing bytes. A database 
 Anything else that fails in steps 1, 2, 4 or 5 is an **invalid backup**.
 
 **Writing a backup.** The database bytes are read from `vault.vdb` under a SQLite read transaction, with the vault held so no write of ours is in flight. With `journal_mode = DELETE`, the file alone is then the whole database. SQLCipher refuses SQLite's online backup API on encrypted databases, and `sqlcipher_export` would rewrite every page; a byte copy keeps the pages and their HMACs exactly as they are. The header bytes are read from `vault.vhdr`. The container is written to `<name>.vaultair-backup.tmp`, flushed and renamed. Vaultair then reads it back (steps 1 to 5) before reporting success.
+
+**Before an upgrade.** Unlocking a vault whose `user_version` is above 0 and below the latest version first writes a backup of it, before any migration runs, to `%LOCALAPPDATA%\Vaultair\upgrade-backups\<Vault name>-YYYYMMDD-HHMMSS.vaultair-backup`, and reads it back the same way. It is an ordinary container v1 holding the vault at its old schema. If it can't be written or doesn't read back, the unlock fails with nothing changed and the `.lock` released. Code: `backup/upgrade.rs`, called from `vault/open.rs`.
 
 **Password change.** A backup carries the header it was made with, so it opens with the master password of that time. The DEK does not change on a password change, so BACKUP_KEY stays the same and older backups of the same vault still pass step 4 with the open vault's key.
 
