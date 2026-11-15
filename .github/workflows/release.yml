@@ -12,6 +12,7 @@ on:
     paths:
       - .github/workflows/release.yml
       - scripts/check-release-version.mjs
+      - e2e/**
   workflow_dispatch:
 
 permissions:
@@ -77,6 +78,38 @@ jobs:
           # The installer is already compressed.
           compression-level: 0
           retention-days: 14
+      # The smoke path of docs/release.md step 5, on the binary the installer was
+      # built from. A failure fails this job, so no draft is created; the installer
+      # above stays downloadable to look into it.
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --version 2.1.0 --locked
+      - name: msedgedriver for this runner's WebView2
+        shell: pwsh
+        run: |
+          $key = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $version = (Get-ItemProperty "HKLM:\$key" -ErrorAction SilentlyContinue).pv
+          if (-not $version) { Write-Error "No WebView2 runtime found."; exit 1 }
+          $dir = Join-Path $env:RUNNER_TEMP msedgedriver
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile "$dir.zip"
+          Expand-Archive "$dir.zip" -DestinationPath $dir
+          & "$dir\msedgedriver.exe" --version
+          "MSEDGEDRIVER=$dir\msedgedriver.exe" >> $env:GITHUB_ENV
+      - run: npm ci
+        working-directory: e2e
+      - name: E2E smoke test
+        working-directory: e2e
+        env:
+          VAULTAIR_E2E_HOME: ${{ runner.temp }}\vaultair-e2e
+        run: npm test
+      # App logs hold no secrets (docs/local-data-storage.md); the scratch vault is not uploaded.
+      - name: App logs from the smoke test
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-app-logs
+          path: ${{ runner.temp }}\vaultair-e2e\Vaultair\logs
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Kept apart from the build so that nothing which runs dependency code holds a write token.
   publish:

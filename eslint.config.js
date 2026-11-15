@@ -71,4 +71,10 @@ export default tseslint.config(
     extends: [js.configs.recommended],
     languageOptions: { globals: globals.node },
   },
+  {
+    // WebdriverIO specs: Node and mocha; callbacks passed to browser.execute run in the page.
+    files: ["e2e/**/*.mjs"],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: { ...globals.node, ...globals.mocha, ...globals.browser } },
+  },
 );
