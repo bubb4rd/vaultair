@@ -31,7 +31,7 @@ The product spec says it: "Browser extensions and autofill features must not be 
 
 - [ ] The MVP is released, and the Phase 16 work is done: the threat-model review, the secret-flow audit, clean dependency audits, and the end-to-end smoke test.
 - [ ] No open bug that can lose or damage vault data.
-- [ ] The automatic backup before a schema migration is built (plan §2.4). It is not today, and a feature that changes the schema on several devices needs it first.
+- [ ] The automatic backup before a schema migration is built (plan §2.4). It is in the code ([#43](https://github.com/bubb4rd/vaultair/issues/43); `docs/backup-restore.md`, "Before an upgrade") but has not yet shipped in a release; a feature that changes the schema on several devices needs it first.
 - [ ] Golden fixtures exist for every released format and schema version, and the new work is tested against them (`vault-format.md` §10).
 - [ ] A backup made by a released build has been restored on a second PC by hand.
 - [ ] If the feature writes to the vault from anywhere but the open app, the single-writer assumption above has been replaced with something tested, not worked around.

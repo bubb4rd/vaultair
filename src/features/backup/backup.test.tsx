@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axeViolations } from "@/test/axe";
 import { PAGE_PATHS } from "@/app/nav";
@@ -166,11 +166,37 @@ describe("backup settings", () => {
     expect(screen.queryByText(/is intact/)).not.toBeInTheDocument();
   });
 
-  it("has no axe violations", async () => {
-    const { container } = await renderApp("/settings", {
-      handlers: { backup_status: () => status({ ...DONE, cloudProvider: "dropbox", reminderDue: true }) },
+  it("shows the copies made before an upgrade only once that folder exists", async () => {
+    const user = userEvent.setup();
+    const upgrades = "C:\\Users\\sam\\AppData\\Local\\Vaultair\\upgrade-backups";
+    const none = await renderApp("/settings", {
+      handlers: { backup_status: () => DONE, upgrade_backups_folder: () => null },
     });
     await screen.findByTestId("backup-folder");
+    await waitFor(() => {
+      expect(none.calls.some((c) => c.cmd === "upgrade_backups_folder")).toBe(true);
+    });
+    expect(screen.queryByText("Copies made before an upgrade")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open folder" })).not.toBeInTheDocument();
+    none.unmount();
+
+    const { calls } = await renderApp("/settings", {
+      handlers: { backup_status: () => DONE, upgrade_backups_folder: () => upgrades },
+    });
+    const line = await screen.findByTestId("upgrade-backups");
+    expect(line).toHaveTextContent("Copies made before an upgrade");
+    await user.click(within(line).getByRole("button", { name: "Open folder" }));
+    expect(calls).toContainEqual({ cmd: "upgrade_backups_open", args: {} });
+  });
+
+  it("has no axe violations", async () => {
+    const { container } = await renderApp("/settings", {
+      handlers: {
+        backup_status: () => status({ ...DONE, cloudProvider: "dropbox", reminderDue: true }),
+        upgrade_backups_folder: () => "C:\\Users\\sam\\AppData\\Local\\Vaultair\\upgrade-backups",
+      },
+    });
+    await screen.findByTestId("upgrade-backups");
     expect(await axeViolations(container)).toEqual([]);
   });
 });

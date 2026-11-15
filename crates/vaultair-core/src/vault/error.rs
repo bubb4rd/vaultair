@@ -9,6 +9,19 @@ pub enum CorruptPart {
     Database,
 }
 
+/// Why the backup an unlock makes before upgrading a vault's schema failed
+/// (`backup::upgrade`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradeBackupFailure {
+    /// The disk has no room for it.
+    DiskFull,
+    /// Its folder can't be created or written to, or there is no app-data
+    /// folder to put it in.
+    NotWritable,
+    /// It was written but didn't read back intact, so it was removed.
+    Unreadable,
+}
+
 /// Vault-level failures. Messages are static and contain no paths, input or
 /// key material, so they are safe to log.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -47,6 +60,10 @@ pub enum VaultError {
     /// The backup folder is missing or can't be written to.
     #[error("the backup destination is not usable")]
     BackupDestination,
+    /// The backup made before upgrading the vault's schema couldn't be written
+    /// or didn't read back. The vault was not changed.
+    #[error("the backup before the upgrade failed ({0:?})")]
+    UpgradeBackup(UpgradeBackupFailure),
     #[error("file system error ({0:?})")]
     Io(std::io::ErrorKind),
     #[error("crypto error: {0}")]
@@ -96,6 +113,7 @@ impl From<VaultError> for AppError {
             VaultError::InvalidBackup => Self::InvalidBackup,
             VaultError::BackupOtherVault => Self::BackupOtherVault,
             VaultError::BackupDestination => Self::BackupDestination,
+            VaultError::UpgradeBackup(reason) => Self::UpgradeBackupFailed { reason },
             VaultError::Io(_) => Self::Internal {
                 context: "file system",
             },

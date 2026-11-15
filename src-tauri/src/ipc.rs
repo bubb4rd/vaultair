@@ -98,6 +98,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::backup::backup_set_destination,
             commands::backup::backup_create,
             commands::backup::backup_verify,
+            commands::backup::upgrade_backups_folder,
+            commands::backup::upgrade_backups_open,
             commands::backup::backup_pick_file,
             commands::backup::backup_restore_to,
             commands::settings::settings_get,

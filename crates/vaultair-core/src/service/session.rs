@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use secrecy::SecretString;
 use serde::Serialize;
 
+use crate::backup::UpgradeBackups;
 use crate::clock::{Clock, SystemClock};
 use crate::config::{CaptureLevel, CaptureMode};
 use crate::crypto::kdf::KdfParams;
@@ -101,6 +102,9 @@ pub struct SessionManager {
     state: Mutex<Option<Unlocked>>,
     idle_lock: Mutex<Option<Duration>>,
     clock: Arc<dyn Clock>,
+    /// Where an unlock that upgrades a vault backs it up first. `None`
+    /// (no `LOCALAPPDATA`): such a vault doesn't open.
+    upgrade_backups: Option<UpgradeBackups>,
 }
 
 impl std::fmt::Debug for SessionManager {
@@ -111,7 +115,7 @@ impl std::fmt::Debug for SessionManager {
 
 impl Default for SessionManager {
     fn default() -> Self {
-        Self::new(Arc::new(SystemClock))
+        Self::new(Arc::new(SystemClock), None)
     }
 }
 
@@ -122,11 +126,12 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl SessionManager {
-    pub fn new(clock: Arc<dyn Clock>) -> Self {
+    pub fn new(clock: Arc<dyn Clock>, upgrade_backups: Option<UpgradeBackups>) -> Self {
         Self {
             state: Mutex::new(None),
             idle_lock: Mutex::new(SessionConfig::default().idle_lock()),
             clock,
+            upgrade_backups,
         }
     }
 
@@ -160,7 +165,7 @@ impl SessionManager {
     /// Unlocks the vault in `dir`. Locks any open vault first.
     pub fn unlock(&self, dir: &Path, password: &SecretString) -> Result<VaultInfo, VaultError> {
         self.lock();
-        let vault = vault::open_vault(dir, password)?;
+        let vault = vault::open_vault(dir, password, self.upgrade_backups.as_ref())?;
         Ok(self.install(vault, true))
     }
 
@@ -225,7 +230,7 @@ impl SessionManager {
         binding: &Binding,
     ) -> Result<VaultInfo, VaultError> {
         self.lock();
-        let vault = vault::open_vault_with_keys(dir, keys, binding)?;
+        let vault = vault::open_vault_with_keys(dir, keys, binding, self.upgrade_backups.as_ref())?;
         Ok(self.install(vault, false))
     }
 

@@ -11,7 +11,9 @@ use std::path::{Path, PathBuf};
 
 use secrecy::SecretString;
 use tempfile::TempDir;
-use vaultair_core::backup::{create_backup, restore_backup, verify_backup, RestoreOptions};
+use vaultair_core::backup::{
+    create_backup, restore_backup, verify_backup, RestoreOptions, UpgradeBackups,
+};
 use vaultair_core::clock::SystemClock;
 use vaultair_core::crypto::envelope::{self, FieldRef};
 use vaultair_core::crypto::kdf::KdfParams;
@@ -28,7 +30,9 @@ use vaultair_core::search::{AccountFilter, AccountSort, SortKey, ViewSpec};
 use vaultair_core::service::settings::{self, VaultProfileInput, VaultSettings};
 use vaultair_core::service::{accounts, catalog, graph, identities, mfa, purposes, search};
 use vaultair_core::vault::layout::{DB_FILE, HEADER_FILE};
-use vaultair_core::vault::{create_vault, open_vault, CreateOptions, OpenVault};
+use vaultair_core::vault::{
+    create_vault, open_vault, open_vault_with_extra_migrations, CreateOptions, OpenVault,
+};
 
 const FIXTURE_PASSWORD: &str = "fixture-only password, not a secret";
 /// The vault in every fixture folder, and the stem of its backup.
@@ -58,6 +62,18 @@ fn copy_vault(src: &Path, parent: &Path, name: &str) -> PathBuf {
     dir
 }
 
+/// `%LOCALAPPDATA%\Vaultair` for these tests.
+fn upgrade_backups(tmp: &Path) -> UpgradeBackups {
+    UpgradeBackups::in_app_dir(&tmp.join("app"))
+}
+
+/// The backups made before an upgrade.
+fn upgrade_backup_files(backups: &UpgradeBackups) -> Vec<PathBuf> {
+    fs::read_dir(&backups.dir)
+        .map(|d| d.map(|e| e.unwrap().path()).collect())
+        .unwrap_or_default()
+}
+
 // ---- Schema V1 (2026-09-23, before v0.1.0) -----------------------------------
 
 const V1_SECRET_CANARY: &str = "CANARY7F3A-secret";
@@ -66,7 +82,10 @@ const V1_SECRET_CANARY: &str = "CANARY7F3A-secret";
 fn golden_fixture_v1_still_opens() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = copy_vault(&fixture_dir().join("Golden"), tmp.path(), "Golden");
-    let v = open_vault(&dir, &pw(FIXTURE_PASSWORD)).unwrap();
+    let backups = upgrade_backups(tmp.path());
+    let v = open_vault(&dir, &pw(FIXTURE_PASSWORD), Some(&backups)).unwrap();
+    // It needed an upgrade, so it was backed up first.
+    assert_eq!(upgrade_backup_files(&backups).len(), 1);
     assert_eq!(v.info().name, "Golden");
     let blob: Vec<u8> = v
         .conn()
@@ -637,7 +656,7 @@ fn release_fixture_v0_1_0_opens_and_migrates() {
     let pristine = f.tmp.path().join("pristine.vdb");
     fs::copy(f.vault.join(DB_FILE), &pristine).unwrap();
 
-    let v = open_vault(&f.vault, &pw(FIXTURE_PASSWORD)).unwrap();
+    let v = open_vault(&f.vault, &pw(FIXTURE_PASSWORD), None).unwrap();
     assert_eq!(v.info().name, VAULT_NAME);
     assert_eq!(
         migrate::current_version(v.conn()).unwrap(),
@@ -665,7 +684,7 @@ fn release_fixture_v0_1_0_opens_and_migrates() {
 fn release_backup_v0_1_0_verifies_and_restores() {
     let f = Release::copy("v0.1.0");
     let scratch = f.tmp.path().join("scratch");
-    let v = open_vault(&f.vault, &pw(FIXTURE_PASSWORD)).unwrap();
+    let v = open_vault(&f.vault, &pw(FIXTURE_PASSWORD), None).unwrap();
     let info = verify_backup(&f.backup, v.keys(), &v.info().vault_id, &scratch).unwrap();
     assert_eq!(info.vault_id, v.info().vault_id);
     drop(v);
@@ -680,11 +699,70 @@ fn release_backup_v0_1_0_verifies_and_restores() {
         &SystemClock,
     )
     .unwrap();
-    let v = open_vault(&restored, &pw(FIXTURE_PASSWORD)).unwrap();
+    let v = open_vault(&restored, &pw(FIXTURE_PASSWORD), None).unwrap();
     assert_eq!(v.info().name, "Restored");
     assert_eq!(
         migrate::current_version(v.conn()).unwrap(),
         migrate::latest_version()
     );
+    assert_release_canaries(&v);
+}
+
+/// A build with a newer schema (here, one test-only migration) backs the
+/// v0.1.0 vault up before upgrading it, and the backup is the vault as
+/// v0.1.0 left it.
+#[test]
+fn release_fixture_v0_1_0_is_backed_up_before_an_upgrade() {
+    const NEXT_MIGRATION: &str = "CREATE TABLE upgrade_probe (id INTEGER PRIMARY KEY);";
+    let f = Release::copy("v0.1.0");
+    let backups = upgrade_backups(f.tmp.path());
+    let v = open_vault_with_extra_migrations(
+        &f.vault,
+        &pw(FIXTURE_PASSWORD),
+        Some(&backups),
+        &[NEXT_MIGRATION],
+    )
+    .unwrap();
+    assert_eq!(
+        migrate::current_version(v.conn()).unwrap(),
+        migrate::latest_version() + 1
+    );
+    let made = upgrade_backup_files(&backups);
+    assert_eq!(made.len(), 1, "{made:?}");
+    let name = made[0].file_name().unwrap().to_string_lossy().into_owned();
+    assert!(
+        name.starts_with(&format!("{VAULT_NAME}-")) && name.ends_with(".vaultair-backup"),
+        "{name}"
+    );
+    verify_backup(&made[0], v.keys(), &v.info().vault_id, &backups.scratch_dir).unwrap();
+    drop(v);
+
+    let bytes = fs::read(&made[0]).unwrap();
+    for canary in [
+        PASSWORD_CANARY,
+        NOTES_CANARY,
+        FIELD_CANARY,
+        RECOVERY_CANARY,
+        LAUNCHER,
+        LOGIN_EMAIL,
+    ] {
+        assert!(
+            !bytes.windows(canary.len()).any(|w| w == canary.as_bytes()),
+            "{canary}"
+        );
+    }
+
+    let restored = restore_backup(
+        &RestoreOptions {
+            backup: made[0].clone(),
+            parent_dir: f.tmp.path().join("restored"),
+            name: "Restored".into(),
+        },
+        &pw(FIXTURE_PASSWORD),
+        &SystemClock,
+    )
+    .unwrap();
+    let v = open_vault(&restored, &pw(FIXTURE_PASSWORD), None).unwrap();
+    assert_eq!(migrate::current_version(v.conn()).unwrap(), 8);
     assert_release_canaries(&v);
 }

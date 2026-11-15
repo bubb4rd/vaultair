@@ -187,16 +187,17 @@ pub async fn logs_open() -> IpcResult<()> {
     blocking(move || open_folder(&dir)).await
 }
 
+/// Opens `dir` in File Explorer.
 #[cfg(windows)]
-fn open_folder(dir: &std::path::Path) -> Result<(), VaultError> {
+pub(super) fn open_folder(dir: &std::path::Path) -> Result<(), VaultError> {
     vaultair_platform::windows::open_folder(dir).map_err(|e| {
-        tracing::warn!(error = %e, "could not open the logs folder");
+        tracing::warn!(error = %e, "could not open a folder in File Explorer");
         VaultError::Io(std::io::ErrorKind::Other)
     })
 }
 
 #[cfg(not(windows))]
-fn open_folder(_dir: &std::path::Path) -> Result<(), VaultError> {
+pub(super) fn open_folder(_dir: &std::path::Path) -> Result<(), VaultError> {
     Err(VaultError::Io(std::io::ErrorKind::Unsupported))
 }
 

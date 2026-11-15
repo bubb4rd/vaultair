@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{AppHandle, WebviewWindow};
+use vaultair_core::backup::UpgradeBackups;
 use vaultair_core::clock::SystemClock;
 use vaultair_core::config::{default_app_dir, ConfigStore};
 use vaultair_core::service::quick_unlock::QuickUnlock;
@@ -41,7 +42,12 @@ impl std::fmt::Debug for AppState {
 impl AppState {
     pub fn init(app: &AppHandle, window: &WebviewWindow) -> Self {
         let config = Arc::new(ConfigStore::load(default_app_dir()));
-        let session = Arc::new(SessionManager::default());
+        // `%LOCALAPPDATA%\Vaultair\upgrade-backups`: unlocking a vault that
+        // needs a schema upgrade backs it up there first.
+        let session = Arc::new(SessionManager::new(
+            Arc::new(SystemClock),
+            default_app_dir().as_deref().map(UpgradeBackups::in_app_dir),
+        ));
         let runtime = tauri::async_runtime::handle().inner().clone();
         let platform = Platform::for_window(window);
 

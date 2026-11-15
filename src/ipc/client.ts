@@ -229,6 +229,7 @@ const KNOWN_CODES = {
   invalid_backup: true,
   backup_other_vault: true,
   backup_destination: true,
+  upgrade_backup_failed: true,
   quick_unlock_unavailable: true,
   quick_unlock_password_required: true,
   quick_unlock_cancelled: true,
@@ -336,6 +337,9 @@ export const backup = {
   /** The system file picker. `null` when cancelled. */
   pickFile: (): Promise<BackupSummary | null> => unwrap(() => commands.backupPickFile()),
   restore: (request: RestoreBackupRequest): Promise<RestoredVault> => unwrap(() => commands.backupRestoreTo(request)),
+  /** `%LOCALAPPDATA%\Vaultair\upgrade-backups`, or null until an upgrade has made a copy there. */
+  upgradeBackupsFolder: (): Promise<string | null> => call(() => commands.upgradeBackupsFolder()),
+  openUpgradeBackups: (): Promise<null> => unwrap(() => commands.upgradeBackupsOpen()),
 };
 
 export const recentVaults = {

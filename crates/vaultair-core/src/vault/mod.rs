@@ -19,7 +19,9 @@ use rusqlite::{params, Connection};
 use serde::Serialize;
 
 pub use create::{create_vault, CreateOptions};
-pub use error::{CorruptPart, VaultError};
+pub use error::{CorruptPart, UpgradeBackupFailure, VaultError};
+#[cfg(feature = "test-support")]
+pub use open::open_vault_with_extra_migrations;
 pub use open::{open_vault, open_vault_with_keys, read_header, unwrap_dek};
 pub use rekey::{install_header, prepare_rewrap};
 

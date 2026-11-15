@@ -165,7 +165,7 @@ mod tests {
     }
 
     fn opens(dir: &std::path::Path, password: &str) -> bool {
-        match open_vault(dir, &pw(password)) {
+        match open_vault(dir, &pw(password), None) {
             Ok(_) => true,
             Err(VaultError::WrongPasswordOrTampered) => false,
             Err(e) => panic!("unexpected error: {e}"),
@@ -175,7 +175,7 @@ mod tests {
     /// Prepares a change to `NEW` and stops after `crash_at`, as if the
     /// process died there.
     fn change_and_crash(dir: &std::path::Path, crash_at: Step) {
-        let vault = open_vault(dir, &pw(OLD)).unwrap();
+        let vault = open_vault(dir, &pw(OLD), None).unwrap();
         let next =
             prepare_rewrap(&vault.header, &pw(OLD), Some(&pw(NEW)), KdfParams::MINIMUM).unwrap();
         let result = replace_header(&vault.paths, &next, &mut |step| {
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn new_password_opens_and_old_does_not() {
         let (_parent, dir) = new_vault();
-        let mut vault = open_vault(&dir, &pw(OLD)).unwrap();
+        let mut vault = open_vault(&dir, &pw(OLD), None).unwrap();
         let before = vault.header.clone();
         let next = prepare_rewrap(&before, &pw(OLD), Some(&pw(NEW)), KdfParams::MINIMUM).unwrap();
         install_header(&mut vault, &before, next, "2026-10-05T00:00:00Z").unwrap();
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     fn wrong_current_password_changes_nothing() {
         let (_parent, dir) = new_vault();
-        let vault = open_vault(&dir, &pw(OLD)).unwrap();
+        let vault = open_vault(&dir, &pw(OLD), None).unwrap();
         let before = std::fs::read(&vault.paths.header).unwrap();
         assert_eq!(
             prepare_rewrap(&vault.header, &pw(NEW), Some(&pw(NEW)), KdfParams::MINIMUM).err(),
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn weak_new_password_is_refused_before_any_work() {
         let (_parent, dir) = new_vault();
-        let vault = open_vault(&dir, &pw(OLD)).unwrap();
+        let vault = open_vault(&dir, &pw(OLD), None).unwrap();
         assert!(matches!(
             prepare_rewrap(
                 &vault.header,
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn strengthening_keeps_the_password_and_records_the_kdf() {
         let (_parent, dir) = new_vault();
-        let mut vault = open_vault(&dir, &pw(OLD)).unwrap();
+        let mut vault = open_vault(&dir, &pw(OLD), None).unwrap();
         let stronger = KdfParams {
             m_kib: KdfParams::MINIMUM.m_kib + 8 * 1024,
             ..KdfParams::MINIMUM
@@ -283,14 +283,14 @@ mod tests {
         assert_eq!(stored, stronger.summary());
         drop(vault);
 
-        let reopened = open_vault(&dir, &pw(OLD)).unwrap();
+        let reopened = open_vault(&dir, &pw(OLD), None).unwrap();
         assert_eq!(reopened.header.kdf_params(), stronger);
     }
 
     #[test]
     fn a_stale_header_is_refused() {
         let (_parent, dir) = new_vault();
-        let mut vault = open_vault(&dir, &pw(OLD)).unwrap();
+        let mut vault = open_vault(&dir, &pw(OLD), None).unwrap();
         let before = vault.header.clone();
         let first = prepare_rewrap(&before, &pw(OLD), Some(&pw(NEW)), KdfParams::MINIMUM).unwrap();
         let second = prepare_rewrap(&before, &pw(OLD), Some(&pw(NEW)), KdfParams::MINIMUM).unwrap();

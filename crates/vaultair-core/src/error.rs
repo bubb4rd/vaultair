@@ -8,6 +8,8 @@
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
+use crate::vault::error::UpgradeBackupFailure;
+
 /// Stable, machine-readable error codes. The frontend switches on these.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -28,6 +30,7 @@ pub enum ErrorCode {
     InvalidBackup,
     BackupOtherVault,
     BackupDestination,
+    UpgradeBackupFailed,
     QuickUnlockUnavailable,
     QuickUnlockPasswordRequired,
     QuickUnlockCancelled,
@@ -72,6 +75,10 @@ pub enum AppError {
     BackupOtherVault,
     #[error("backup folder is not usable")]
     BackupDestination,
+    /// The backup an unlock makes before upgrading the vault couldn't be made,
+    /// so the vault stayed locked and unchanged. `reason` picks the message.
+    #[error("the backup before the upgrade failed")]
+    UpgradeBackupFailed { reason: UpgradeBackupFailure },
     /// Windows Hello isn't set up, or this PC doesn't support it.
     #[error("Windows Hello is not available")]
     QuickUnlockUnavailable,
@@ -103,6 +110,7 @@ impl AppError {
             Self::InvalidBackup => ErrorCode::InvalidBackup,
             Self::BackupOtherVault => ErrorCode::BackupOtherVault,
             Self::BackupDestination => ErrorCode::BackupDestination,
+            Self::UpgradeBackupFailed { .. } => ErrorCode::UpgradeBackupFailed,
             Self::QuickUnlockUnavailable => ErrorCode::QuickUnlockUnavailable,
             Self::QuickUnlockPasswordRequired => ErrorCode::QuickUnlockPasswordRequired,
             Self::QuickUnlockCancelled => ErrorCode::QuickUnlockCancelled,
@@ -136,6 +144,17 @@ impl AppError {
             Self::BackupDestination => {
                 "Vaultair couldn't write to the backup folder. Check that it exists and the drive is connected."
             }
+            Self::UpgradeBackupFailed { reason } => match reason {
+                UpgradeBackupFailure::DiskFull => {
+                    "This vault needs an upgrade, and Vaultair makes a safety copy of it first. The copy couldn't be written because the disk is full. Free up some space and unlock again. The vault was not changed."
+                }
+                UpgradeBackupFailure::NotWritable => {
+                    "This vault needs an upgrade, and Vaultair makes a safety copy of it first. The copy couldn't be written because the folder for it (%LOCALAPPDATA%\\Vaultair\\upgrade-backups) can't be written to. The vault was not changed."
+                }
+                UpgradeBackupFailure::Unreadable => {
+                    "This vault needs an upgrade, and Vaultair makes a safety copy of it first. The copy didn't read back correctly, so it was removed. Check the disk and unlock again. The vault was not changed."
+                }
+            },
             Self::QuickUnlockUnavailable => {
                 "Windows Hello isn't set up on this PC. Set it up in Windows Settings, under Accounts > Sign-in options."
             }
@@ -224,6 +243,15 @@ mod tests {
             AppError::InvalidBackup,
             AppError::BackupOtherVault,
             AppError::BackupDestination,
+            AppError::UpgradeBackupFailed {
+                reason: UpgradeBackupFailure::DiskFull,
+            },
+            AppError::UpgradeBackupFailed {
+                reason: UpgradeBackupFailure::NotWritable,
+            },
+            AppError::UpgradeBackupFailed {
+                reason: UpgradeBackupFailure::Unreadable,
+            },
             AppError::QuickUnlockUnavailable,
             AppError::QuickUnlockPasswordRequired,
             AppError::QuickUnlockCancelled,

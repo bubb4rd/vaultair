@@ -93,7 +93,7 @@ fn create_lock_unlock_persists_data() {
     let id = v.info().vault_id;
     drop(v); // lock: connection closed, keys wiped, .lock released
 
-    let v = open_vault(&dir, &pw(PASSWORD)).unwrap();
+    let v = open_vault(&dir, &pw(PASSWORD), None).unwrap();
     assert_eq!(v.info().vault_id, id);
     let user: String = v
         .conn()
@@ -130,11 +130,11 @@ fn wrong_password_fails_only_after_running_argon2() {
     drop(v);
 
     let t = Instant::now();
-    open_vault(&dir, &pw(PASSWORD)).unwrap();
+    open_vault(&dir, &pw(PASSWORD), None).unwrap();
     let good = t.elapsed();
 
     let t = Instant::now();
-    let err = open_vault(&dir, &pw("orbit lantern cactus mosaiC")).unwrap_err();
+    let err = open_vault(&dir, &pw("orbit lantern cactus mosaiC"), None).unwrap_err();
     let bad = t.elapsed();
 
     assert_eq!(err, VaultError::WrongPasswordOrTampered);
@@ -193,7 +193,7 @@ fn authenticated_header_fields_cannot_be_changed() {
         drop(v);
         tamper(&dir, mutate);
         assert_eq!(
-            open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+            open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
             VaultError::WrongPasswordOrTampered,
             "{name}"
         );
@@ -224,7 +224,7 @@ fn damaged_or_foreign_headers_are_classified() {
     for (name, bytes) in raw_cases {
         fs::write(&path, &bytes).unwrap();
         assert_eq!(
-            open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+            open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
             corrupt,
             "{name}"
         );
@@ -233,7 +233,7 @@ fn damaged_or_foreign_headers_are_classified() {
     fs::write(&path, &original).unwrap();
     tamper(&dir, |h| h.kdf.m_kib = 1024);
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         corrupt,
         "KDF below floor"
     );
@@ -241,7 +241,7 @@ fn damaged_or_foreign_headers_are_classified() {
     fs::write(&path, &original).unwrap();
     tamper(&dir, |h| h.kdf.m_kib = 4 * 1024 * 1024);
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         corrupt,
         "KDF above cap"
     );
@@ -252,13 +252,13 @@ fn damaged_or_foreign_headers_are_classified() {
         h.min_reader_version = 2;
     });
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::TooNew
     );
 
     fs::write(&path, &original).unwrap();
     assert!(
-        open_vault(&dir, &pw(PASSWORD)).is_ok(),
+        open_vault(&dir, &pw(PASSWORD), None).is_ok(),
         "restoring the header restores access"
     );
 }
@@ -275,7 +275,7 @@ fn flipped_database_bytes_are_detected() {
     bytes[4096 * 2 + 200] ^= 0xFF; // inside page 3
     fs::write(&db, &bytes).unwrap();
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::Corrupted(CorruptPart::Database)
     );
 }
@@ -290,7 +290,7 @@ fn swapped_database_from_another_vault_is_rejected() {
     fs::copy(dir_b.join(DB_FILE), dir_a.join(DB_FILE)).unwrap();
     // Different DEK, so the key doesn't open the foreign database.
     assert_eq!(
-        open_vault(&dir_a, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir_a, &pw(PASSWORD), None).unwrap_err(),
         VaultError::Corrupted(CorruptPart::Database)
     );
 }
@@ -299,11 +299,11 @@ fn swapped_database_from_another_vault_is_rejected() {
 fn missing_pieces_are_distinct() {
     let tmp = tempfile::tempdir().unwrap();
     assert_eq!(
-        open_vault(&tmp.path().join("nope"), &pw(PASSWORD)).unwrap_err(),
+        open_vault(&tmp.path().join("nope"), &pw(PASSWORD), None).unwrap_err(),
         VaultError::NotFound
     );
     assert_eq!(
-        open_vault(Path::new("relative/dir"), &pw(PASSWORD)).unwrap_err(),
+        open_vault(Path::new("relative/dir"), &pw(PASSWORD), None).unwrap_err(),
         VaultError::InvalidLocation
     );
 
@@ -313,14 +313,14 @@ fn missing_pieces_are_distinct() {
     let moved = tmp.path().join("db.bak");
     fs::rename(&db, &moved).unwrap();
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::DatabaseMissing
     );
     fs::rename(&moved, &db).unwrap();
 
     fs::remove_file(dir.join(HEADER_FILE)).unwrap();
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::HeaderMissing
     );
 }
@@ -330,13 +330,13 @@ fn a_vault_can_only_be_open_once() {
     let tmp = tempfile::tempdir().unwrap();
     let (v, dir) = new_vault(tmp.path());
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::InUse
     );
     drop(v);
-    let again = open_vault(&dir, &pw(PASSWORD)).unwrap();
+    let again = open_vault(&dir, &pw(PASSWORD), None).unwrap();
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::InUse
     );
     drop(again);
@@ -459,7 +459,7 @@ fn schema_is_migrated_and_future_schemas_are_refused() {
     v.conn().pragma_update(None, "user_version", 99).unwrap();
     drop(v);
     assert_eq!(
-        open_vault(&dir, &pw(PASSWORD)).unwrap_err(),
+        open_vault(&dir, &pw(PASSWORD), None).unwrap_err(),
         VaultError::TooNew
     );
 }
@@ -502,7 +502,7 @@ fn session_manager_state_machine() {
 fn idle_lock_fires_at_the_deadline_and_touch_extends_it() {
     let tmp = tempfile::tempdir().unwrap();
     let clock = Arc::new(ManualClock::default());
-    let session = SessionManager::new(clock.clone());
+    let session = SessionManager::new(clock.clone(), None);
     session.set_idle_lock(Some(Duration::from_secs(300)));
     // Nothing to lock, and touching a locked session does nothing.
     assert!(!session.lock_if_idle());
@@ -538,7 +538,7 @@ fn idle_lock_fires_at_the_deadline_and_touch_extends_it() {
 fn idle_lock_can_be_turned_off() {
     let tmp = tempfile::tempdir().unwrap();
     let clock = Arc::new(ManualClock::default());
-    let session = SessionManager::new(clock.clone());
+    let session = SessionManager::new(clock.clone(), None);
     session
         .create(&opts(tmp.path(), "Never"), &pw(PASSWORD))
         .unwrap();
@@ -590,7 +590,7 @@ fn unlock_time_at_calibrated_params() {
         .dir()
         .clone();
     let t = Instant::now();
-    let _v = open_vault(&dir, &pw(PASSWORD)).unwrap();
+    let _v = open_vault(&dir, &pw(PASSWORD), None).unwrap();
     let elapsed = t.elapsed();
     eprintln!("unlock took {elapsed:?} at {}", params.summary());
     assert!(

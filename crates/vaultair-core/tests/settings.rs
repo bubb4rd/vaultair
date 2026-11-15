@@ -58,7 +58,7 @@ fn settings_persist_across_unlocks() {
     let vault_dir = vault.dir().clone();
     drop(vault);
 
-    let vault = open_vault(&vault_dir, &SecretString::from(PASSWORD)).unwrap();
+    let vault = open_vault(&vault_dir, &SecretString::from(PASSWORD), None).unwrap();
     assert_eq!(settings::load(vault.conn()).unwrap(), next);
 
     let mut config = SessionConfig::default();
@@ -190,7 +190,7 @@ fn profile_renames_the_vault_but_not_its_folder() {
     drop(vault);
 
     assert!(folder.is_dir());
-    let reopened = open_vault(&folder, &SecretString::from(PASSWORD)).unwrap();
+    let reopened = open_vault(&folder, &SecretString::from(PASSWORD), None).unwrap();
     assert_eq!(reopened.info().name, "Tournament (EU)");
     assert_eq!(reopened.info().color, Some(IdentityColor::Teal));
 }
@@ -198,7 +198,7 @@ fn profile_renames_the_vault_but_not_its_folder() {
 #[test]
 fn change_password_through_the_session() {
     let dir = tempfile::tempdir().unwrap();
-    let session = SessionManager::new(Arc::new(SystemClock));
+    let session = SessionManager::new(Arc::new(SystemClock), None);
     let info = session
         .create(&options(dir.path()), &SecretString::from(PASSWORD))
         .unwrap();
@@ -239,7 +239,7 @@ fn change_password_through_the_session() {
 
 #[test]
 fn rewrap_needs_an_unlocked_vault() {
-    let session = SessionManager::new(Arc::new(SystemClock));
+    let session = SessionManager::new(Arc::new(SystemClock), None);
     assert_eq!(
         session
             .rewrap(&SecretString::from(PASSWORD), None, None)

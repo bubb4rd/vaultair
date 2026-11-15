@@ -5,21 +5,22 @@
 ## Where things stand
 
 - **v0.1.0** is published as an unsigned pre-release for the private beta (`docs/release.md`). There is no updater (ADR-0004 decision 15), so every build reaches testers by hand.
-- **ADR-0007** (browser fill and save) is Proposed. Its security review on 2026-10-09 left 22 findings open, SR1–SR22, and that review is still going.
-- **Open issues:** #40 (p1, Security Health history is never recorded), #34 (p2, backup link lands at the top of Settings), #35 (p2, duplicate Security Health quick action).
-- **Not built yet, and needed before anything in `future-extension-sync-checklist.md` starts:** the automatic backup before a schema migration (no code for it exists), the end-to-end smoke test in CI (`release.md`), a recorded install on a PC without WebView2, and a recorded restore on a second PC.
+- **ADR-0007** (browser fill and save) is Proposed. Its security review on 2026-10-09 found 22 issues, SR1–SR22; the ADR's design text and the threat model resolve all of them, and none of it is built. Acceptance waits on the checklist gates, not on the review.
+- **Open issues:** [#43](https://github.com/bubb4rd/vaultair/issues/43) (p1, automatic backup before a schema migration, in progress) and [#42](https://github.com/bubb4rd/vaultair/issues/42) (p1, code signing with Azure Artifact Signing, waiting on the Azure setup).
+- **Done since this file was first drafted:** #34 and #35 (backup deep links, one quick action fewer) and #40 (option B, an account-growth chart; see "Decided"), all in `a266a01`; #41, the golden vault and backup written by v0.1.0.
+- **Not done yet, and needed before anything in `future-extension-sync-checklist.md` starts:** the automatic backup before a schema migration (#43, built and tested, not yet merged or released), the end-to-end smoke test in CI (`release.md`), a recorded install on a PC without WebView2, and a recorded restore on a second PC.
 - **Schema:** V1–V8 migrations. Golden fixtures (`vault-format.md` §10): `tests-fixtures/v1/Golden` (schema V1) and `tests-fixtures/v1/v0.1.0` (schema V8, with a backup), both append-only.
 
 ## Decided (2026-10-09, project owner)
 
-- **#40 takes option A, per vault:** one row of health counts per day for the whole vault, in a new table, migration **V9**.
+- **#40 took option B** (recorded in ADR-0004, "As built"): the dashboard chart shows account growth from each account's creation time. Health history is not recorded, so there is no `health_history` table and no migration. This replaces option A, which an earlier draft of this file recorded.
 - **Passkeys are stored and used in Phase 17**, not only recorded. See "Passkeys" for what that pulls into the phase.
 - **Updates come through a separate updater program** (option E under "Updates"), **installed by the same installer as the app** (see "Bundling"). The vault app keeps no network code.
 - **The v0.1.0 beta counts as "the MVP is released"** for checklist box 1. The passkeys ADR records this; the box itself is unchanged.
 - **On a PC that can't use passkeys** (Windows 10, or Windows 11 before the builds below), Vaultair keeps them and says plainly that they can't be used on this PC yet. See "Where passkeys can't be used".
 - **The security review before the public release** is done by an Opus 5.5 security reviewer agent. ADR-0004's Consequences called for a third-party review when the source was closed; it has been public under GPL-3.0 since 2026-10-08. The README, `SECURITY.md` and release notes describe the review as what it is (an AI agent review, with its date and scope), not as an independent audit.
 
-**Migration numbers:** V9 is health history, V10 is passkeys. ADR-0007 names V9 for `browser_pairing` and `browser_activity`; those take the next free number the next time the ADR is edited.
+**Migration numbers:** V9 is the next free number, and passkeys take it as the first migration planned. ADR-0007 names V9 for `browser_activity` and the account's website-fill flag; those take the next free number the next time the ADR is edited.
 
 ## Phases
 
@@ -27,7 +28,7 @@
 timeline
     title Vaultair, phases after the MVP
     section Private beta
-        Phase 17, 0.2 : Issues 34 and 35 : Backup before migration : Health history V9 : E2E smoke test in CI : Code signing : Passkeys V10 : Updates ADR
+        Phase 17, 0.2 : Backup before migration : E2E smoke test in CI : Code signing : Passkeys V9 : Updates ADR
         Phase 18, 0.3 : Imports : Encrypted attachments : Health reports : Rotate encryption key
     section Public
         Phase 19, 1.0 : Updater live : Security review : Format v1 frozen
@@ -47,10 +48,9 @@ flowchart LR
         FIX["Golden fixture per schema version"]
         E2E["E2E smoke test in CI"]
         R2["Restore on a second PC"]
-        H40["Health history, V9"]
+        PK["Passkeys, V9"]
         SPK["Passkey spike"]
         SIGN["Code signing"]
-        PK["Passkeys, V10"]
         UPD["Updates ADR"]
     end
 
@@ -58,8 +58,7 @@ flowchart LR
     G2(["Gates 2, 5: threat model, opt-in"])
     G24(["Gates 2, 4, 5: threat model, E2EE, opt-in"])
 
-    PMB --> H40
-    FIX --> H40
+    PMB --> PK
     PMB --> G1
     FIX --> G1
     E2E --> G1
@@ -67,7 +66,6 @@ flowchart LR
 
     SPK --> PK
     SIGN --> PK
-    H40 --> PK
     G1 --> PK
     G2 --> PK
 
@@ -81,7 +79,7 @@ flowchart LR
     REV["Security review"] --> V1
     G1 --> V1
 
-    SR["SR1–SR22 closed"] --> ACC["ADR-0007 Accepted"]
+    SR["SR1–SR22 resolved in the ADR text"] --> ACC["ADR-0007 Accepted"]
     ACC --> EXT["Phase 20: browser extension"]
     V1 --> EXT
     SIGN -->|SR5 server check| EXT
@@ -95,21 +93,20 @@ flowchart LR
     G24 --> BR
 ```
 
-### Phase 17 (v0.2): Foundations, health history, passkeys
+### Phase 17 (v0.2): Foundations and passkeys
 
-Work in this order: the safety net, then the first migration, then passkeys.
+Work in this order: the safety net, then passkeys.
 
-1. **#34** (backup links open Settings at Backups) and **#35** (remove the duplicate Review health tile).
-2. **Automatic backup before a schema migration** (plan §2.4, checklist box 1). Ships in the same build as V9 or earlier, never later: beta vaults are real vaults.
-3. **Golden fixtures per schema version**: the current V8 fixture is kept as it is, a fixture is added for each new migration, and a test opens each.
+1. **Done:** #34 (backup links open Settings at Backups), #35 (the duplicate Review health tile removed) and #40 (option B, no schema change), in `a266a01`.
+2. **Automatic backup before a schema migration** ([#43](https://github.com/bubb4rd/vaultair/issues/43), plan §2.4, checklist box 1). Ships in the same build as V9 or earlier, never later: beta vaults are real vaults.
+3. **Golden fixtures per schema version**: the V8 vault and backup written by v0.1.0 are committed (#41) and kept as they are; a fixture is added for each new migration, and a test opens each.
 4. **E2E smoke test in CI**: `tauri-driver` with WebdriverIO on Windows, driving `release.md` step 5, run against the release build before the draft is created.
 5. **Install on a clean PC** without WebView2, and **restore a backup on a second PC**, both recorded.
-6. **Health history (#40 option A, per vault).** One row per day, upserted on unlock or summary load; the last N days returned in `DashboardSummary`. The migration is tested on the V8 fixture; the gallery fixture injection is removed; `local-data-storage.md` and the privacy statement list the new table.
-7. **Passkey spike, ADR and threat-model section**, then **code signing**, then **passkeys** (see "Passkeys").
-8. **Updates ADR**: records option E and the bundling decision, and supersedes ADR-0004 decision 15.
-9. The manual checks `security-assumptions.md` lists as not automated: hand-copy backstop in a real WebView2 window, clipboard exclusion formats, real Windows Hello.
+6. **Passkey spike, ADR and threat-model section**, then **code signing** ([#42](https://github.com/bubb4rd/vaultair/issues/42)), then **passkeys** (see "Passkeys"). The Azure subscription and Public Trust identity validation that #42 needs are the owner's to set up, and can start now.
+7. **Updates ADR**: records option E and the bundling decision, and supersedes ADR-0004 decision 15.
+8. The manual checks `security-assumptions.md` lists as not automated: hand-copy backstop in a real WebView2 window, clipboard exclusion formats, real Windows Hello.
 
-**Done when:** a pre-release carries V9 and V10 with the pre-migration backup; gate 1's boxes are ticked with evidence; the passkeys and updates ADRs are Accepted; a passkey made on a test site with Vaultair signs in again after a lock and unlock; and the same vault opened on Windows 10 keeps its passkeys and shows the toast and warnings.
+**Done when:** a pre-release carries V9 (passkeys) with the pre-migration backup; gate 1's boxes are ticked with evidence; the passkeys and updates ADRs are Accepted; a passkey made on a test site with Vaultair signs in again after a lock and unlock; and the same vault opened on Windows 10 keeps its passkeys and shows the toast and warnings.
 
 ### Phase 18 (v0.3): Offline features
 
@@ -126,7 +123,7 @@ From the product spec's Phase 2 list, the items that need no network. Each one t
 ### Phase 19 (v1.0): Public release
 
 - **The updater**, built to the Phase 17 ADR, signed, and installed by the same installer as the app.
-- `--prerelease` removed from `release.yml`; README and `SECURITY.md` updated for signed builds. The certificate itself arrives in Phase 17 (see "Passkeys").
+- `--prerelease` removed from `release.yml`; README and `SECURITY.md` updated for signed builds. The certificate itself arrives in Phase 17 (#42, see "Passkeys").
 - **Security review** by the Opus 5.5 security reviewer, of the 1.0 build and its docs, with findings recorded and closed the way ADR-0007's are.
 - `threat-model.md` out of draft (the README still calls it one).
 - **Format v1 frozen**: from here golden fixtures are append-only (`vault-format.md` §10).
@@ -139,7 +136,8 @@ ADR-0007, in its own order of work (§Consequences), once the ADR is Accepted.
 
 ```mermaid
 flowchart TD
-    A["Close SR1–SR22 in the ADR text and threat model"] --> B["ADR-0007 Accepted"]
+    A["SR1–SR22 resolved in the ADR text and threat model (done)"] --> B["ADR-0007 Accepted"]
+    CL["Checklist: gate 1 and the browser extension section ticked"] --> B
     B --> C["1. Threat model and docs final"]
     C --> D["2. bridge-proto, core::bridge, bridge-wasm"]
     D --> E["3. Pipe and host, Windows CI test"]
@@ -151,7 +149,7 @@ flowchart TD
     M["Backup before migration, fixture for its migration"] --> F
 ```
 
-Open findings by severity, as of 2026-10-09 (the review is still running):
+Findings of the 2026-10-09 review by severity. All are resolved in the ADR's design text and the threat model; none is built:
 
 | Severity | Findings | Count |
 |---|---|---|

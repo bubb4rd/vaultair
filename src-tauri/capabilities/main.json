@@ -106,6 +106,8 @@
     "allow-backup-set-destination",
     "allow-backup-create",
     "allow-backup-verify",
+    "allow-upgrade-backups-folder",
+    "allow-upgrade-backups-open",
     "allow-backup-pick-file",
     "allow-backup-restore-to",
     "allow-settings-get",

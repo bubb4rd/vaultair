@@ -20,7 +20,7 @@ crates/vaultair-platform  OS integrations; the only crate with `unsafe` (windows
 | `crates/vaultair-core/src/vault/` | Header encode/decode, layout, `.lock`, atomic writes, `create_vault` / `open_vault`, `rekey.rs` (password and KDF change), `VaultError` |
 | `crates/vaultair-core/src/db/` | SQLCipher open with pinned pragmas, integrity checks, `user_version` migrations (`migrations/V1` to `V8`), and the repositories (`repo/`) |
 | `crates/vaultair-core/src/{domain,service}/` | Record types and validation; one service per area (accounts, identities, purposes, catalog, MFA, search, health, graph, dashboard, backup, settings, quick unlock) |
-| `crates/vaultair-core/src/{search,health,graph,generator,backup}/` | The FTS index and filter language, health rules, the relationship-map builder, the password generator, and the backup container |
+| `crates/vaultair-core/src/{search,health,graph,generator,backup}/` | The FTS index and filter language, health rules, the relationship-map builder, the password generator, and the backup container, including the backup an unlock makes before a migration (`backup/upgrade.rs`) |
 | `crates/vaultair-core/src/service/session.rs` | Lock/unlock state machine; one vault open at a time; slow work outside the mutex. Owns the idle deadline (`touch`, `lock_if_idle`) and `SessionConfig` (ADR-0004 defaults) |
 | `crates/vaultair-core/src/service/settings.rs` | The vault's own lock and clipboard settings (`vault_settings`), with their bounds, and its name and colour |
 | `crates/vaultair-core/src/config.rs` | App config (`config.json`): the recent-vaults list (paths only), the screenshot-protection policy, email masking, the tray switch and the declined Hello offer; atomic writes; unreadable = defaults |

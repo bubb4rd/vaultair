@@ -263,6 +263,13 @@ export const commands = {
 	 */
 	backupVerify: (path: string) => typedError<BackupSummary, IpcError_Serialize>(__TAURI_INVOKE("backup_verify", { path })),
 	/**
+	 *  Where the backups made before an upgrade are. `None` until the first one
+	 *  is made (or without `LOCALAPPDATA`).
+	 */
+	upgradeBackupsFolder: () => __TAURI_INVOKE<string | null>("upgrade_backups_folder"),
+	/**  Opens the folder of backups made before an upgrade in File Explorer. */
+	upgradeBackupsOpen: () => typedError<null, IpcError_Serialize>(__TAURI_INVOKE("upgrade_backups_open")),
+	/**
 	 *  Shows the system file picker for a backup. Returns `None` if cancelled,
 	 *  and `invalid_backup` for a file that isn't one. The date and size come
 	 *  from the file itself and aren't checked until it's verified or restored.
@@ -731,7 +738,7 @@ export type Dependent = {
 export type EdgeKind = "owns" | "primary_email" | "recovery_email" | "phone" | "login_email" | "recovery_phone" | "linked_launcher" | "linked_console" | "on_platform" | "plays" | "mfa" | "prospective";
 
 /**  Stable, machine-readable error codes. The frontend switches on these. */
-export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy" | "invalid_backup" | "backup_other_vault" | "backup_destination" | "quick_unlock_unavailable" | "quick_unlock_password_required" | "quick_unlock_cancelled" | "quick_unlock_failed";
+export type ErrorCode = "vault_locked" | "invalid_input" | "not_found" | "internal" | "wrong_password" | "weak_password" | "vault_not_found" | "vault_exists" | "vault_in_use" | "vault_too_new" | "vault_corrupted" | "clipboard_busy" | "invalid_backup" | "backup_other_vault" | "backup_destination" | "upgrade_backup_failed" | "quick_unlock_unavailable" | "quick_unlock_password_required" | "quick_unlock_cancelled" | "quick_unlock_failed";
 
 /**  What the map can be centred on. A contact is an email or a phone. */
 export type FocusKind = "identity" | "account" | "contact" | "platform" | "game";

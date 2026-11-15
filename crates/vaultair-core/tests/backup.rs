@@ -11,16 +11,22 @@ use rusqlite::params;
 use secrecy::SecretString;
 use tempfile::TempDir;
 use vaultair_core::backup::{
-    create_backup, inspect_backup, restore_backup, verify_backup, RestoreOptions,
+    create_backup, inspect_backup, restore_backup, verify_backup, RestoreOptions, UpgradeBackups,
 };
 use vaultair_core::clock::{Clock, ManualClock, SystemClock};
 use vaultair_core::crypto::envelope::{self, FieldRef};
 use vaultair_core::crypto::kdf::KdfParams;
+use vaultair_core::db::migrate;
 use vaultair_core::service::backup::{self as service, BackupOutcome, REMINDER_AFTER_DAYS};
-use vaultair_core::vault::layout::{DB_FILE, HEADER_FILE};
+use vaultair_core::service::session::SessionManager;
+use vaultair_core::vault::layout::{DB_FILE, HEADER_FILE, LOCK_FILE};
 use vaultair_core::vault::location::{CloudProvider, CloudRoots};
-use vaultair_core::vault::{create_vault, open_vault, CreateOptions, OpenVault, VaultError};
-use vaultair_core::AppError;
+use vaultair_core::vault::lockfile::VaultLock;
+use vaultair_core::vault::{
+    create_vault, open_vault, open_vault_with_extra_migrations, CreateOptions, OpenVault,
+    UpgradeBackupFailure, VaultError,
+};
+use vaultair_core::{AppError, ErrorCode};
 
 const PASSWORD: &str = "orbit lantern cactus mosaic";
 const SECRET_CANARY: &str = "CANARY7F3A-secret";
@@ -214,7 +220,7 @@ fn backup_verify_restore_round_trip() {
     assert_eq!(dir, f.tmp.path().join("restored").join("Main restored"));
     assert!(dir.join(HEADER_FILE).is_file() && dir.join(DB_FILE).is_file());
 
-    let restored = open_vault(&dir, &pw(PASSWORD)).unwrap();
+    let restored = open_vault(&dir, &pw(PASSWORD), None).unwrap();
     assert_eq!(restored.info().vault_id, f.vault.info().vault_id);
     assert_eq!(restored.info().name, "Main restored");
     assert_eq!(count(&restored, "account"), accounts);
@@ -511,8 +517,181 @@ fn a_restored_vault_remembers_its_backup_settings() {
     )
     .unwrap();
     drop(vault);
-    let restored = open_vault(&dir, &pw(PASSWORD)).unwrap();
+    let restored = open_vault(&dir, &pw(PASSWORD), None).unwrap();
     let status = service::status(&restored, &CloudRoots::default(), SystemClock.now_utc()).unwrap();
     assert_eq!(status.destination, Some(backups.display().to_string()));
     assert_eq!(status.last_outcome, Some(BackupOutcome::Ok));
+}
+
+// ---- Before an upgrade (docs/backup-restore.md) ------------------------------
+
+/// Stands in for the next release's migration, so no real one is needed.
+const NEXT_MIGRATION: &str = "CREATE TABLE upgrade_probe (id INTEGER PRIMARY KEY);";
+
+/// `%LOCALAPPDATA%\Vaultair` for these tests.
+fn upgrade_backups(tmp: &Path) -> UpgradeBackups {
+    UpgradeBackups::in_app_dir(&tmp.join("app"))
+}
+
+/// A locked vault at the current schema, with the demo data and the canary
+/// account.
+fn locked_vault(parent: &Path, demo: bool) -> PathBuf {
+    let mut v = new_vault(parent, "Main", demo, &SystemClock);
+    vaultair_core::demo::seed(&mut v, &SystemClock).unwrap();
+    insert_canary_account(&mut v);
+    v.dir().clone()
+}
+
+/// Opens `dir` as a build one migration newer would.
+fn open_upgrading(dir: &Path, backups: &UpgradeBackups) -> Result<OpenVault, VaultError> {
+    open_vault_with_extra_migrations(dir, &pw(PASSWORD), Some(backups), &[NEXT_MIGRATION])
+}
+
+fn has_probe_table(v: &OpenVault) -> bool {
+    v.conn()
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE name = 'upgrade_probe'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )
+        .unwrap()
+        == 1
+}
+
+#[test]
+fn an_upgrade_backs_the_vault_up_first() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = locked_vault(tmp.path(), false);
+    let backups = upgrade_backups(tmp.path());
+    let old_version = migrate::latest_version();
+    let accounts = {
+        let v = open_vault(&dir, &pw(PASSWORD), Some(&backups)).unwrap();
+        assert_eq!(migrate::current_version(v.conn()).unwrap(), old_version);
+        count(&v, "account")
+    };
+    assert!(!backups.dir.exists(), "an up-to-date vault isn't backed up");
+
+    let v = open_upgrading(&dir, &backups).unwrap();
+    assert_eq!(migrate::current_version(v.conn()).unwrap(), old_version + 1);
+    assert!(has_probe_table(&v));
+    let made = entries(&backups.dir);
+    assert_eq!(made.len(), 1, "{made:?}");
+    assert!(
+        made[0].starts_with("Main-") && made[0].ends_with(".vaultair-backup"),
+        "{}",
+        made[0]
+    );
+    let backup = backups.dir.join(&made[0]);
+    let scratch = tmp.path().join("scratch");
+    verify_backup(&backup, v.keys(), &v.info().vault_id, &scratch).unwrap();
+    assert!(entries(&backups.scratch_dir).is_empty());
+
+    // Not the user's backup: "Backup due" doesn't change.
+    let status = service::status(&v, &CloudRoots::default(), SystemClock.now_utc()).unwrap();
+    assert_eq!(status.last_backup_at, None);
+    assert_eq!(status.last_outcome, None);
+    assert!(status.reminder_due);
+
+    // The same canaries as `backup_bytes_hold_no_plaintext`.
+    let bytes = fs::read(&backup).unwrap();
+    for canary in [SECRET_CANARY, USER_CANARY, "Main account", "builtin-main"] {
+        assert!(!contains(&bytes, canary), "{canary}");
+    }
+    drop(v);
+
+    // Upgraded now: opening it again makes no second copy.
+    drop(open_upgrading(&dir, &backups).unwrap());
+    assert_eq!(entries(&backups.dir).len(), 1);
+
+    // The way back: the backup restores to a new folder, at the old schema
+    // with the old data, and the build that made it opens it as it is.
+    let restored = restore_backup(
+        &RestoreOptions {
+            backup,
+            parent_dir: tmp.path().join("restored"),
+            name: "Before upgrade".into(),
+        },
+        &pw(PASSWORD),
+        &SystemClock,
+    )
+    .unwrap();
+    let r = open_vault(&restored, &pw(PASSWORD), None).unwrap();
+    assert_eq!(migrate::current_version(r.conn()).unwrap(), old_version);
+    assert!(!has_probe_table(&r));
+    assert_eq!(count(&r, "account"), accounts);
+    assert_eq!(canary_secret(&r), SECRET_CANARY.as_bytes());
+}
+
+#[test]
+fn a_demo_vault_is_backed_up_before_an_upgrade_too() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = locked_vault(tmp.path(), true);
+    let backups = upgrade_backups(tmp.path());
+    let v = open_upgrading(&dir, &backups).unwrap();
+    assert!(v.info().demo);
+    assert_eq!(entries(&backups.dir).len(), 1);
+}
+
+#[test]
+fn new_and_up_to_date_vaults_are_not_backed_up() {
+    let tmp = tempfile::tempdir().unwrap();
+    let backups = upgrade_backups(tmp.path());
+    let session = SessionManager::new(std::sync::Arc::new(SystemClock), Some(backups.clone()));
+    let info = session
+        .create(
+            &CreateOptions {
+                parent_dir: tmp.path().to_path_buf(),
+                name: "Main".into(),
+                kdf: KdfParams::MINIMUM,
+                demo: false,
+            },
+            &pw(PASSWORD),
+        )
+        .unwrap();
+    assert!(session.lock());
+    session
+        .unlock(Path::new(&info.path), &pw(PASSWORD))
+        .unwrap();
+    assert!(session.lock());
+    assert!(!backups.dir.exists());
+}
+
+#[test]
+fn an_unwritable_backup_folder_leaves_the_vault_as_it_was() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = locked_vault(tmp.path(), false);
+    let backups = upgrade_backups(tmp.path());
+    // A file where the folder should be: nothing can be written into it.
+    fs::create_dir_all(backups.dir.parent().unwrap()).unwrap();
+    fs::write(&backups.dir, b"not a folder").unwrap();
+    let db_before = fs::read(dir.join(DB_FILE)).unwrap();
+    let header_before = fs::read(dir.join(HEADER_FILE)).unwrap();
+
+    let err = open_upgrading(&dir, &backups).unwrap_err();
+    assert_eq!(
+        err,
+        VaultError::UpgradeBackup(UpgradeBackupFailure::NotWritable)
+    );
+    let app = AppError::from(err);
+    assert_eq!(app.code(), ErrorCode::UpgradeBackupFailed);
+    assert!(app.user_message().contains("safety copy"));
+    assert!(app.user_message().contains("can't be written to"));
+
+    assert_eq!(fs::read(dir.join(DB_FILE)).unwrap(), db_before);
+    assert_eq!(fs::read(dir.join(HEADER_FILE)).unwrap(), header_before);
+    drop(VaultLock::acquire(&dir.join(LOCK_FILE)).expect("the .lock is released"));
+    let v = open_vault(&dir, &pw(PASSWORD), None).unwrap();
+    assert_eq!(
+        migrate::current_version(v.conn()).unwrap(),
+        migrate::latest_version()
+    );
+    assert!(!has_probe_table(&v));
+    drop(v);
+
+    // No app-data folder at all: the same, and still nothing changes.
+    assert_eq!(
+        open_vault_with_extra_migrations(&dir, &pw(PASSWORD), None, &[NEXT_MIGRATION]).err(),
+        Some(VaultError::UpgradeBackup(UpgradeBackupFailure::NotWritable))
+    );
+    assert_eq!(fs::read(dir.join(DB_FILE)).unwrap(), db_before);
 }
