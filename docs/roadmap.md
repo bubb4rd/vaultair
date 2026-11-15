@@ -98,7 +98,7 @@ flowchart LR
 Work in this order: the safety net, then passkeys.
 
 1. **Done:** #34 (backup links open Settings at Backups), #35 (the duplicate Review health tile removed) and #40 (option B, no schema change), in `a266a01`.
-2. **Automatic backup before a schema migration** ([#43](https://github.com/bubb4rd/vaultair/issues/43), plan §2.4, checklist box 1). Ships in the same build as V9 or earlier, never later: beta vaults are real vaults.
+2. **Automatic backup before a schema migration** ([#43](https://github.com/bubb4rd/vaultair/issues/43), plan §2.4, checklist box 1): built, in #46. Ships in the same build as V9 or earlier, never later: beta vaults are real vaults.
 3. **Golden fixtures per schema version**: the V8 vault and backup written by v0.1.0 are committed (#41) and kept as they are; a fixture is added for each new migration, and a test opens each.
 4. **E2E smoke test in CI**: built (`e2e/`, `release.md` "E2E smoke test"). `tauri-driver` with WebdriverIO on Windows drives `release.md` step 5 on the release build, in the release workflow before the draft is created.
 5. **Install on a clean PC** without WebView2, and **restore a backup on a second PC**, both recorded.
