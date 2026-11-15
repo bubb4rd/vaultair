@@ -12,6 +12,7 @@ on:
     paths:
       - .github/workflows/release.yml
       - scripts/check-release-version.mjs
+      - e2e/**
   workflow_dispatch:
 
 permissions:
@@ -77,11 +78,83 @@ jobs:
           # The installer is already compressed.
           compression-level: 0
           retention-days: 14
+      # The exact binary the installer carries, for the smoke test job.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-binary
+          path: target/release/vaultair.exe
+          if-no-files-found: error
+          retention-days: 3
+
+  # The smoke path of docs/release.md step 5, on the binary the installer was built
+  # from. Its own job, so the test tooling never runs where the installer is made;
+  # publish needs it, so a failure means no draft.
+  e2e:
+    name: E2E smoke test
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v8
+        with:
+          name: app-binary
+          path: ${{ runner.temp }}\app
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --version 2.1.0 --locked
+      - name: msedgedriver for this runner's WebView2
+        shell: pwsh
+        run: |
+          $key = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $version = (Get-ItemProperty "HKLM:\$key" -ErrorAction SilentlyContinue).pv
+          if (-not $version) { Write-Error "No WebView2 runtime found."; exit 1 }
+          $dir = Join-Path $env:RUNNER_TEMP msedgedriver
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile "$dir.zip"
+          Expand-Archive "$dir.zip" -DestinationPath $dir
+          & "$dir\msedgedriver.exe" --version
+          "MSEDGEDRIVER=$dir\msedgedriver.exe" >> $env:GITHUB_ENV
+      # The runner is elevated, and WebView2 150+ ignores msedgedriver's
+      # --remote-debugging-port for an elevated app (tauri-apps/wry#1782), so the
+      # test runs at medium integrity through gsudo, pinned by version and SHA-256.
+      - name: gsudo, to run the test unelevated
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP gsudo.zip
+          Invoke-WebRequest https://github.com/gerardog/gsudo/releases/download/v2.6.1/gsudo.portable.zip -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($hash -ne '21130BF178D7B9891207F00BFF56F05B6B363CE9CEC7B2D084E45FB12EE51F44') { Write-Error "gsudo.portable.zip hash $hash"; exit 1 }
+          $dir = Join-Path $env:RUNNER_TEMP gsudo
+          Expand-Archive $zip -DestinationPath $dir
+          "$dir\x64" >> $env:GITHUB_PATH
+          # A medium-integrity process needs write access here to make the scratch folder.
+          icacls $env:RUNNER_TEMP /grant "*S-1-5-32-545:(OI)(CI)M" | Out-Null
+      - run: npm ci
+        working-directory: e2e
+      - name: E2E smoke test
+        working-directory: e2e
+        shell: pwsh
+        env:
+          VAULTAIR_APP: ${{ runner.temp }}\app\vaultair.exe
+          VAULTAIR_E2E_HOME: ${{ runner.temp }}\vaultair-e2e
+        run: gsudo --integrity Medium npm test
+      # App logs hold no secrets (docs/local-data-storage.md); the scratch vault is not uploaded.
+      - name: App logs from the smoke test
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-app-logs
+          path: ${{ runner.temp }}\vaultair-e2e\Vaultair\logs
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Kept apart from the build so that nothing which runs dependency code holds a write token.
   publish:
     name: Draft pre-release
-    needs: build
+    needs: [build, e2e]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:

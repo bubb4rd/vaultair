@@ -31,8 +31,8 @@ There is no updater (ADR-0004, decision 15). Testers get a new build by download
    git push origin v0.1.1
    ```
 
-4. **Wait for the Release workflow** (`.github/workflows/release.yml`). It refuses a tag that doesn't match the version or isn't on `main`, runs the release-config check, builds with `npx tauri build -- --locked` from the lockfiles with no build cache, and creates a draft pre-release holding `Vaultair_<version>_x64-setup.exe` and `SHA256SUMS.txt`.
-5. **Try the installer from the draft.** Download it, compare its SHA-256 with `SHA256SUMS.txt`, install it, and go through the smoke path by hand: create a vault, add an account, copy a password, lock, unlock, make a backup. Install over the previous version at least once, and check that an existing vault still opens.
+4. **Wait for the Release workflow** (`.github/workflows/release.yml`). It refuses a tag that doesn't match the version or isn't on `main`, runs the release-config check, builds with `npx tauri build -- --locked` from the lockfiles with no build cache, runs the E2E smoke test on the binary it just built (see "E2E smoke test" below), and creates a draft pre-release holding `Vaultair_<version>_x64-setup.exe` and `SHA256SUMS.txt`. If the smoke test fails, no draft is made.
+5. **Try the installer from the draft.** Download it, compare its SHA-256 with `SHA256SUMS.txt`, and install it. The workflow has driven the smoke path (create a vault, add an account, copy a password, lock, unlock, make a backup) on the same build; by hand, open the installed app once, and install over the previous version at least once to check that an existing vault still opens.
 6. **Publish the draft.** Edit the generated notes first: say what changed, and keep the SHA-256 and the link to the install steps. Leave **Set as a pre-release** ticked.
 7. **Tell testers.** Send the release link with the three things they need to know:
    - Windows SmartScreen will say "Windows protected your PC", because the installer isn't signed yet. **More info**, then **Run anyway**.
@@ -68,6 +68,32 @@ Put the SHA-256 in the notes. In PowerShell a bare `--` is swallowed before `npx
 
 The first build fetches Microsoft's WebView2 runtime installer onto the build machine, because the installer carries it (`webviewInstallMode: offlineInstaller`). That is a download on the build machine only.
 
+## E2E smoke test
+
+`e2e/` drives the smoke path of step 5 through the real app: `tauri-driver` with WebdriverIO, and Microsoft's `msedgedriver` for WebView2. The release workflow runs it in its own job, on the same `vaultair.exe` the installer carries, and the draft waits for it, so a release whose smoke path fails never reaches a draft. A pull request that changes `e2e/` or the workflow runs it as part of the dry run.
+
+- It runs the app with `LOCALAPPDATA` pointed at a scratch folder (`VAULTAIR_E2E_HOME`, or a new temp folder), so it never sees a real vault, config or Windows Hello slot, and checks that the vault was created there.
+- Every step goes through the UI except one: the backup folder is set with the `backup_set_destination` command that **Choose a folder** calls, because WebDriver can't reach the native folder picker.
+- Copying reads the clipboard with PowerShell, then **Clear now** must empty it.
+- On a failure the workflow uploads the app's logs from the scratch folder (no secrets or paths, see `local-data-storage.md`); the scratch vault itself is not uploaded.
+- **Run it unelevated.** WebView2 150 and later ignores msedgedriver's `--remote-debugging-port` when the app runs as administrator ([tauri-apps/wry#1782](https://github.com/tauri-apps/wry/issues/1782)), and the session fails with "DevToolsActivePort file doesn't exist". GitHub's Windows runners are elevated, so the workflow runs the test at medium integrity through `gsudo`, pinned by version and SHA-256. The app is not changed for this: the port exists only when msedgedriver launches it.
+
+To run it on your PC: close Vaultair first (it is single-instance, and the test's launch would hand off to the running copy), then
+
+```powershell
+cargo install tauri-driver --version 2.1.0 --locked
+# msedgedriver must match the WebView2 runtime exactly; the version is the `pv` value under
+# HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}.
+# Download https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip and unzip it.
+$env:MSEDGEDRIVER = "C:\path\to\msedgedriver.exe"
+npx tauri build --no-bundle
+cd e2e
+npm ci
+npm test
+```
+
+`VAULTAIR_APP` points the test at another build of `vaultair.exe` (by default `target/release/vaultair.exe`), and `TAURI_DRIVER` at another `tauri-driver`.
+
 ## Not done yet
 
 ### Code signing
@@ -86,10 +112,6 @@ What it needs and how it fits:
 - Afterwards, take `--prerelease` out of `release.yml`, and update the README's Install section, `SECURITY.md` ("Official builds") and the Phase 16 notes (internal, not in this repository).
 
 A signature names the publisher. SmartScreen's warning is tied to reputation as well, so it may not disappear with the first signed build.
-
-### E2E smoke test in CI
-
-The plan (Phase 16) calls for `tauri-driver` with WebdriverIO on Windows, driving the path in step 5. It doesn't exist yet, so step 5 is done by hand for every release. When it exists it should run against the release build before the draft is created.
 
 ### Install test on a clean PC
 

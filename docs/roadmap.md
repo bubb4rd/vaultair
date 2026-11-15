@@ -6,9 +6,9 @@
 
 - **v0.1.0** is published as an unsigned pre-release for the private beta (`docs/release.md`). There is no updater (ADR-0004 decision 15), so every build reaches testers by hand.
 - **ADR-0007** (browser fill and save) is Proposed. Its security review on 2026-10-09 found 22 issues, SR1–SR22; the ADR's design text and the threat model resolve all of them, and none of it is built. Acceptance waits on the checklist gates, not on the review.
-- **Open issues:** [#43](https://github.com/bubb4rd/vaultair/issues/43) (p1, automatic backup before a schema migration, in progress) and [#42](https://github.com/bubb4rd/vaultair/issues/42) (p1, code signing with Azure Artifact Signing, waiting on the Azure setup).
-- **Done since this file was first drafted:** #34 and #35 (backup deep links, one quick action fewer) and #40 (option B, an account-growth chart; see "Decided"), all in `a266a01`; #41, the golden vault and backup written by v0.1.0.
-- **Not done yet, and needed before anything in `future-extension-sync-checklist.md` starts:** the automatic backup before a schema migration (#43, built and tested, not yet merged or released), the end-to-end smoke test in CI (`release.md`), a recorded install on a PC without WebView2, and a recorded restore on a second PC.
+- **Open issues:** [#42](https://github.com/bubb4rd/vaultair/issues/42) (p1, code signing with Azure Artifact Signing, waiting on the Azure setup).
+- **Done since this file was first drafted:** #34 and #35 (backup deep links, one quick action fewer) and #40 (option B, an account-growth chart; see "Decided"), all in `a266a01`; #41, the golden vault and backup written by v0.1.0; #43, the automatic backup before a schema migration (#46, not yet released); the end-to-end smoke test in the release workflow (`release.md`, "E2E smoke test").
+- **Not done yet, and needed before anything in `future-extension-sync-checklist.md` starts:** a release that carries the backup before a migration, a recorded install on a PC without WebView2, and a recorded restore on a second PC.
 - **Schema:** V1–V8 migrations. Golden fixtures (`vault-format.md` §10): `tests-fixtures/v1/Golden` (schema V1) and `tests-fixtures/v1/v0.1.0` (schema V8, with a backup), both append-only.
 
 ## Decided (2026-10-09, project owner)
@@ -98,9 +98,9 @@ flowchart LR
 Work in this order: the safety net, then passkeys.
 
 1. **Done:** #34 (backup links open Settings at Backups), #35 (the duplicate Review health tile removed) and #40 (option B, no schema change), in `a266a01`.
-2. **Automatic backup before a schema migration** ([#43](https://github.com/bubb4rd/vaultair/issues/43), plan §2.4, checklist box 1). Ships in the same build as V9 or earlier, never later: beta vaults are real vaults.
+2. **Automatic backup before a schema migration** ([#43](https://github.com/bubb4rd/vaultair/issues/43), plan §2.4, checklist box 1): built, in #46. Ships in the same build as V9 or earlier, never later: beta vaults are real vaults.
 3. **Golden fixtures per schema version**: the V8 vault and backup written by v0.1.0 are committed (#41) and kept as they are; a fixture is added for each new migration, and a test opens each.
-4. **E2E smoke test in CI**: `tauri-driver` with WebdriverIO on Windows, driving `release.md` step 5, run against the release build before the draft is created.
+4. **E2E smoke test in CI**: built (`e2e/`, `release.md` "E2E smoke test"). `tauri-driver` with WebdriverIO on Windows drives `release.md` step 5 on the release build, in the release workflow before the draft is created.
 5. **Install on a clean PC** without WebView2, and **restore a backup on a second PC**, both recorded.
 6. **Passkey spike, ADR and threat-model section**, then **code signing** ([#42](https://github.com/bubb4rd/vaultair/issues/42)), then **passkeys** (see "Passkeys"). The Azure subscription and Public Trust identity validation that #42 needs are the owner's to set up, and can start now.
 7. **Updates ADR**: records option E and the bundling decision, and supersedes ADR-0004 decision 15.
