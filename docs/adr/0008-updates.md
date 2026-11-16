@@ -1,9 +1,9 @@
 # ADR-0008: Updates through a separate updater program
 
-- **Status:** Proposed. Nothing here is built. Building it is Phase 19 work (`roadmap.md`), after code signing ([#42](https://github.com/bubb4rd/vaultair/issues/42)), which the updater depends on.
+- **Status:** Accepted (2026-11-16). Nothing here is built. Building it is Phase 19 work (`roadmap.md`), after code signing ([#42](https://github.com/bubb4rd/vaultair/issues/42)), which the updater depends on.
 - **Date:** 2026-11-16
-- **Supersedes, once accepted:** ADR-0004 decision 15, "Auto-updates: None in the MVP". The rest of decision 15's note stays: the installer still carries the WebView2 runtime (`offlineInstaller`) and downloads nothing.
-- **Decided by:** project owner (2026-10-09): option E and the bundling, recorded in `roadmap.md` ("Updates"). The answers under "Decision" items 3–9 are proposed here and wait on the owner's acceptance.
+- **Supersedes:** ADR-0004 decision 15, "Auto-updates: None in the MVP". The rest of decision 15's note stays: the installer still carries the WebView2 runtime (`offlineInstaller`) and downloads nothing.
+- **Decided by:** project owner. Option E and the bundling on 2026-10-09 (`roadmap.md`, "Updates"); on 2026-11-16, two signatures (item 4), strictly higher versions (5), the updater asks you to lock and quit (6), never touching a vault (7), off by default (8), and the server seeing only the IP address and the time (9).
 
 ## Context
 
