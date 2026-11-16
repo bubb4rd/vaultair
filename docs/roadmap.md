@@ -103,7 +103,7 @@ Work in this order: the safety net, then passkeys.
 4. **E2E smoke test in CI**: built (`e2e/`, `release.md` "E2E smoke test"). `tauri-driver` with WebdriverIO on Windows drives `release.md` step 5 on the release build, in the release workflow before the draft is created.
 5. **Install on a clean PC** without WebView2, and **restore a backup on a second PC**, both recorded.
 6. **Passkey spike, ADR and threat-model section**, then **code signing** ([#42](https://github.com/bubb4rd/vaultair/issues/42)), then **passkeys** (see "Passkeys"). The Azure subscription and Public Trust identity validation that #42 needs are the owner's to set up, and can start now.
-7. **Updates ADR**: records option E and the bundling decision, and supersedes ADR-0004 decision 15.
+7. **Updates ADR**: drafted as [ADR-0008](adr/0008-updates.md), Proposed. It records option E and the bundling decision, answers the questions under "Updates" below, and supersedes ADR-0004 decision 15 once accepted.
 8. The manual checks `security-assumptions.md` lists as not automated: hand-copy backstop in a real WebView2 window, clipboard exclusion formats, real Windows Hello.
 
 **Done when:** a pre-release carries V9 (passkeys) with the pre-migration backup; gate 1's boxes are ticked with evidence; the passkeys and updates ADRs are Accepted; a passkey made on a test site with Vaultair signs in again after a lock and unlock; and the same vault opened on Windows 10 keeps its passkeys and shows the toast and warnings.
@@ -273,11 +273,4 @@ What that means in the repository:
 - **Shipped with the app** through Tauri's `bundle.externalBin`, and started from Rust with `std::process::Command`. `tauri-plugin-shell` stays banned. `scripts/check-release-config.mjs` checks that the updater is the only external binary.
 - **The installer updates both.** The updater starts the new installer and exits, so it never has to replace itself while running. Uninstalling removes both.
 
-The ADR still has to answer:
-
-- **Signing key.** An update key separate from the Authenticode certificate, kept offline, and what happens if either leaks. The updater checks both.
-- **Downgrades.** Refuse a lower version, so an old vulnerable build can't be pushed.
-- **A running app.** The installer can't replace `vaultair.exe` while it's open; the app locks and closes first, or the installer waits.
-- **Vault compatibility.** A newer build migrates the vault; going back means restoring the pre-migration backup, since older builds refuse a newer vault as "too new".
-- **What the server sees.** The user's IP address, the time and the current version. The privacy statement says so.
-- **Opt-in and frequency.** Asked once, off by default; checks on request or on a schedule the user picks; never a silent install.
+[ADR-0008](adr/0008-updates.md) (Proposed) answers what this section left open: two signatures (an offline Ed25519 key for the manifest, Authenticode for the installer) and what a leak of either means; no lower or equal version; the updater never closes the app; vaults stay the app's business, with the pre-migration backup as the way back; the request carries no version, so the server sees the IP address and the time; off by default, asked once, checks on click or when Vaultair starts, never silent. Two answers are narrower than this section first said: no version is sent, and there is no free schedule, because one needs something that starts by itself.

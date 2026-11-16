@@ -145,7 +145,7 @@ CI runs formatting, Clippy, tests, dependency checks, and license checks. It als
 | [Logo pipeline](docs/logo-pipeline.md) | How platform and game logos are sourced and approved |
 | [Before sync or extensions](docs/future-extension-sync-checklist.md) | What must be true before any network or extension feature starts |
 | [Roadmap](docs/roadmap.md) | Phases after the MVP; a draft |
-| [Decision records](docs/adr/) | Architecture and scope decisions (ADR-0001 to ADR-0007) |
+| [Decision records](docs/adr/) | Architecture and scope decisions (ADR-0001 to ADR-0008) |
 | [Releasing](docs/release.md) | Version bumps, tags, the installer build, and code signing plans |
 | [Security policy](SECURITY.md) | How to report vulnerabilities |
 
