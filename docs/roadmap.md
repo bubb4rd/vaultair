@@ -4,11 +4,11 @@
 
 ## Where things stand
 
-- **v0.1.0** is published as an unsigned pre-release for the private beta (`docs/release.md`). There is no updater (ADR-0004 decision 15), so every build reaches testers by hand.
+- **v0.1.1** is published (2026-11-16) as an unsigned pre-release for the private beta (`docs/release.md`), after v0.1.0. It is the first release whose draft waited on the E2E smoke test. There is no updater (ADR-0004 decision 15), so every build reaches testers by hand.
 - **ADR-0007** (browser fill and save) is Proposed. Its security review on 2026-10-09 found 22 issues, SR1–SR22; the ADR's design text and the threat model resolve all of them, and none of it is built. Acceptance waits on the checklist gates, not on the review.
 - **Open issues:** [#42](https://github.com/bubb4rd/vaultair/issues/42) (p1, code signing with Azure Artifact Signing, waiting on the Azure setup).
-- **Done since this file was first drafted:** #34 and #35 (backup deep links, one quick action fewer) and #40 (option B, an account-growth chart; see "Decided"), all in `a266a01`; #41, the golden vault and backup written by v0.1.0; #43, the automatic backup before a schema migration (#46, not yet released); the end-to-end smoke test in the release workflow (`release.md`, "E2E smoke test").
-- **Not done yet, and needed before anything in `future-extension-sync-checklist.md` starts:** a release that carries the backup before a migration, a recorded install on a PC without WebView2, and a recorded restore on a second PC.
+- **Done since this file was first drafted:** #34 and #35 (backup deep links, one quick action fewer) and #40 (option B, an account-growth chart; see "Decided"), all in `a266a01`; #41, the golden vault and backup written by v0.1.0; #43, the automatic backup before a schema migration (#46, released in v0.1.1); the end-to-end smoke test in the release workflow (`release.md`, "E2E smoke test").
+- **Not done yet, and needed before anything in `future-extension-sync-checklist.md` starts:** a recorded install on a PC without WebView2, and a recorded restore on a second PC.
 - **Schema:** V1–V8 migrations. Golden fixtures (`vault-format.md` §10): `tests-fixtures/v1/Golden` (schema V1) and `tests-fixtures/v1/v0.1.0` (schema V8, with a backup), both append-only.
 
 ## Decided (2026-10-09, project owner)
